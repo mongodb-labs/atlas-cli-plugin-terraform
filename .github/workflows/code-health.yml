@@ -8,12 +8,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  code-health: # required PR check
-    needs: [build, lint, shellcheck]
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-      - run: echo "job must have some step"
   build:
     runs-on: ubuntu-latest
     permissions: {}
@@ -44,11 +38,6 @@ jobs:
           make tools
           echo "::add-matcher::.github/actionlint-matcher.json"
           actionlint -color
-        shell: bash  
-  shellcheck:
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Run ShellCheck
+        shell: bash
+      - name: shellcheck
         uses: bewuethr/shellcheck-action@d01912909579c4b1a335828b8fca197fbb8e0aa4
