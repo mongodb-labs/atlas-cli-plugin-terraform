@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  code-health:
+  code-health: # required PR check
     needs: [build, lint, shellcheck]
     runs-on: ubuntu-latest
     permissions: {}
@@ -38,7 +38,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@971e284b6050e8a5849b72094c50ab08da042db8
         with:
-          version: v1.62.2 # Also update GOLANGCI_VERSION variable in GNUmakefile when updating this version
+          version: v1.63.4 # Also update GOLANGCI_VERSION variable in GNUmakefile when updating this version
       - name: actionlint
         run: |
           make tools
