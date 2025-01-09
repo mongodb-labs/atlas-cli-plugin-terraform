@@ -10,8 +10,8 @@ build:
 	go build -o $(CLI_DESTINATION) $(CLI_SOURCE_FILES)
 
 .PHONY: tools
-tools:  ## Install dev tools
-	@echo "==> Installing dependencies..."
+tools:
+	@echo "==> Installing dev tools..."
 	go telemetry off # disable sending telemetry data, more info: https://go.dev/doc/telemetry
 	go install github.com/rhysd/actionlint/cmd/actionlint@latest
 	go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
