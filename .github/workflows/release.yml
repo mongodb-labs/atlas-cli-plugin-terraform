@@ -1,0 +1,11 @@
+name: 'New Release'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: echo "Placeholder for release GHA"
