@@ -1,0 +1,10 @@
+version: 1
+labels:
+  - label: "breaking-change"
+    title: "!"
+  - label: "enhancement"
+    title: "feat:*"
+  - label: "enhancement"
+    title: "feature:*"
+  - label: "bug"
+    title: "fix:*"
