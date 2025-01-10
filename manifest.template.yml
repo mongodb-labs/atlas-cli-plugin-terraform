@@ -1,0 +1,12 @@
+name: atlas-cli-plugin-terraform
+description: Utilities for Terraform's MongoDB Atlas Provider
+version: $VERSION
+github:
+    owner: $GITHUB_REPOSITORY_OWNER
+    name: $GITHUB_REPOSITORY_NAME
+binary: $BINARY
+commands:
+    terraform:
+        description: Utilities for Terraform's MongoDB Atlas Provider
+    tf:
+        description: Alias for the terraform command
