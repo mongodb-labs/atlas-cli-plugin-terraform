@@ -1,3 +1,3 @@
-# Contributing to Atlas CLI plugin for MongoDB Atlas Provider
+# Contributing to the Atlas CLI plugin for Terraform's MongoDB Atlas Provider
 
 WIP

@@ -1,8 +1,8 @@
-# Atlas CLI plugin for MongoDB Atlas Provider
+# Atlas CLI plugin for Terraform's MongoDB Atlas Provider
 
 [![Code Health](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/actions/workflows/code-health.yml/badge.svg)](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/actions/workflows/code-health.yml)
 
-This repository contains the Atlas CLI plugin for MongoDB Atlas Provider. 
+This repository contains the Atlas CLI plugin for Terraform's MongoDB Atlas Provider.
 
 WIP
 
