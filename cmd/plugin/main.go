@@ -12,6 +12,7 @@ func main() {
 	terraformCmd := &cobra.Command{
 		Use:   "terraform",
 		Short: "Root command of the Atlas CLI plugin for MongoDB Atlas Provider",
+		Aliases:            []string{"tf"},
 	}
 
 	terraformCmd.AddCommand(
@@ -25,7 +26,6 @@ func main() {
 		HiddenDefaultCmd:    true,
 	}
 	rootCmd := &cobra.Command{
-		Aliases:            []string{"tf"},
 		DisableFlagParsing: true,
 		DisableAutoGenTag:  true,
 		DisableSuggestions: true,
