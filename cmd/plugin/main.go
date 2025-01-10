@@ -10,9 +10,9 @@ import (
 
 func main() {
 	terraformCmd := &cobra.Command{
-		Use:   "terraform",
-		Short: "Root command of the Atlas CLI plugin for Terraform's MongoDB Atlas Provider",
-		Aliases:            []string{"tf"},
+		Use:     "terraform",
+		Short:   "Root command of the Atlas CLI plugin for Terraform's MongoDB Atlas Provider",
+		Aliases: []string{"tf"},
 	}
 
 	terraformCmd.AddCommand(
