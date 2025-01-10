@@ -8,7 +8,7 @@ WIP
 
 ## Installing
 
-Install the [Atlas CLI](https://github.com/mongodb/mongodb-atlas-cli) if you don't have done it yet.
+Install the [Atlas CLI](https://github.com/mongodb/mongodb-atlas-cli) if you haven't done it yet.
 
 Install the plugin by running:
 ```bash
