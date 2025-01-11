@@ -22,10 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    steps:
+    steps: 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - run: echo "WIP - Placeholder for create tag"
-      
+      - name: Create release tag
+        uses: rickstaa/action-create-tag@a1c7777fcb2fee4f19b0f283ba888afa11678b72
+        with:
+          tag: ${{ inputs.version_number }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.PASSPHRASE }}
+
   release:
     needs: create-tag
     runs-on: ubuntu-latest
@@ -33,9 +38,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a
         with:
-          go-version-file: 'go.mod'
+            ref: ${{ inputs.version_number }}
       - name: Generate manifest files
         env:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -43,4 +47,8 @@ jobs:
           VERSION: ${{ inputs.version_number }}
         run: make generate-all-manifests
       - name: Run GoReleaser
-        run: echo "WIP - Placeholder for release"
+        uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf
+        with:
+          args: release --clean        
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
