@@ -1,11 +1,46 @@
 name: 'New Release'
+run-name: 'Release ${{ inputs.version_number }}'
 
 on:
   workflow_dispatch:
+    inputs:
+      version_number:
+          description: 'Version number (e.g. v1.0.0, v1.0.0-pre, v1.0.0-pre1)'
+          required: true
 
 jobs:
-  release:
+
+  validate-inputs:
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-      - run: echo "WIP - Placeholder for release GHA"
+      - name: Validation of version format
+        run: echo "${{ inputs.version_number }}" | grep -P '^v\d+\.\d+\.\d+(-pre[A-Za-z0-9-]*)?$'
+
+  create-tag:
+    needs: validate-inputs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: echo "WIP - Placeholder for create tag"
+      
+  release:
+    needs: create-tag
+    runs-on: ubuntu-latest
+    permissions: 
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a
+        with:
+          go-version-file: 'go.mod'
+      - name: Generate manifest files
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          VERSION: ${{ inputs.version_number }}
+        run: make generate-all-manifests
+      - name: Run GoReleaser
+        run: echo "WIP - Placeholder for release"
