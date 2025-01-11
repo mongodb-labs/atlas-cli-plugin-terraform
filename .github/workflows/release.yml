@@ -40,6 +40,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
             ref: ${{ inputs.version_number }}
+            fetch-depth: 0
       - name: Generate manifest files
         env:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
