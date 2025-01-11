@@ -1,4 +1,4 @@
-name: pull-request-lint
+name: PR Linters
 
 # Run validations over pull request titles while also adding appropriate labels.
 on:
