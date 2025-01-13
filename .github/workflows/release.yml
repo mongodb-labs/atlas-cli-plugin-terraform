@@ -32,6 +32,8 @@ jobs:
         with:
           tag: ${{ inputs.version_number }}
           commit_sha: ${{ steps.get-sha.outputs.sha }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.PASSPHRASE }}
 
   release:
     needs: create-tag
