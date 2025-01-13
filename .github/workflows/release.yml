@@ -24,8 +24,6 @@ jobs:
       contents: write
     steps: 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: 'main'
       - name: Get the latest commit SHA
         id: get-sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"  
