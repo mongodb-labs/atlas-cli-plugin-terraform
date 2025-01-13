@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+project_name: atlas-cli-plugin-terraform
+
+version: 2
+
+builds:
+  - id: "atlas-cli-plugin-terraform"
+    main: ./cmd/plugin/main.go
+    binary: ./binary
+
+archives:
+  - files:
+      - src: './bin/manifest{{ if eq .Os "windows" }}.windows{{end}}.yml'
+        dst: ./manifest.yml
+
+release:
+  prerelease: auto

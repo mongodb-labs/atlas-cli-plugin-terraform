@@ -1,11 +1,59 @@
 name: 'New Release'
+run-name: 'Release ${{ inputs.version_number }}'
 
 on:
   workflow_dispatch:
+    inputs:
+      version_number:
+          description: 'Version number (e.g. v1.0.0, v1.0.0-pre, v1.0.0-pre1)'
+          required: true
 
 jobs:
-  release:
+
+  validate-inputs:
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-      - run: echo "WIP - Placeholder for release GHA"
+      - name: Validation of version format
+        run: echo "${{ inputs.version_number }}" | grep -P '^v\d+\.\d+\.\d+(-pre[A-Za-z0-9-]*)?$'
+
+  create-tag:
+    needs: validate-inputs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps: 
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Get the latest commit SHA
+        id: get-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"  
+      - name: Create release tag
+        uses: rickstaa/action-create-tag@a1c7777fcb2fee4f19b0f283ba888afa11678b72
+        with:
+          tag: ${{ inputs.version_number }}
+          commit_sha: ${{ steps.get-sha.outputs.sha }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.PASSPHRASE }}
+
+  release:
+    needs: create-tag
+    runs-on: ubuntu-latest
+    permissions: 
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+            ref: ${{ inputs.version_number }}
+            fetch-depth: 0
+      - name: Generate manifest files
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          VERSION: ${{ inputs.version_number }}
+        run: make generate-all-manifests
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf
+        with:
+          args: release --clean        
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
