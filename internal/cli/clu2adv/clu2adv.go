@@ -1,9 +1,6 @@
-package cluster
+package clu2adv
 
 import (
-	"fmt"
-
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/file"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -28,32 +25,4 @@ func Builder() *cobra.Command {
 	_ = cmd.MarkFlagRequired("output")
 	cmd.Flags().BoolVarP(&o.overwriteOutput, "overwriteOutput", "w", false, "overwrite output file if exists")
 	return cmd
-}
-
-type opts struct {
-	fs              afero.Fs
-	file            string
-	output          string
-	overwriteOutput bool
-}
-
-func (o *opts) PreRun() error {
-	if err := file.MustExist(o.fs, o.file); err != nil {
-		return err
-	}
-	if !o.overwriteOutput {
-		return file.MustNotExist(o.fs, o.output)
-	}
-	return nil
-}
-
-func (o *opts) Run() error {
-	content, err := afero.ReadFile(o.fs, o.file)
-	if err != nil {
-		return fmt.Errorf("failed to read file %s: %w", o.file, err)
-	}
-	if err := afero.WriteFile(o.fs, o.output, content, 0o600); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", o.output, err)
-	}
-	return nil
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli/cluster"
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli/clu2adv"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,7 @@ func main() {
 	}
 
 	terraformCmd.AddCommand(
-		cluster.Builder(),
+		clu2adv.Builder(),
 	)
 
 	completionOption := &cobra.CompletionOptions{
