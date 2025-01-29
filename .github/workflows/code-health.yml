@@ -18,6 +18,8 @@ jobs:
         go-version-file: 'go.mod'
     - name: Build
       run: make build
+    - name: Unit Test
+      run: make test
   lint:
     runs-on: ubuntu-latest
     permissions: {}
