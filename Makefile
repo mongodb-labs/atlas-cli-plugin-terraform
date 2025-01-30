@@ -23,6 +23,14 @@ tools: ## Install the dev tools (dependencies)
 clean: ## Clean binary folders
 	rm -rf ./bin ./bin-plugin
 
+.PHONY: test
+test: ## Run unit tests
+	go test ./... -timeout=30s -parallel=4 -race
+
+.PHONY: test-update
+test-update: ## Run unit tests and update the golden files
+	go test ./... -timeout=30s -parallel=4 -race -update
+
 .PHONY: local
 local: clean build ## Allow to run the plugin locally
 	@echo "==> Configuring plugin locally"
