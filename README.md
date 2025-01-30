@@ -17,6 +17,19 @@ atlas plugin install github.com/mongodb-labs/atlas-cli-plugin-terraform
 
 ## Usage
 
+### Convert cluster to advanced_cluster v2
+If you want to convert a Terraform configuration from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` schema v2, use the following command:
+```bash
+atlas terraform clusterToAdvancedCluster --file in.tf --output out.tf
+```
+
+you can also use shorter alias, e.g.: 
+```bash
+atlas tf clu2adv -f in.tf -o out.tf
+```
+
+If you want to overwrite the output file if it exists, or even use the same output file as the input file, use `--overwriteOutput true` or `-w` flag.
+
 
 ## Contributing
 
