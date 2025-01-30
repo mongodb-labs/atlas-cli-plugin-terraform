@@ -14,8 +14,8 @@ const (
 	advCluster   = "mongodbatlas_advanced_cluster"
 )
 
-// ClusterToAdvancedCluster transforms all cluster definition in a
-// Terraform config file into an advanced_cluster definition.
+// ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
+// Terraform configuration file into mongodbatlas_advanced_cluster schema v2 definitions.
 // All other resources and data sources are left untouched.
 // TODO: at the moment it just changes the resource type.
 func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
