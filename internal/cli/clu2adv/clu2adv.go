@@ -8,9 +8,9 @@ import (
 func Builder() *cobra.Command {
 	o := &opts{fs: afero.NewOsFs()}
 	cmd := &cobra.Command{
-		Use:     "cluster_to_advanced",
-		Short:   "Upgrade cluster to advanced_cluster",
-		Long:    "Upgrade Terraform config from mongodbatlas_cluster to mongodbatlas_advanced_cluster",
+		Use:     "clusterToAdvancedCluster",
+		Short:   "Convert cluster to advanced_cluster",
+		Long:    "Convert a Terraform configuration from mongodbatlas_cluster to mongodbatlas_advanced_cluster",
 		Aliases: []string{"clu2adv"},
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return o.PreRun()
