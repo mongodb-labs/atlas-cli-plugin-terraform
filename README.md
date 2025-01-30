@@ -23,7 +23,7 @@ If you want to convert a Terraform configuration from `mongodbatlas_cluster` to 
 atlas terraform clusterToAdvancedCluster --file in.tf --output out.tf
 ```
 
-you can also use shorter alias, e.g.: 
+you can also use shorter aliases, e.g.: 
 ```bash
 atlas tf clu2adv -f in.tf -o out.tf
 ```
