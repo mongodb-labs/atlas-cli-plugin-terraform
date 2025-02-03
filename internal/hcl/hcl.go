@@ -62,8 +62,8 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	return parser.Bytes(), nil
 }
 
-func isFreeTier(resourceBody *hclwrite.Body) bool {
-	return resourceBody.FirstMatchingBlock(strReplicationSpecs, nil) == nil
+func isFreeTier(body *hclwrite.Body) bool {
+	return body.FirstMatchingBlock(strReplicationSpecs, nil) == nil
 }
 
 func fillFreeTier(body *hclwrite.Body) error {
