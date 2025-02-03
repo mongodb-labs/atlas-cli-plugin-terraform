@@ -100,13 +100,6 @@ func moveAttribute(fromAttrName, toAttrName string, fromBody, toBody *hclwrite.B
 	return nil
 }
 
-func setAttrExpr(body *hclwrite.Body, attrName, expression string) {
-	tokens := hclwrite.Tokens{
-		{Type: hclsyntax.TokenIdent, Bytes: []byte(expression)},
-	}
-	body.SetAttributeRaw(attrName, tokens)
-}
-
 func setAttrInt(body *hclwrite.Body, attrName string, number int) {
 	tokens := hclwrite.Tokens{
 		{Type: hclsyntax.TokenNumberLit, Bytes: []byte(strconv.Itoa(number))},
