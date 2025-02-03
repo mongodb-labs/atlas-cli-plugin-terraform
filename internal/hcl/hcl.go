@@ -23,14 +23,17 @@ const (
 	strBackingProviderName      = "backing_provider_name"
 	strProviderInstanceSizeName = "provider_instance_size_name"
 	strInstanceSize             = "instance_size"
+	strClusterType              = "cluster_type"
+	strPriority                 = "priority"
 
-	errFreeCluster = "free cluster (as doesn't contain " + strReplicationSpecs + ")"
+	errFreeCluster = "free cluster (because no " + strReplicationSpecs + ")"
 )
 
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
 // Terraform configuration file into mongodbatlas_advanced_cluster schema v2 definitions.
 // All other resources and data sources are left untouched.
-// TODO: at the moment it just changes the resource type.
+// Note: hclwrite.Tokens are used instead of cty.Value so expressions like var.region can be preserved.
+// cty.Value only supports resolved values.
 func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	parser, err := getParser(config)
 	if err != nil {
@@ -43,12 +46,10 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 			continue
 		}
 		resourceBody := resource.Body()
-
-		// TODO: Do the full transformation
 		labels[0] = advCluster
 		resource.SetLabels(labels)
 
-		if resourceBody.FirstMatchingBlock(strReplicationSpecs, nil) == nil {
+		if isFreeTier(resourceBody) {
 			if err := fillFreeTier(resourceBody); err != nil {
 				return nil, err
 			}
@@ -61,32 +62,37 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	return parser.Bytes(), nil
 }
 
-func fillFreeTier(resourceBody *hclwrite.Body) error {
-	resourceBody.SetAttributeValue("cluster_type", cty.StringVal("REPLICASET"))
+func isFreeTier(resourceBody *hclwrite.Body) bool {
+	return resourceBody.FirstMatchingBlock(strReplicationSpecs, nil) == nil
+}
 
+func fillFreeTier(body *hclwrite.Body) error {
+	const (
+		valClusterType = "REPLICASET"
+		valPriority    = 7
+	)
+	body.SetAttributeValue(strClusterType, cty.StringVal(valClusterType))
 	regionConfig := hclwrite.NewEmptyFile()
 	regionConfigBody := regionConfig.Body()
-	setAttrInt(regionConfig.Body(), "priority", 7)
-	if err := moveAttribute(strProviderRegionName, strRegionName, resourceBody, regionConfigBody, errFreeCluster); err != nil {
+	setAttrInt(regionConfigBody, "priority", valPriority)
+	if err := moveAttribute(strProviderRegionName, strRegionName, body, regionConfigBody, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttribute(strProviderName, strProviderName, resourceBody, regionConfigBody, errFreeCluster); err != nil {
+	if err := moveAttribute(strProviderName, strProviderName, body, regionConfigBody, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttribute(strBackingProviderName, strBackingProviderName, resourceBody, regionConfigBody, errFreeCluster); err != nil {
+	if err := moveAttribute(strBackingProviderName, strBackingProviderName, body, regionConfigBody, errFreeCluster); err != nil {
 		return err
 	}
-
 	electableSpec := hclwrite.NewEmptyFile()
-	if err := moveAttribute(strProviderInstanceSizeName, strInstanceSize, resourceBody, electableSpec.Body(), errFreeCluster); err != nil {
+	if err := moveAttribute(strProviderInstanceSizeName, strInstanceSize, body, electableSpec.Body(), errFreeCluster); err != nil {
 		return err
 	}
-	regionConfig.Body().SetAttributeRaw(strElectableSpecs, objectTokens(electableSpec))
+	regionConfigBody.SetAttributeRaw(strElectableSpecs, tokensObject(electableSpec))
 
 	replicationSpec := hclwrite.NewEmptyFile()
-	replicationSpec.Body().SetAttributeRaw(strRegionConfigs, singleArrayTokens(regionConfig))
-
-	resourceBody.SetAttributeRaw(strReplicationSpecs, singleArrayTokens(replicationSpec))
+	replicationSpec.Body().SetAttributeRaw(strRegionConfigs, tokenArrayObject(regionConfig))
+	body.SetAttributeRaw(strReplicationSpecs, tokenArrayObject(replicationSpec))
 	return nil
 }
 
@@ -107,20 +113,17 @@ func setAttrInt(body *hclwrite.Body, attrName string, number int) {
 	body.SetAttributeRaw(attrName, tokens)
 }
 
-func singleArrayTokens(file *hclwrite.File) hclwrite.Tokens {
+func tokenArrayObject(file *hclwrite.File) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")},
-		{Type: hclsyntax.TokenOBrack, Bytes: []byte("{")},
-		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
-	ret = append(ret, file.BuildTokens(nil)...)
+	ret = append(ret, tokensObject(file)...)
 	ret = append(ret,
-		&hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("}")},
 		&hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")})
 	return ret
 }
 
-func objectTokens(file *hclwrite.File) hclwrite.Tokens {
+func tokensObject(file *hclwrite.File) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrack, Bytes: []byte("{")},
 		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
@@ -131,20 +134,17 @@ func objectTokens(file *hclwrite.File) hclwrite.Tokens {
 	return ret
 }
 
+func appendComment(body *hclwrite.Body, comment string) {
+	tokens := hclwrite.Tokens{
+		&hclwrite.Token{Type: hclsyntax.TokenComment, Bytes: []byte("# " + comment + "\n")},
+	}
+	body.AppendUnstructuredTokens(tokens)
+}
+
 func getParser(config []byte) (*hclwrite.File, error) {
 	parser, diags := hclwrite.ParseConfig(config, "", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to parse Terraform config file: %s", diags.Error())
 	}
 	return parser, nil
-}
-
-func appendComment(body *hclwrite.Body, comment string) {
-	tokens := hclwrite.Tokens{
-		&hclwrite.Token{
-			Type:  hclsyntax.TokenComment,
-			Bytes: []byte("# " + comment + "\n"),
-		},
-	}
-	body.AppendUnstructuredTokens(tokens)
 }
