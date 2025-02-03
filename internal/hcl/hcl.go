@@ -91,8 +91,8 @@ func fillFreeTier(body *hclwrite.Body) error {
 	regionConfigBody.SetAttributeRaw(strElectableSpecs, tokensObject(electableSpec))
 
 	replicationSpec := hclwrite.NewEmptyFile()
-	replicationSpec.Body().SetAttributeRaw(strRegionConfigs, tokenArrayObject(regionConfig))
-	body.SetAttributeRaw(strReplicationSpecs, tokenArrayObject(replicationSpec))
+	replicationSpec.Body().SetAttributeRaw(strRegionConfigs, tokensArrayObject(regionConfig))
+	body.SetAttributeRaw(strReplicationSpecs, tokensArrayObject(replicationSpec))
 	return nil
 }
 
@@ -113,7 +113,7 @@ func setAttrInt(body *hclwrite.Body, attrName string, number int) {
 	body.SetAttributeRaw(attrName, tokens)
 }
 
-func tokenArrayObject(file *hclwrite.File) hclwrite.Tokens {
+func tokensArrayObject(file *hclwrite.File) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")},
 	}
