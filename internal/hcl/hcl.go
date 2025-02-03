@@ -24,7 +24,7 @@ const (
 	strProviderInstanceSizeName = "provider_instance_size_name"
 	strInstanceSize             = "instance_size"
 
-	errFreeCluster = "free cluster"
+	errFreeCluster = "free cluster (as doesn't contain " + strReplicationSpecs + ")"
 )
 
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
