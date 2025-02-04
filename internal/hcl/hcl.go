@@ -11,22 +11,22 @@ import (
 )
 
 const (
-	resourceType                = "resource"
-	cluster                     = "mongodbatlas_cluster"
-	advCluster                  = "mongodbatlas_advanced_cluster"
-	strReplicationSpecs         = "replication_specs"
-	strRegionConfigs            = "region_configs"
-	strElectableSpecs           = "electable_specs"
-	strProviderRegionName       = "provider_region_name"
-	strRegionName               = "region_name"
-	strProviderName             = "provider_name"
-	strBackingProviderName      = "backing_provider_name"
-	strProviderInstanceSizeName = "provider_instance_size_name"
-	strInstanceSize             = "instance_size"
-	strClusterType              = "cluster_type"
-	strPriority                 = "priority"
+	resourceType                 = "resource"
+	cluster                      = "mongodbatlas_cluster"
+	advCluster                   = "mongodbatlas_advanced_cluster"
+	nameReplicationSpecs         = "replication_specs"
+	nameRegionConfigs            = "region_configs"
+	nameElectableSpecs           = "electable_specs"
+	nameProviderRegionName       = "provider_region_name"
+	nameRegionName               = "region_name"
+	nameProviderName             = "provider_name"
+	nameBackingProviderName      = "backing_provider_name"
+	nameProviderInstanceSizeName = "provider_instance_size_name"
+	nameInstanceSize             = "instance_size"
+	nameClusterType              = "cluster_type"
+	namePriority                 = "priority"
 
-	errFreeCluster = "free cluster (because no " + strReplicationSpecs + ")"
+	errFreeCluster = "free cluster (because no " + nameReplicationSpecs + ")"
 )
 
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
@@ -63,7 +63,7 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 }
 
 func isFreeTier(body *hclwrite.Body) bool {
-	return body.FirstMatchingBlock(strReplicationSpecs, nil) == nil
+	return body.FirstMatchingBlock(nameReplicationSpecs, nil) == nil
 }
 
 func fillFreeTier(body *hclwrite.Body) error {
@@ -71,28 +71,28 @@ func fillFreeTier(body *hclwrite.Body) error {
 		valClusterType = "REPLICASET"
 		valPriority    = 7
 	)
-	body.SetAttributeValue(strClusterType, cty.StringVal(valClusterType))
+	body.SetAttributeValue(nameClusterType, cty.StringVal(valClusterType))
 	regionConfig := hclwrite.NewEmptyFile()
 	regionConfigBody := regionConfig.Body()
 	setAttrInt(regionConfigBody, "priority", valPriority)
-	if err := moveAttribute(strProviderRegionName, strRegionName, body, regionConfigBody, errFreeCluster); err != nil {
+	if err := moveAttribute(nameProviderRegionName, nameRegionName, body, regionConfigBody, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttribute(strProviderName, strProviderName, body, regionConfigBody, errFreeCluster); err != nil {
+	if err := moveAttribute(nameProviderName, nameProviderName, body, regionConfigBody, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttribute(strBackingProviderName, strBackingProviderName, body, regionConfigBody, errFreeCluster); err != nil {
+	if err := moveAttribute(nameBackingProviderName, nameBackingProviderName, body, regionConfigBody, errFreeCluster); err != nil {
 		return err
 	}
 	electableSpec := hclwrite.NewEmptyFile()
-	if err := moveAttribute(strProviderInstanceSizeName, strInstanceSize, body, electableSpec.Body(), errFreeCluster); err != nil {
+	if err := moveAttribute(nameProviderInstanceSizeName, nameInstanceSize, body, electableSpec.Body(), errFreeCluster); err != nil {
 		return err
 	}
-	regionConfigBody.SetAttributeRaw(strElectableSpecs, tokensObject(electableSpec))
+	regionConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
 
 	replicationSpec := hclwrite.NewEmptyFile()
-	replicationSpec.Body().SetAttributeRaw(strRegionConfigs, tokensArrayObject(regionConfig))
-	body.SetAttributeRaw(strReplicationSpecs, tokensArrayObject(replicationSpec))
+	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionConfig))
+	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
 	return nil
 }
 
