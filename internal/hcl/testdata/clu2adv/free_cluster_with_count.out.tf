@@ -3,10 +3,11 @@ resource "resource1" "res1" {
 }
 
 resource "mongodbatlas_advanced_cluster" "free_cluster" { # comment in the resource
-  # comment in own line
-  count        = local.use_free_cluster ? 1 : 0
-  project_id   = var.project_id # inline comment kept
-  name         = var.cluster_name
+  # comment in own line in the beginning
+  count      = local.use_free_cluster ? 1 : 0
+  project_id = var.project_id # inline comment kept
+  name       = var.cluster_name
+  # comment in own line at the end happens before replication_specs
   cluster_type = "REPLICASET"
   replication_specs = [{
     region_configs = [{
