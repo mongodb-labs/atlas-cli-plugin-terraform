@@ -1,0 +1,4 @@
+{
+	"configuration_file_error": "failed to parse Terraform config file",
+	"free_cluster_missing_attribute": "free cluster (because no replication_specs): attribute backing_provider_name not found"
+}
