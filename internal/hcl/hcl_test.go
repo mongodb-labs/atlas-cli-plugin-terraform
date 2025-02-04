@@ -1,6 +1,7 @@
 package hcl_test
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,14 +15,20 @@ import (
 
 func TestClusterToAdvancedCluster(t *testing.T) {
 	const (
-		root      = "testdata/clu2adv"
-		inSuffix  = ".in.tf"
-		outSuffix = ".out.tf"
+		root        = "testdata/clu2adv"
+		inSuffix    = ".in.tf"
+		outSuffix   = ".out.tf"
+		errFilename = "errors.json"
 	)
+	fs := afero.NewOsFs()
+	errMap := make(map[string]string)
+	errContent, err := afero.ReadFile(fs, filepath.Join(root, errFilename))
+	require.NoError(t, err)
+	err = json.Unmarshal(errContent, &errMap)
+	require.NoError(t, err)
 	g := goldie.New(t,
 		goldie.WithFixtureDir(root),
 		goldie.WithNameSuffix(outSuffix))
-	fs := afero.NewOsFs()
 	pattern := filepath.Join(root, "*"+inSuffix)
 	inputFiles, err := afero.Glob(fs, pattern)
 	require.NoError(t, err)
@@ -31,7 +38,12 @@ func TestClusterToAdvancedCluster(t *testing.T) {
 		inConfig, err := afero.ReadFile(fs, inputFile)
 		require.NoError(t, err)
 		outConfig, err := hcl.ClusterToAdvancedCluster(inConfig)
-		require.NoError(t, err)
-		g.Assert(t, testName, outConfig)
+		if err == nil {
+			g.Assert(t, testName, outConfig)
+		} else {
+			errMsg, found := errMap[testName]
+			assert.True(t, found, "error not found for test %s", testName)
+			assert.Contains(t, err.Error(), errMsg)
+		}
 	}
 }
