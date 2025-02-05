@@ -10,34 +10,6 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-const (
-	resourceType = "resource"
-	cluster      = "mongodbatlas_cluster"
-	advCluster   = "mongodbatlas_advanced_cluster"
-
-	nameReplicationSpecs         = "replication_specs"
-	nameRegionConfigs            = "region_configs"
-	nameElectableSpecs           = "electable_specs"
-	nameProviderRegionName       = "provider_region_name"
-	nameRegionName               = "region_name"
-	nameProviderName             = "provider_name"
-	nameBackingProviderName      = "backing_provider_name"
-	nameProviderInstanceSizeName = "provider_instance_size_name"
-	nameInstanceSize             = "instance_size"
-	nameClusterType              = "cluster_type"
-	namePriority                 = "priority"
-	nameNumShards                = "num_shards"
-	nameBackupEnabled            = "backup_enabled"
-	nameCloudBackup              = "cloud_backup"
-	nameDiskSizeGB               = "disk_size_gb"
-
-	valClusterType = "REPLICASET"
-	valPriority    = 7
-
-	errFreeCluster = "free cluster (because no " + nameReplicationSpecs + ")"
-	errRepSpecs    = "setting " + nameReplicationSpecs
-)
-
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
 // Terraform configuration file into mongodbatlas_advanced_cluster schema v2 definitions.
 // All other resources and data sources are left untouched.
@@ -100,13 +72,17 @@ func fillFreeTier(body *hclwrite.Body) error {
 	return nil
 }
 
-type rootAttrs struct {
-	diskSizeGBOpt hclwrite.Tokens
-	providerName  hclwrite.Tokens
+func fillAutoScaling(regionsConfigBody *hclwrite.Body, attrs map[string]hclwrite.Tokens) {
+	file := hclwrite.NewEmptyFile()
+	fileBody := file.Body()
+	if attrs[nameAutoScalingDiskGBEnabled] != nil {
+		fileBody.SetAttributeRaw(nameDiskGBEnabled, attrs[nameAutoScalingDiskGBEnabled])
+	}
+	regionsConfigBody.SetAttributeRaw(nameAutoScaling, tokensObject(file))
 }
 
 func fillReplicationSpecs(body *hclwrite.Body) error {
-	root, err := extractRootAttrs(body, errRepSpecs)
+	rootAttrs, err := extractRootAttrs(body, errRepSpecs)
 	if err != nil {
 		return err
 	}
@@ -120,17 +96,18 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 	_ = moveAttr(body, body, nameCloudBackup, nameBackupEnabled, errRepSpecs)
 
 	electableSpec := hclwrite.NewEmptyFile()
-	if root.diskSizeGBOpt != nil {
-		electableSpec.Body().SetAttributeRaw(nameDiskSizeGB, root.diskSizeGBOpt)
+	if rootAttrs[nameDiskSizeGB] != nil {
+		electableSpec.Body().SetAttributeRaw(nameDiskSizeGB, rootAttrs[nameDiskSizeGB])
 	}
 
-	regionConfig := hclwrite.NewEmptyFile()
-	regionConfigBody := regionConfig.Body()
-	regionConfigBody.SetAttributeRaw(nameProviderName, root.providerName)
-	regionConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
+	regionsConfig := hclwrite.NewEmptyFile()
+	regionsConfigBody := regionsConfig.Body()
+	regionsConfigBody.SetAttributeRaw(nameProviderName, rootAttrs[nameProviderName])
+	fillAutoScaling(regionsConfigBody, rootAttrs)
+	regionsConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
 
 	replicationSpec := hclwrite.NewEmptyFile()
-	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionConfig))
+	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionsConfig))
 	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
 
 	body.RemoveBlock(srcReplicationSpecs)
@@ -147,16 +124,22 @@ func moveAttr(fromBody, toBody *hclwrite.Body, fromAttrName, toAttrName, errPref
 }
 
 // extractRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
-func extractRootAttrs(body *hclwrite.Body, errPrefix string) (*rootAttrs, error) {
-	diskSizeGBOpt, _ := extractAttr(body, nameDiskSizeGB, errPrefix)
-	providerName, err := extractAttr(body, nameProviderName, errPrefix)
-	if err != nil {
-		return nil, err
+func extractRootAttrs(body *hclwrite.Body, errPrefix string) (map[string]hclwrite.Tokens, error) {
+	attrs := make(map[string]hclwrite.Tokens)
+	for _, name := range rootAttrsMandatory {
+		tokens, err := extractAttr(body, name, errPrefix)
+		if err != nil {
+			return nil, err
+		}
+		attrs[name] = tokens
 	}
-	return &rootAttrs{
-		diskSizeGBOpt: diskSizeGBOpt,
-		providerName:  providerName,
-	}, nil
+	for _, name := range rootAttrsOptional {
+		tokens, _ := extractAttr(body, name, errPrefix)
+		if tokens != nil {
+			attrs[name] = tokens
+		}
+	}
+	return attrs, nil
 }
 
 // extractAttr deletes an attribute and returns it value.
@@ -212,3 +195,66 @@ func getParser(config []byte) (*hclwrite.File, error) {
 	}
 	return parser, nil
 }
+
+const (
+	resourceType = "resource"
+	cluster      = "mongodbatlas_cluster"
+	advCluster   = "mongodbatlas_advanced_cluster"
+
+	nameReplicationSpecs                          = "replication_specs"
+	nameRegionConfigs                             = "region_configs"
+	nameElectableSpecs                            = "electable_specs"
+	nameAutoScaling                               = "auto_scaling"
+	nameProviderRegionName                        = "provider_region_name"
+	nameRegionName                                = "region_name"
+	nameProviderName                              = "provider_name"
+	nameBackingProviderName                       = "backing_provider_name"
+	nameProviderInstanceSizeName                  = "provider_instance_size_name"
+	nameInstanceSize                              = "instance_size"
+	nameClusterType                               = "cluster_type"
+	namePriority                                  = "priority"
+	nameNumShards                                 = "num_shards"
+	nameBackupEnabled                             = "backup_enabled"
+	nameCloudBackup                               = "cloud_backup"
+	nameDiskSizeGB                                = "disk_size_gb"
+	nameAutoScalingDiskGBEnabled                  = "auto_scaling_disk_gb_enabled"
+	nameAutoScalingComputeEnabled                 = "auto_scaling_compute_enabled"
+	nameAutoScalingComputeScaleDownEnabled        = "auto_scaling_compute_scale_down_enabled"
+	nameProviderAutoScalingComputeMinInstanceSize = "provider_auto_scaling_compute_min_instance_size"
+	nameProviderAutoScalingComputeMaxInstanceSize = "provider_auto_scaling_compute_max_instance_size"
+	nameDiskGBEnabled                             = "disk_gb_enabled"
+	nameComputeEnabled                            = "compute_enabled"
+	nameComputeScaleDownEnabled                   = "compute_scale_down_enabled"
+	nameComputeMinInstanceSize                    = "compute_min_instance_size"
+	nameComputeMaxInstanceSize                    = "compute_max_instance_size"
+
+	valClusterType = "REPLICASET"
+	valPriority    = 7
+
+	errFreeCluster = "free cluster (because no " + nameReplicationSpecs + ")"
+	errRepSpecs    = "setting " + nameReplicationSpecs
+)
+
+var (
+	rootAttrsMandatory = []string{
+		nameProviderName,
+		nameProviderInstanceSizeName,
+	}
+
+	rootAttrsOptional = []string{
+		nameDiskSizeGB,
+		nameAutoScalingDiskGBEnabled,
+		nameAutoScalingComputeEnabled,
+		nameProviderAutoScalingComputeMinInstanceSize,
+		nameProviderAutoScalingComputeMaxInstanceSize,
+		nameAutoScalingComputeScaleDownEnabled,
+	}
+
+	mappingAutoScale = map[string]string{
+		nameAutoScalingDiskGBEnabled:                  nameDiskGBEnabled,
+		nameAutoScalingComputeEnabled:                 nameComputeEnabled,
+		nameProviderAutoScalingComputeMinInstanceSize: nameComputeMinInstanceSize,
+		nameProviderAutoScalingComputeMaxInstanceSize: nameComputeMaxInstanceSize,
+		nameAutoScalingComputeScaleDownEnabled:        nameComputeScaleDownEnabled,
+	}
+)
