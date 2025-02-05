@@ -26,11 +26,16 @@ const (
 	nameInstanceSize             = "instance_size"
 	nameClusterType              = "cluster_type"
 	namePriority                 = "priority"
+	nameNumShards                = "num_shards"
+	nameBackupEnabled            = "backup_enabled"
+	nameCloudBackup              = "cloud_backup"
+	nameDiskSizeGB               = "disk_size_gb"
 
 	valClusterType = "REPLICASET"
 	valPriority    = 7
 
 	errFreeCluster = "free cluster (because no " + nameReplicationSpecs + ")"
+	errRepSpecs    = "setting " + nameReplicationSpecs
 )
 
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
@@ -74,17 +79,17 @@ func fillFreeTier(body *hclwrite.Body) error {
 	regionConfig := hclwrite.NewEmptyFile()
 	regionConfigBody := regionConfig.Body()
 	setAttrInt(regionConfigBody, "priority", valPriority)
-	if err := moveAttribute(nameProviderRegionName, nameRegionName, body, regionConfigBody, errFreeCluster); err != nil {
+	if err := moveAttr(body, regionConfigBody, nameProviderRegionName, nameRegionName, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttribute(nameProviderName, nameProviderName, body, regionConfigBody, errFreeCluster); err != nil {
+	if err := moveAttr(body, regionConfigBody, nameProviderName, nameProviderName, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttribute(nameBackingProviderName, nameBackingProviderName, body, regionConfigBody, errFreeCluster); err != nil {
+	if err := moveAttr(body, regionConfigBody, nameBackingProviderName, nameBackingProviderName, errFreeCluster); err != nil {
 		return err
 	}
 	electableSpec := hclwrite.NewEmptyFile()
-	if err := moveAttribute(nameProviderInstanceSizeName, nameInstanceSize, body, electableSpec.Body(), errFreeCluster); err != nil {
+	if err := moveAttr(body, electableSpec.Body(), nameProviderInstanceSizeName, nameInstanceSize, errFreeCluster); err != nil {
 		return err
 	}
 	regionConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
@@ -96,17 +101,54 @@ func fillFreeTier(body *hclwrite.Body) error {
 }
 
 func fillReplicationSpecs(body *hclwrite.Body) error {
+	diskSizeGBOptional, _ := extractAttr(body, nameDiskSizeGB, errRepSpecs)
+	providerName, err := extractAttr(body, nameProviderName, errRepSpecs)
+	if err != nil {
+		return nil
+	}
+
+	srcReplicationSpecs := body.FirstMatchingBlock(nameReplicationSpecs, nil)
+	// srcRegionsConfig := srcReplicationSpecs.Body().FirstMatchingBlock(nameRegionConfigs, nil)
+	// regionName := srcRegionsConfig.Body().GetAttribute(nameRegionName)
+
+	body.RemoveAttribute(nameNumShards) // num_shards in root is not relevant, only in replication_specs
+	// ok moveAttr to fail as cloud_backup is optional
+	_ = moveAttr(body, body, nameCloudBackup, nameBackupEnabled, errRepSpecs)
+
+	electableSpec := hclwrite.NewEmptyFile()
+
+	regionConfig := hclwrite.NewEmptyFile()
+	regionConfigBody := regionConfig.Body()
+	regionConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
+
+	replicationSpec := hclwrite.NewEmptyFile()
+	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionConfig))
+	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
+
+	_, _ = diskSizeGBOptional, providerName
+
+	body.RemoveBlock(srcReplicationSpecs)
 	return nil
 }
 
-func moveAttribute(fromAttrName, toAttrName string, fromBody, toBody *hclwrite.Body, errPrefix string) error {
-	attr := fromBody.GetAttribute(fromAttrName)
-	if attr == nil {
-		return fmt.Errorf("%s: attribute %s not found", errPrefix, fromAttrName)
+// moveAttr deletes an attribute from fromBody and adds it to toBody.
+func moveAttr(fromBody, toBody *hclwrite.Body, fromAttrName, toAttrName, errPrefix string) error {
+	tokens, err := extractAttr(fromBody, fromAttrName, errPrefix)
+	if err == nil {
+		toBody.SetAttributeRaw(toAttrName, tokens)
 	}
-	fromBody.RemoveAttribute(fromAttrName)
-	toBody.SetAttributeRaw(toAttrName, attr.Expr().BuildTokens(nil))
-	return nil
+	return err
+}
+
+// extractAttr deletes an attribute and returns it value.
+func extractAttr(body *hclwrite.Body, attrName, errPrefix string) (hclwrite.Tokens, error) {
+	attr := body.GetAttribute(attrName)
+	if attr == nil {
+		return nil, fmt.Errorf("%s: attribute %s not found", errPrefix, attrName)
+	}
+	tokens := attr.Expr().BuildTokens(nil)
+	body.RemoveAttribute(attrName)
+	return tokens, nil
 }
 
 func setAttrInt(body *hclwrite.Body, attrName string, number int) {
