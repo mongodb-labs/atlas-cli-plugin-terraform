@@ -72,17 +72,17 @@ func fillFreeTier(body *hclwrite.Body) error {
 	return nil
 }
 
-func fillAutoScaling(regionsConfigBody *hclwrite.Body, attrs map[string]hclwrite.Tokens) {
+func fillAutoScaling(regionsConfigBody *hclwrite.Body, opt map[string]hclwrite.Tokens) {
 	file := hclwrite.NewEmptyFile()
 	fileBody := file.Body()
-	if attrs[nameAutoScalingDiskGBEnabled] != nil {
-		fileBody.SetAttributeRaw(nameDiskGBEnabled, attrs[nameAutoScalingDiskGBEnabled])
+	if opt[nameAutoScalingDiskGBEnabled] != nil {
+		fileBody.SetAttributeRaw(nameDiskGBEnabled, opt[nameAutoScalingDiskGBEnabled])
 	}
 	regionsConfigBody.SetAttributeRaw(nameAutoScaling, tokensObject(file))
 }
 
 func fillReplicationSpecs(body *hclwrite.Body) error {
-	rootAttrs, err := extractRootAttrs(body, errRepSpecs)
+	root, err := extractRootAttrs(body, errRepSpecs)
 	if err != nil {
 		return err
 	}
@@ -96,14 +96,14 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 	_ = moveAttr(body, body, nameCloudBackup, nameBackupEnabled, errRepSpecs)
 
 	electableSpec := hclwrite.NewEmptyFile()
-	if rootAttrs[nameDiskSizeGB] != nil {
-		electableSpec.Body().SetAttributeRaw(nameDiskSizeGB, rootAttrs[nameDiskSizeGB])
+	if root.opt[nameDiskSizeGB] != nil {
+		electableSpec.Body().SetAttributeRaw(nameDiskSizeGB, root.opt[nameDiskSizeGB])
 	}
 
 	regionsConfig := hclwrite.NewEmptyFile()
 	regionsConfigBody := regionsConfig.Body()
-	regionsConfigBody.SetAttributeRaw(nameProviderName, rootAttrs[nameProviderName])
-	fillAutoScaling(regionsConfigBody, rootAttrs)
+	regionsConfigBody.SetAttributeRaw(nameProviderName, root.req[nameProviderName])
+	fillAutoScaling(regionsConfigBody, root.opt)
 	regionsConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
 
 	replicationSpec := hclwrite.NewEmptyFile()
@@ -124,22 +124,23 @@ func moveAttr(fromBody, toBody *hclwrite.Body, fromAttrName, toAttrName, errPref
 }
 
 // extractRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
-func extractRootAttrs(body *hclwrite.Body, errPrefix string) (map[string]hclwrite.Tokens, error) {
-	attrs := make(map[string]hclwrite.Tokens)
+func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
+	req := make(map[string]hclwrite.Tokens)
 	for _, name := range rootAttrsMandatory {
 		tokens, err := extractAttr(body, name, errPrefix)
 		if err != nil {
-			return nil, err
+			return attrVals{}, err
 		}
-		attrs[name] = tokens
+		req[name] = tokens
 	}
+	opt := make(map[string]hclwrite.Tokens)
 	for _, name := range rootAttrsOptional {
 		tokens, _ := extractAttr(body, name, errPrefix)
 		if tokens != nil {
-			attrs[name] = tokens
+			opt[name] = tokens
 		}
 	}
-	return attrs, nil
+	return attrVals{req: req, opt: opt}, nil
 }
 
 // extractAttr deletes an attribute and returns it value.
@@ -194,6 +195,11 @@ func getParser(config []byte) (*hclwrite.File, error) {
 		return nil, fmt.Errorf("failed to parse Terraform config file: %s", diags.Error())
 	}
 	return parser, nil
+}
+
+type attrVals struct {
+	req map[string]hclwrite.Tokens
+	opt map[string]hclwrite.Tokens
 }
 
 const (
