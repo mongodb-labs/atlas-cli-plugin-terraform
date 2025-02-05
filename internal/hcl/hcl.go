@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	resourceType                 = "resource"
-	cluster                      = "mongodbatlas_cluster"
-	advCluster                   = "mongodbatlas_advanced_cluster"
+	resourceType = "resource"
+	cluster      = "mongodbatlas_cluster"
+	advCluster   = "mongodbatlas_advanced_cluster"
+
 	nameReplicationSpecs         = "replication_specs"
 	nameRegionConfigs            = "region_configs"
 	nameElectableSpecs           = "electable_specs"
@@ -25,6 +26,9 @@ const (
 	nameInstanceSize             = "instance_size"
 	nameClusterType              = "cluster_type"
 	namePriority                 = "priority"
+
+	valClusterType = "REPLICASET"
+	valPriority    = 7
 
 	errFreeCluster = "free cluster (because no " + nameReplicationSpecs + ")"
 )
@@ -49,10 +53,13 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 		labels[0] = advCluster
 		resource.SetLabels(labels)
 
-		if isFreeTier(resourceBody) {
-			if err := fillFreeTier(resourceBody); err != nil {
-				return nil, err
-			}
+		if resourceBody.FirstMatchingBlock(nameReplicationSpecs, nil) != nil {
+			err = fillReplicationSpecs(resourceBody)
+		} else {
+			err = fillFreeTier(resourceBody)
+		}
+		if err != nil {
+			return nil, err
 		}
 
 		resourceBody.AppendNewline()
@@ -62,15 +69,7 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	return parser.Bytes(), nil
 }
 
-func isFreeTier(body *hclwrite.Body) bool {
-	return body.FirstMatchingBlock(nameReplicationSpecs, nil) == nil
-}
-
 func fillFreeTier(body *hclwrite.Body) error {
-	const (
-		valClusterType = "REPLICASET"
-		valPriority    = 7
-	)
 	body.SetAttributeValue(nameClusterType, cty.StringVal(valClusterType))
 	regionConfig := hclwrite.NewEmptyFile()
 	regionConfigBody := regionConfig.Body()
@@ -93,6 +92,10 @@ func fillFreeTier(body *hclwrite.Body) error {
 	replicationSpec := hclwrite.NewEmptyFile()
 	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionConfig))
 	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
+	return nil
+}
+
+func fillReplicationSpecs(body *hclwrite.Body) error {
 	return nil
 }
 
