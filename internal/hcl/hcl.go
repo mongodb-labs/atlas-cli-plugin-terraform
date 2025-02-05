@@ -100,11 +100,15 @@ func fillFreeTier(body *hclwrite.Body) error {
 	return nil
 }
 
+type rootAttrs struct {
+	diskSizeGBOpt hclwrite.Tokens
+	providerName  hclwrite.Tokens
+}
+
 func fillReplicationSpecs(body *hclwrite.Body) error {
-	diskSizeGBOptional, _ := extractAttr(body, nameDiskSizeGB, errRepSpecs)
-	providerName, err := extractAttr(body, nameProviderName, errRepSpecs)
+	root, err := extractRootAttrs(body, errRepSpecs)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	srcReplicationSpecs := body.FirstMatchingBlock(nameReplicationSpecs, nil)
@@ -116,16 +120,18 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 	_ = moveAttr(body, body, nameCloudBackup, nameBackupEnabled, errRepSpecs)
 
 	electableSpec := hclwrite.NewEmptyFile()
+	if root.diskSizeGBOpt != nil {
+		electableSpec.Body().SetAttributeRaw(nameDiskSizeGB, root.diskSizeGBOpt)
+	}
 
 	regionConfig := hclwrite.NewEmptyFile()
 	regionConfigBody := regionConfig.Body()
+	regionConfigBody.SetAttributeRaw(nameProviderName, root.providerName)
 	regionConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
 
 	replicationSpec := hclwrite.NewEmptyFile()
 	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionConfig))
 	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
-
-	_, _ = diskSizeGBOptional, providerName
 
 	body.RemoveBlock(srcReplicationSpecs)
 	return nil
@@ -138,6 +144,19 @@ func moveAttr(fromBody, toBody *hclwrite.Body, fromAttrName, toAttrName, errPref
 		toBody.SetAttributeRaw(toAttrName, tokens)
 	}
 	return err
+}
+
+// extractRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
+func extractRootAttrs(body *hclwrite.Body, errPrefix string) (*rootAttrs, error) {
+	diskSizeGBOpt, _ := extractAttr(body, nameDiskSizeGB, errPrefix)
+	providerName, err := extractAttr(body, nameProviderName, errPrefix)
+	if err != nil {
+		return nil, err
+	}
+	return &rootAttrs{
+		diskSizeGBOpt: diskSizeGBOpt,
+		providerName:  providerName,
+	}, nil
 }
 
 // extractAttr deletes an attribute and returns it value.
