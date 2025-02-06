@@ -75,7 +75,7 @@ func fillFreeTier(resourceb *hclwrite.Body) error {
 
 // fillReplicationSpecs is the entry point to convert clusters with replications_specs (all but free tier)
 func fillReplicationSpecs(resourceb *hclwrite.Body) error {
-	root, errRoot := extractRootAttrs(resourceb, errRepSpecs)
+	root, errRoot := popRootAttrs(resourceb, errRepSpecs)
 	if errRoot != nil {
 		return errRoot
 	}
@@ -101,8 +101,8 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	return nil
 }
 
-// extractRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
-func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
+// popRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
+func popRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 	var (
 		reqNames = []string{
 			nProviderName,
