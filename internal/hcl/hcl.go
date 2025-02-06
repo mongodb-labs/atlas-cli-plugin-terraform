@@ -112,7 +112,6 @@ func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 			nameProviderName,
 			nameProviderInstanceSizeName,
 		}
-
 		optNames = []string{
 			nameDiskSizeGB,
 			nameAutoScalingDiskGBEnabled,
