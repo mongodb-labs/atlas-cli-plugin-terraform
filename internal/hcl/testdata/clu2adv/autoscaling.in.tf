@@ -4,7 +4,7 @@ resource "mongodbatlas_cluster" "autoscaling" {
   disk_size_gb = 100
   num_shards = 1
   cluster_type = "REPLICASET"
-  
+
   replication_specs {
     num_shards = 1
     regions_config {
@@ -16,8 +16,8 @@ resource "mongodbatlas_cluster" "autoscaling" {
   }
   cloud_backup                            = true
   auto_scaling_disk_gb_enabled            = true
-  auto_scaling_compute_enabled            = true
-  auto_scaling_compute_scale_down_enabled = true
+  auto_scaling_compute_enabled            = false
+  auto_scaling_compute_scale_down_enabled = local.scale_down
 
   //Provider Settings "block"
   provider_name                                   = "AWS"

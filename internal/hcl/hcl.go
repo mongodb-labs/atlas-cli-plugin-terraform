@@ -73,12 +73,28 @@ func fillFreeTier(body *hclwrite.Body) error {
 }
 
 func fillAutoScaling(regionsConfigBody *hclwrite.Body, opt map[string]hclwrite.Tokens) {
-	file := hclwrite.NewEmptyFile()
-	fileBody := file.Body()
-	if opt[nameAutoScalingDiskGBEnabled] != nil {
-		fileBody.SetAttributeRaw(nameDiskGBEnabled, opt[nameAutoScalingDiskGBEnabled])
+	var (
+		names = [][2]string{ // use slice instead of map to preserve order
+			{nameAutoScalingDiskGBEnabled, nameDiskGBEnabled},
+			{nameAutoScalingComputeEnabled, nameComputeEnabled},
+			{nameProviderAutoScalingComputeMinInstanceSize, nameComputeMinInstanceSize},
+			{nameProviderAutoScalingComputeMaxInstanceSize, nameComputeMaxInstanceSize},
+			{nameAutoScalingComputeScaleDownEnabled, nameComputeScaleDownEnabled},
+		}
+		file     = hclwrite.NewEmptyFile()
+		fileBody = file.Body()
+		filled   = false
+	)
+	for _, tuple := range names {
+		oldName, newName := tuple[0], tuple[1]
+		if tokens := opt[oldName]; tokens != nil {
+			fileBody.SetAttributeRaw(newName, tokens)
+			filled = true
+		}
 	}
-	regionsConfigBody.SetAttributeRaw(nameAutoScaling, tokensObject(file))
+	if filled {
+		regionsConfigBody.SetAttributeRaw(nameAutoScaling, tokensObject(file))
+	}
 }
 
 func fillReplicationSpecs(body *hclwrite.Body) error {
@@ -254,13 +270,5 @@ var (
 		nameProviderAutoScalingComputeMinInstanceSize,
 		nameProviderAutoScalingComputeMaxInstanceSize,
 		nameAutoScalingComputeScaleDownEnabled,
-	}
-
-	mappingAutoScale = map[string]string{
-		nameAutoScalingDiskGBEnabled:                  nameDiskGBEnabled,
-		nameAutoScalingComputeEnabled:                 nameComputeEnabled,
-		nameProviderAutoScalingComputeMinInstanceSize: nameComputeMinInstanceSize,
-		nameProviderAutoScalingComputeMaxInstanceSize: nameComputeMaxInstanceSize,
-		nameAutoScalingComputeScaleDownEnabled:        nameComputeScaleDownEnabled,
 	}
 )
