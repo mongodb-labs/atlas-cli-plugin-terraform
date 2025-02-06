@@ -50,22 +50,22 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 func fillFreeTier(body *hclwrite.Body) error {
 	body.SetAttributeValue(nameClusterType, cty.StringVal(valClusterType))
 	regionConfig := hclwrite.NewEmptyFile()
-	regionConfigBody := regionConfig.Body()
-	setAttrInt(regionConfigBody, "priority", valPriority)
-	if err := moveAttr(body, regionConfigBody, nameProviderRegionName, nameRegionName, errFreeCluster); err != nil {
+	regionConfigB := regionConfig.Body()
+	setAttrInt(regionConfigB, "priority", valPriority)
+	if err := moveAttr(body, regionConfigB, nameProviderRegionName, nameRegionName, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttr(body, regionConfigBody, nameProviderName, nameProviderName, errFreeCluster); err != nil {
+	if err := moveAttr(body, regionConfigB, nameProviderName, nameProviderName, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttr(body, regionConfigBody, nameBackingProviderName, nameBackingProviderName, errFreeCluster); err != nil {
+	if err := moveAttr(body, regionConfigB, nameBackingProviderName, nameBackingProviderName, errFreeCluster); err != nil {
 		return err
 	}
 	electableSpec := hclwrite.NewEmptyFile()
 	if err := moveAttr(body, electableSpec.Body(), nameProviderInstanceSizeName, nameInstanceSize, errFreeCluster); err != nil {
 		return err
 	}
-	regionConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
+	regionConfigB.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
 
 	replicationSpec := hclwrite.NewEmptyFile()
 	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionConfig))
@@ -137,34 +137,35 @@ func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 
 func getRegionConfigs(srcConfig *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
 	file := hclwrite.NewEmptyFile()
-	configBody := file.Body()
-	configBody.SetAttributeRaw(nameProviderName, root.req[nameProviderName])
-	if err := moveAttr(srcConfig.Body(), configBody, nameRegionName, nameRegionName, errRepSpecs); err != nil {
+	fileb := file.Body()
+	fileb.SetAttributeRaw(nameProviderName, root.req[nameProviderName])
+	if err := moveAttr(srcConfig.Body(), fileb, nameRegionName, nameRegionName, errRepSpecs); err != nil {
 		return nil, err
 	}
-	if err := moveAttr(srcConfig.Body(), configBody, namePriority, namePriority, errRepSpecs); err != nil {
+	if err := moveAttr(srcConfig.Body(), fileb, namePriority, namePriority, errRepSpecs); err != nil {
 		return nil, err
 	}
 	autoScaling := getAutoScalingOpt(root.opt)
 	if autoScaling != nil {
-		configBody.SetAttributeRaw(nameAutoScaling, autoScaling)
+		fileb.SetAttributeRaw(nameAutoScaling, autoScaling)
 	}
 	electableSpecs, errElect := getElectableSpecs(srcConfig, root)
 	if errElect != nil {
 		return nil, errElect
 	}
-	configBody.SetAttributeRaw(nameElectableSpecs, electableSpecs)
+	fileb.SetAttributeRaw(nameElectableSpecs, electableSpecs)
 	return tokensArrayObject(file), nil
 }
 
 func getElectableSpecs(srcConfig *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
 	file := hclwrite.NewEmptyFile()
-	if err := moveAttr(srcConfig.Body(), file.Body(), nameElectableNodes, nameNodeCount, errRepSpecs); err != nil {
+	fileb := file.Body()
+	if err := moveAttr(srcConfig.Body(), fileb, nameElectableNodes, nameNodeCount, errRepSpecs); err != nil {
 		return nil, err
 	}
-	file.Body().SetAttributeRaw(nameInstanceSize, root.req[nameProviderInstanceSizeName])
+	fileb.SetAttributeRaw(nameInstanceSize, root.req[nameProviderInstanceSizeName])
 	if root.opt[nameDiskSizeGB] != nil {
-		file.Body().SetAttributeRaw(nameDiskSizeGB, root.opt[nameDiskSizeGB])
+		fileb.SetAttributeRaw(nameDiskSizeGB, root.opt[nameDiskSizeGB])
 	}
 	return tokensObject(file), nil
 }
