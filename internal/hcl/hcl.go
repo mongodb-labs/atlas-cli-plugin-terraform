@@ -79,26 +79,38 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 	}
 
 	srcReplicationSpecs := body.FirstMatchingBlock(nameReplicationSpecs, nil)
-	// srcRegionsConfig := srcReplicationSpecs.Body().FirstMatchingBlock(nameRegionConfigs, nil)
-	// regionName := srcRegionsConfig.Body().GetAttribute(nameRegionName)
+	srcConfig := srcReplicationSpecs.Body().FirstMatchingBlock(nameRegionsConfig, nil)
+	if srcConfig == nil {
+		return fmt.Errorf("%s: %s not found", errRepSpecs, nameRegionsConfig)
+	}
 
 	body.RemoveAttribute(nameNumShards) // num_shards in root is not relevant, only in replication_specs
 	// ok moveAttr to fail as cloud_backup is optional
 	_ = moveAttr(body, body, nameCloudBackup, nameBackupEnabled, errRepSpecs)
 
 	electableSpec := hclwrite.NewEmptyFile()
+	if err := moveAttr(srcConfig.Body(), electableSpec.Body(), nameElectableNodes, nameNodeCount, errRepSpecs); err != nil {
+		return err
+	}
+	electableSpec.Body().SetAttributeRaw(nameInstanceSize, root.req[nameProviderInstanceSizeName])
 	if root.opt[nameDiskSizeGB] != nil {
 		electableSpec.Body().SetAttributeRaw(nameDiskSizeGB, root.opt[nameDiskSizeGB])
 	}
 
-	regionsConfig := hclwrite.NewEmptyFile()
-	regionsConfigBody := regionsConfig.Body()
-	regionsConfigBody.SetAttributeRaw(nameProviderName, root.req[nameProviderName])
-	fillAutoScaling(regionsConfigBody, root.opt)
-	regionsConfigBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
+	config := hclwrite.NewEmptyFile()
+	configBody := config.Body()
+	configBody.SetAttributeRaw(nameProviderName, root.req[nameProviderName])
+	if err := moveAttr(srcConfig.Body(), configBody, nameRegionName, nameRegionName, errRepSpecs); err != nil {
+		return err
+	}
+	if err := moveAttr(srcConfig.Body(), configBody, namePriority, namePriority, errRepSpecs); err != nil {
+		return err
+	}
+	fillAutoScaling(configBody, root.opt)
+	configBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
 
 	replicationSpec := hclwrite.NewEmptyFile()
-	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionsConfig))
+	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(config))
 	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
 
 	body.RemoveBlock(srcReplicationSpecs)
@@ -239,6 +251,7 @@ const (
 
 	nameReplicationSpecs                          = "replication_specs"
 	nameRegionConfigs                             = "region_configs"
+	nameRegionsConfig                             = "regions_config"
 	nameElectableSpecs                            = "electable_specs"
 	nameAutoScaling                               = "auto_scaling"
 	nameProviderRegionName                        = "provider_region_name"
@@ -263,6 +276,8 @@ const (
 	nameComputeScaleDownEnabled                   = "compute_scale_down_enabled"
 	nameComputeMinInstanceSize                    = "compute_min_instance_size"
 	nameComputeMaxInstanceSize                    = "compute_max_instance_size"
+	nameNodeCount                                 = "node_count"
+	nameElectableNodes                            = "electable_nodes"
 
 	valClusterType = "REPLICASET"
 	valPriority    = 7

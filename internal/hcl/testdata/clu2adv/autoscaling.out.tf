@@ -24,9 +24,9 @@ resource "mongodbatlas_advanced_cluster" "autoscaling" {
         compute_scale_down_enabled = local.scale_down
       }
       electable_specs = {
-        node_count      = 3
-        instance_size   = "M20"
-        disk_size_gb = 100
+        node_count    = 3
+        instance_size = "M20"
+        disk_size_gb  = 100
       }
     }]
   }]
