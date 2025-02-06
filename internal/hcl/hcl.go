@@ -120,14 +120,14 @@ func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 		opt = make(map[string]hclwrite.Tokens)
 	)
 	for _, name := range reqNames {
-		tokens, err := extractAttr(body, name, errPrefix)
+		tokens, err := popAttr(body, name, errPrefix)
 		if err != nil {
 			return attrVals{}, err
 		}
 		req[name] = tokens
 	}
 	for _, name := range optNames {
-		tokens, _ := extractAttr(body, name, errPrefix)
+		tokens, _ := popAttr(body, name, errPrefix)
 		if tokens != nil {
 			opt[name] = tokens
 		}
@@ -195,17 +195,17 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 	return tokensObject(file)
 }
 
-// moveAttr deletes an attribute from fromBody and adds it to toBody.
+// popAttr deletes an attribute from fromBody and adds it to toBody.
 func moveAttr(fromBody, toBody *hclwrite.Body, fromAttrName, toAttrName, errPrefix string) error {
-	tokens, err := extractAttr(fromBody, fromAttrName, errPrefix)
+	tokens, err := popAttr(fromBody, fromAttrName, errPrefix)
 	if err == nil {
 		toBody.SetAttributeRaw(toAttrName, tokens)
 	}
 	return err
 }
 
-// extractAttr deletes an attribute and returns it value.
-func extractAttr(body *hclwrite.Body, attrName, errPrefix string) (hclwrite.Tokens, error) {
+// popAttr deletes an attribute and returns it value.
+func popAttr(body *hclwrite.Body, attrName, errPrefix string) (hclwrite.Tokens, error) {
 	attr := body.GetAttribute(attrName)
 	if attr == nil {
 		return nil, fmt.Errorf("%s: attribute %s not found", errPrefix, attrName)
