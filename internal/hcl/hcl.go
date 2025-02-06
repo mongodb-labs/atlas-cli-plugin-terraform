@@ -46,6 +46,7 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	return parser.Bytes(), nil
 }
 
+// fillFreeTier is the entry point to convert clusters in free tier
 func fillFreeTier(body *hclwrite.Body) error {
 	body.SetAttributeValue(nameClusterType, cty.StringVal(valClusterType))
 	regionConfig := hclwrite.NewEmptyFile()
@@ -72,12 +73,12 @@ func fillFreeTier(body *hclwrite.Body) error {
 	return nil
 }
 
+// fillReplicationSpecs is the entry point to convert clusters with replications_specs (all but free tier)
 func fillReplicationSpecs(body *hclwrite.Body) error {
-	root, err := extractRootAttrs(body, errRepSpecs)
-	if err != nil {
-		return err
+	root, errRoot := extractRootAttrs(body, errRepSpecs)
+	if errRoot != nil {
+		return errRoot
 	}
-
 	srcReplicationSpecs := body.FirstMatchingBlock(nameReplicationSpecs, nil)
 	srcConfig := srcReplicationSpecs.Body().FirstMatchingBlock(nameRegionsConfig, nil)
 	if srcConfig == nil {
@@ -88,29 +89,12 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 	// ok moveAttr to fail as cloud_backup is optional
 	_ = moveAttr(body, body, nameCloudBackup, nameBackupEnabled, errRepSpecs)
 
-	electableSpec := hclwrite.NewEmptyFile()
-	if err := moveAttr(srcConfig.Body(), electableSpec.Body(), nameElectableNodes, nameNodeCount, errRepSpecs); err != nil {
-		return err
-	}
-	electableSpec.Body().SetAttributeRaw(nameInstanceSize, root.req[nameProviderInstanceSizeName])
-	if root.opt[nameDiskSizeGB] != nil {
-		electableSpec.Body().SetAttributeRaw(nameDiskSizeGB, root.opt[nameDiskSizeGB])
-	}
-
-	config := hclwrite.NewEmptyFile()
-	configBody := config.Body()
-	configBody.SetAttributeRaw(nameProviderName, root.req[nameProviderName])
-	if err := moveAttr(srcConfig.Body(), configBody, nameRegionName, nameRegionName, errRepSpecs); err != nil {
-		return err
-	}
-	if err := moveAttr(srcConfig.Body(), configBody, namePriority, namePriority, errRepSpecs); err != nil {
-		return err
-	}
-	fillAutoScaling(configBody, root.opt)
-	configBody.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
-
 	replicationSpec := hclwrite.NewEmptyFile()
-	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(config))
+	config, errConfig := getRegionConfigs(srcConfig, root)
+	if errConfig != nil {
+		return errConfig
+	}
+	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, config)
 	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
 
 	body.RemoveBlock(srcReplicationSpecs)
@@ -151,7 +135,41 @@ func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 	return attrVals{req: req, opt: opt}, nil
 }
 
-func fillAutoScaling(regionsConfigBody *hclwrite.Body, opt map[string]hclwrite.Tokens) {
+func getRegionConfigs(srcConfig *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+	file := hclwrite.NewEmptyFile()
+	configBody := file.Body()
+	configBody.SetAttributeRaw(nameProviderName, root.req[nameProviderName])
+	if err := moveAttr(srcConfig.Body(), configBody, nameRegionName, nameRegionName, errRepSpecs); err != nil {
+		return nil, err
+	}
+	if err := moveAttr(srcConfig.Body(), configBody, namePriority, namePriority, errRepSpecs); err != nil {
+		return nil, err
+	}
+	autoScaling := getAutoScalingOpt(root.opt)
+	if autoScaling != nil {
+		configBody.SetAttributeRaw(nameAutoScaling, autoScaling)
+	}
+	electableSpecs, errElect := getElectableSpecs(srcConfig, root)
+	if errElect != nil {
+		return nil, errElect
+	}
+	configBody.SetAttributeRaw(nameElectableSpecs, electableSpecs)
+	return tokensArrayObject(file), nil
+}
+
+func getElectableSpecs(srcConfig *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+	file := hclwrite.NewEmptyFile()
+	if err := moveAttr(srcConfig.Body(), file.Body(), nameElectableNodes, nameNodeCount, errRepSpecs); err != nil {
+		return nil, err
+	}
+	file.Body().SetAttributeRaw(nameInstanceSize, root.req[nameProviderInstanceSizeName])
+	if root.opt[nameDiskSizeGB] != nil {
+		file.Body().SetAttributeRaw(nameDiskSizeGB, root.opt[nameDiskSizeGB])
+	}
+	return tokensObject(file), nil
+}
+
+func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 	var (
 		names = [][2]string{ // use slice instead of map to preserve order
 			{nameAutoScalingDiskGBEnabled, nameDiskGBEnabled},
@@ -160,20 +178,20 @@ func fillAutoScaling(regionsConfigBody *hclwrite.Body, opt map[string]hclwrite.T
 			{nameProviderAutoScalingComputeMaxInstanceSize, nameComputeMaxInstanceSize},
 			{nameAutoScalingComputeScaleDownEnabled, nameComputeScaleDownEnabled},
 		}
-		file     = hclwrite.NewEmptyFile()
-		fileBody = file.Body()
-		filled   = false
+		file  = hclwrite.NewEmptyFile()
+		found = false
 	)
 	for _, tuple := range names {
 		oldName, newName := tuple[0], tuple[1]
 		if tokens := opt[oldName]; tokens != nil {
-			fileBody.SetAttributeRaw(newName, tokens)
-			filled = true
+			file.Body().SetAttributeRaw(newName, tokens)
+			found = true
 		}
 	}
-	if filled {
-		regionsConfigBody.SetAttributeRaw(nameAutoScaling, tokensObject(file))
+	if !found {
+		return nil
 	}
+	return tokensObject(file)
 }
 
 // moveAttr deletes an attribute from fromBody and adds it to toBody.
