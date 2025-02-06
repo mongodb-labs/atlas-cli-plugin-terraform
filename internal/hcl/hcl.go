@@ -86,14 +86,14 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 	}
 
 	body.RemoveAttribute(nNumShards) // num_shards in root is not relevant, only in replication_specs
-	// ok moveAttr to fail as cloud_backup is optional
+	// ok to fail as cloud_backup is optional
 	_ = moveAttr(body, body, nCloudBackup, nBackupEnabled, errRepSpecs)
 
-	repSpecs := hclwrite.NewEmptyFile()
 	config, errConfig := getRegionConfigs(configSrc, root)
 	if errConfig != nil {
 		return errConfig
 	}
+	repSpecs := hclwrite.NewEmptyFile()
 	repSpecs.Body().SetAttributeRaw(nConfig, config)
 	body.SetAttributeRaw(nRepSpecs, tokensArrayObject(repSpecs))
 
