@@ -1,4 +1,4 @@
-package hcl_test
+package convert_test
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/convert"
 	"github.com/sebdah/goldie/v2"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +38,7 @@ func TestClusterToAdvancedCluster(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			inConfig, err := afero.ReadFile(fs, inputFile)
 			require.NoError(t, err)
-			outConfig, err := hcl.ClusterToAdvancedCluster(inConfig)
+			outConfig, err := convert.ClusterToAdvancedCluster(inConfig)
 			if err == nil {
 				g.Assert(t, testName, outConfig)
 			} else {
