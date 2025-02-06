@@ -30,7 +30,7 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 		labels[0] = advCluster
 		resource.SetLabels(labels)
 
-		if resourceBody.FirstMatchingBlock(nameReplicationSpecs, nil) != nil {
+		if resourceBody.FirstMatchingBlock(nRepSpecs, nil) != nil {
 			err = fillReplicationSpecs(resourceBody)
 		} else {
 			err = fillFreeTier(resourceBody)
@@ -48,28 +48,28 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 
 // fillFreeTier is the entry point to convert clusters in free tier
 func fillFreeTier(body *hclwrite.Body) error {
-	body.SetAttributeValue(nameClusterType, cty.StringVal(valClusterType))
-	regionConfig := hclwrite.NewEmptyFile()
-	regionConfigB := regionConfig.Body()
-	setAttrInt(regionConfigB, "priority", valPriority)
-	if err := moveAttr(body, regionConfigB, nameProviderRegionName, nameRegionName, errFreeCluster); err != nil {
+	body.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
+	config := hclwrite.NewEmptyFile()
+	configb := config.Body()
+	setAttrInt(configb, "priority", valPriority)
+	if err := moveAttr(body, configb, nRegionNameSrc, nRegionName, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttr(body, regionConfigB, nameProviderName, nameProviderName, errFreeCluster); err != nil {
+	if err := moveAttr(body, configb, nProviderName, nProviderName, errFreeCluster); err != nil {
 		return err
 	}
-	if err := moveAttr(body, regionConfigB, nameBackingProviderName, nameBackingProviderName, errFreeCluster); err != nil {
+	if err := moveAttr(body, configb, nBackingProviderName, nBackingProviderName, errFreeCluster); err != nil {
 		return err
 	}
 	electableSpec := hclwrite.NewEmptyFile()
-	if err := moveAttr(body, electableSpec.Body(), nameProviderInstanceSizeName, nameInstanceSize, errFreeCluster); err != nil {
+	if err := moveAttr(body, electableSpec.Body(), nInstanceSizeSrc, nInstanceSize, errFreeCluster); err != nil {
 		return err
 	}
-	regionConfigB.SetAttributeRaw(nameElectableSpecs, tokensObject(electableSpec))
+	configb.SetAttributeRaw(nElectableSpecs, tokensObject(electableSpec))
 
-	replicationSpec := hclwrite.NewEmptyFile()
-	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, tokensArrayObject(regionConfig))
-	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
+	repSpecs := hclwrite.NewEmptyFile()
+	repSpecs.Body().SetAttributeRaw(nConfig, tokensArrayObject(config))
+	body.SetAttributeRaw(nRepSpecs, tokensArrayObject(repSpecs))
 	return nil
 }
 
@@ -79,25 +79,25 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 	if errRoot != nil {
 		return errRoot
 	}
-	srcReplicationSpecs := body.FirstMatchingBlock(nameReplicationSpecs, nil)
-	srcConfig := srcReplicationSpecs.Body().FirstMatchingBlock(nameRegionsConfig, nil)
-	if srcConfig == nil {
-		return fmt.Errorf("%s: %s not found", errRepSpecs, nameRegionsConfig)
+	repSpecsSrc := body.FirstMatchingBlock(nRepSpecs, nil)
+	configSrc := repSpecsSrc.Body().FirstMatchingBlock(nConfigSrc, nil)
+	if configSrc == nil {
+		return fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
 
-	body.RemoveAttribute(nameNumShards) // num_shards in root is not relevant, only in replication_specs
+	body.RemoveAttribute(nNumShards) // num_shards in root is not relevant, only in replication_specs
 	// ok moveAttr to fail as cloud_backup is optional
-	_ = moveAttr(body, body, nameCloudBackup, nameBackupEnabled, errRepSpecs)
+	_ = moveAttr(body, body, nCloudBackup, nBackupEnabled, errRepSpecs)
 
-	replicationSpec := hclwrite.NewEmptyFile()
-	config, errConfig := getRegionConfigs(srcConfig, root)
+	repSpecs := hclwrite.NewEmptyFile()
+	config, errConfig := getRegionConfigs(configSrc, root)
 	if errConfig != nil {
 		return errConfig
 	}
-	replicationSpec.Body().SetAttributeRaw(nameRegionConfigs, config)
-	body.SetAttributeRaw(nameReplicationSpecs, tokensArrayObject(replicationSpec))
+	repSpecs.Body().SetAttributeRaw(nConfig, config)
+	body.SetAttributeRaw(nRepSpecs, tokensArrayObject(repSpecs))
 
-	body.RemoveBlock(srcReplicationSpecs)
+	body.RemoveBlock(repSpecsSrc)
 	return nil
 }
 
@@ -105,16 +105,16 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 	var (
 		reqNames = []string{
-			nameProviderName,
-			nameProviderInstanceSizeName,
+			nProviderName,
+			nInstanceSizeSrc,
 		}
 		optNames = []string{
-			nameDiskSizeGB,
-			nameAutoScalingDiskGBEnabled,
-			nameAutoScalingComputeEnabled,
-			nameProviderAutoScalingComputeMinInstanceSize,
-			nameProviderAutoScalingComputeMaxInstanceSize,
-			nameAutoScalingComputeScaleDownEnabled,
+			nDiskSizeGB,
+			nDiskGBEnabledSrc,
+			nComputeEnabledSrc,
+			nComputeMinInstanceSizeSrc,
+			nComputeMaxInstanceSizeSrc,
+			nComputeScaleDownEnabledSrc,
 		}
 		req = make(map[string]hclwrite.Tokens)
 		opt = make(map[string]hclwrite.Tokens)
@@ -135,37 +135,37 @@ func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 	return attrVals{req: req, opt: opt}, nil
 }
 
-func getRegionConfigs(srcConfig *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+func getRegionConfigs(configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
 	file := hclwrite.NewEmptyFile()
 	fileb := file.Body()
-	fileb.SetAttributeRaw(nameProviderName, root.req[nameProviderName])
-	if err := moveAttr(srcConfig.Body(), fileb, nameRegionName, nameRegionName, errRepSpecs); err != nil {
+	fileb.SetAttributeRaw(nProviderName, root.req[nProviderName])
+	if err := moveAttr(configSrc.Body(), fileb, nRegionName, nRegionName, errRepSpecs); err != nil {
 		return nil, err
 	}
-	if err := moveAttr(srcConfig.Body(), fileb, namePriority, namePriority, errRepSpecs); err != nil {
+	if err := moveAttr(configSrc.Body(), fileb, nPriority, nPriority, errRepSpecs); err != nil {
 		return nil, err
 	}
 	autoScaling := getAutoScalingOpt(root.opt)
 	if autoScaling != nil {
-		fileb.SetAttributeRaw(nameAutoScaling, autoScaling)
+		fileb.SetAttributeRaw(nAutoScaling, autoScaling)
 	}
-	electableSpecs, errElect := getElectableSpecs(srcConfig, root)
+	electableSpecs, errElect := getElectableSpecs(configSrc, root)
 	if errElect != nil {
 		return nil, errElect
 	}
-	fileb.SetAttributeRaw(nameElectableSpecs, electableSpecs)
+	fileb.SetAttributeRaw(nElectableSpecs, electableSpecs)
 	return tokensArrayObject(file), nil
 }
 
-func getElectableSpecs(srcConfig *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+func getElectableSpecs(configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
 	file := hclwrite.NewEmptyFile()
 	fileb := file.Body()
-	if err := moveAttr(srcConfig.Body(), fileb, nameElectableNodes, nameNodeCount, errRepSpecs); err != nil {
+	if err := moveAttr(configSrc.Body(), fileb, nElectableNodes, nNodeCount, errRepSpecs); err != nil {
 		return nil, err
 	}
-	fileb.SetAttributeRaw(nameInstanceSize, root.req[nameProviderInstanceSizeName])
-	if root.opt[nameDiskSizeGB] != nil {
-		fileb.SetAttributeRaw(nameDiskSizeGB, root.opt[nameDiskSizeGB])
+	fileb.SetAttributeRaw(nInstanceSize, root.req[nInstanceSizeSrc])
+	if root.opt[nDiskSizeGB] != nil {
+		fileb.SetAttributeRaw(nDiskSizeGB, root.opt[nDiskSizeGB])
 	}
 	return tokensObject(file), nil
 }
@@ -173,19 +173,19 @@ func getElectableSpecs(srcConfig *hclwrite.Block, root attrVals) (hclwrite.Token
 func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 	var (
 		names = [][2]string{ // use slice instead of map to preserve order
-			{nameAutoScalingDiskGBEnabled, nameDiskGBEnabled},
-			{nameAutoScalingComputeEnabled, nameComputeEnabled},
-			{nameProviderAutoScalingComputeMinInstanceSize, nameComputeMinInstanceSize},
-			{nameProviderAutoScalingComputeMaxInstanceSize, nameComputeMaxInstanceSize},
-			{nameAutoScalingComputeScaleDownEnabled, nameComputeScaleDownEnabled},
+			{nDiskGBEnabledSrc, nDiskGBEnabled},
+			{nComputeEnabledSrc, nComputeEnabled},
+			{nComputeMinInstanceSizeSrc, nComputeMinInstanceSize},
+			{nComputeMaxInstanceSizeSrc, nComputeMaxInstanceSize},
+			{nComputeScaleDownEnabledSrc, nComputeScaleDownEnabled},
 		}
 		file  = hclwrite.NewEmptyFile()
 		found = false
 	)
 	for _, tuple := range names {
-		oldName, newName := tuple[0], tuple[1]
-		if tokens := opt[oldName]; tokens != nil {
-			file.Body().SetAttributeRaw(newName, tokens)
+		src, dst := tuple[0], tuple[1]
+		if tokens := opt[src]; tokens != nil {
+			file.Body().SetAttributeRaw(dst, tokens)
 			found = true
 		}
 	}
@@ -268,39 +268,39 @@ const (
 	cluster      = "mongodbatlas_cluster"
 	advCluster   = "mongodbatlas_advanced_cluster"
 
-	nameReplicationSpecs                          = "replication_specs"
-	nameRegionConfigs                             = "region_configs"
-	nameRegionsConfig                             = "regions_config"
-	nameElectableSpecs                            = "electable_specs"
-	nameAutoScaling                               = "auto_scaling"
-	nameProviderRegionName                        = "provider_region_name"
-	nameRegionName                                = "region_name"
-	nameProviderName                              = "provider_name"
-	nameBackingProviderName                       = "backing_provider_name"
-	nameProviderInstanceSizeName                  = "provider_instance_size_name"
-	nameInstanceSize                              = "instance_size"
-	nameClusterType                               = "cluster_type"
-	namePriority                                  = "priority"
-	nameNumShards                                 = "num_shards"
-	nameBackupEnabled                             = "backup_enabled"
-	nameCloudBackup                               = "cloud_backup"
-	nameDiskSizeGB                                = "disk_size_gb"
-	nameAutoScalingDiskGBEnabled                  = "auto_scaling_disk_gb_enabled"
-	nameAutoScalingComputeEnabled                 = "auto_scaling_compute_enabled"
-	nameAutoScalingComputeScaleDownEnabled        = "auto_scaling_compute_scale_down_enabled"
-	nameProviderAutoScalingComputeMinInstanceSize = "provider_auto_scaling_compute_min_instance_size"
-	nameProviderAutoScalingComputeMaxInstanceSize = "provider_auto_scaling_compute_max_instance_size"
-	nameDiskGBEnabled                             = "disk_gb_enabled"
-	nameComputeEnabled                            = "compute_enabled"
-	nameComputeScaleDownEnabled                   = "compute_scale_down_enabled"
-	nameComputeMinInstanceSize                    = "compute_min_instance_size"
-	nameComputeMaxInstanceSize                    = "compute_max_instance_size"
-	nameNodeCount                                 = "node_count"
-	nameElectableNodes                            = "electable_nodes"
+	nRepSpecs                   = "replication_specs"
+	nConfig                     = "region_configs"
+	nConfigSrc                  = "regions_config"
+	nElectableSpecs             = "electable_specs"
+	nAutoScaling                = "auto_scaling"
+	nRegionNameSrc              = "provider_region_name"
+	nRegionName                 = "region_name"
+	nProviderName               = "provider_name"
+	nBackingProviderName        = "backing_provider_name"
+	nInstanceSizeSrc            = "provider_instance_size_name"
+	nInstanceSize               = "instance_size"
+	nClusterType                = "cluster_type"
+	nPriority                   = "priority"
+	nNumShards                  = "num_shards"
+	nBackupEnabled              = "backup_enabled"
+	nCloudBackup                = "cloud_backup"
+	nDiskSizeGB                 = "disk_size_gb"
+	nDiskGBEnabledSrc           = "auto_scaling_disk_gb_enabled"
+	nComputeEnabledSrc          = "auto_scaling_compute_enabled"
+	nComputeScaleDownEnabledSrc = "auto_scaling_compute_scale_down_enabled"
+	nComputeMinInstanceSizeSrc  = "provider_auto_scaling_compute_min_instance_size"
+	nComputeMaxInstanceSizeSrc  = "provider_auto_scaling_compute_max_instance_size"
+	nDiskGBEnabled              = "disk_gb_enabled"
+	nComputeEnabled             = "compute_enabled"
+	nComputeScaleDownEnabled    = "compute_scale_down_enabled"
+	nComputeMinInstanceSize     = "compute_min_instance_size"
+	nComputeMaxInstanceSize     = "compute_max_instance_size"
+	nNodeCount                  = "node_count"
+	nElectableNodes             = "electable_nodes"
 
 	valClusterType = "REPLICASET"
 	valPriority    = 7
 
-	errFreeCluster = "free cluster (because no " + nameReplicationSpecs + ")"
-	errRepSpecs    = "setting " + nameReplicationSpecs
+	errFreeCluster = "free cluster (because no " + nRepSpecs + ")"
+	errRepSpecs    = "setting " + nRepSpecs
 )
