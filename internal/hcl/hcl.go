@@ -72,31 +72,6 @@ func fillFreeTier(body *hclwrite.Body) error {
 	return nil
 }
 
-func fillAutoScaling(regionsConfigBody *hclwrite.Body, opt map[string]hclwrite.Tokens) {
-	var (
-		names = [][2]string{ // use slice instead of map to preserve order
-			{nameAutoScalingDiskGBEnabled, nameDiskGBEnabled},
-			{nameAutoScalingComputeEnabled, nameComputeEnabled},
-			{nameProviderAutoScalingComputeMinInstanceSize, nameComputeMinInstanceSize},
-			{nameProviderAutoScalingComputeMaxInstanceSize, nameComputeMaxInstanceSize},
-			{nameAutoScalingComputeScaleDownEnabled, nameComputeScaleDownEnabled},
-		}
-		file     = hclwrite.NewEmptyFile()
-		fileBody = file.Body()
-		filled   = false
-	)
-	for _, tuple := range names {
-		oldName, newName := tuple[0], tuple[1]
-		if tokens := opt[oldName]; tokens != nil {
-			fileBody.SetAttributeRaw(newName, tokens)
-			filled = true
-		}
-	}
-	if filled {
-		regionsConfigBody.SetAttributeRaw(nameAutoScaling, tokensObject(file))
-	}
-}
-
 func fillReplicationSpecs(body *hclwrite.Body) error {
 	root, err := extractRootAttrs(body, errRepSpecs)
 	if err != nil {
@@ -130,6 +105,66 @@ func fillReplicationSpecs(body *hclwrite.Body) error {
 	return nil
 }
 
+// extractRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
+func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
+	var (
+		reqNames = []string{
+			nameProviderName,
+			nameProviderInstanceSizeName,
+		}
+
+		optNames = []string{
+			nameDiskSizeGB,
+			nameAutoScalingDiskGBEnabled,
+			nameAutoScalingComputeEnabled,
+			nameProviderAutoScalingComputeMinInstanceSize,
+			nameProviderAutoScalingComputeMaxInstanceSize,
+			nameAutoScalingComputeScaleDownEnabled,
+		}
+		req = make(map[string]hclwrite.Tokens)
+		opt = make(map[string]hclwrite.Tokens)
+	)
+	for _, name := range reqNames {
+		tokens, err := extractAttr(body, name, errPrefix)
+		if err != nil {
+			return attrVals{}, err
+		}
+		req[name] = tokens
+	}
+	for _, name := range optNames {
+		tokens, _ := extractAttr(body, name, errPrefix)
+		if tokens != nil {
+			opt[name] = tokens
+		}
+	}
+	return attrVals{req: req, opt: opt}, nil
+}
+
+func fillAutoScaling(regionsConfigBody *hclwrite.Body, opt map[string]hclwrite.Tokens) {
+	var (
+		names = [][2]string{ // use slice instead of map to preserve order
+			{nameAutoScalingDiskGBEnabled, nameDiskGBEnabled},
+			{nameAutoScalingComputeEnabled, nameComputeEnabled},
+			{nameProviderAutoScalingComputeMinInstanceSize, nameComputeMinInstanceSize},
+			{nameProviderAutoScalingComputeMaxInstanceSize, nameComputeMaxInstanceSize},
+			{nameAutoScalingComputeScaleDownEnabled, nameComputeScaleDownEnabled},
+		}
+		file     = hclwrite.NewEmptyFile()
+		fileBody = file.Body()
+		filled   = false
+	)
+	for _, tuple := range names {
+		oldName, newName := tuple[0], tuple[1]
+		if tokens := opt[oldName]; tokens != nil {
+			fileBody.SetAttributeRaw(newName, tokens)
+			filled = true
+		}
+	}
+	if filled {
+		regionsConfigBody.SetAttributeRaw(nameAutoScaling, tokensObject(file))
+	}
+}
+
 // moveAttr deletes an attribute from fromBody and adds it to toBody.
 func moveAttr(fromBody, toBody *hclwrite.Body, fromAttrName, toAttrName, errPrefix string) error {
 	tokens, err := extractAttr(fromBody, fromAttrName, errPrefix)
@@ -137,26 +172,6 @@ func moveAttr(fromBody, toBody *hclwrite.Body, fromAttrName, toAttrName, errPref
 		toBody.SetAttributeRaw(toAttrName, tokens)
 	}
 	return err
-}
-
-// extractRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
-func extractRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
-	req := make(map[string]hclwrite.Tokens)
-	for _, name := range rootAttrsMandatory {
-		tokens, err := extractAttr(body, name, errPrefix)
-		if err != nil {
-			return attrVals{}, err
-		}
-		req[name] = tokens
-	}
-	opt := make(map[string]hclwrite.Tokens)
-	for _, name := range rootAttrsOptional {
-		tokens, _ := extractAttr(body, name, errPrefix)
-		if tokens != nil {
-			opt[name] = tokens
-		}
-	}
-	return attrVals{req: req, opt: opt}, nil
 }
 
 // extractAttr deletes an attribute and returns it value.
@@ -255,20 +270,4 @@ const (
 
 	errFreeCluster = "free cluster (because no " + nameReplicationSpecs + ")"
 	errRepSpecs    = "setting " + nameReplicationSpecs
-)
-
-var (
-	rootAttrsMandatory = []string{
-		nameProviderName,
-		nameProviderInstanceSizeName,
-	}
-
-	rootAttrsOptional = []string{
-		nameDiskSizeGB,
-		nameAutoScalingDiskGBEnabled,
-		nameAutoScalingComputeEnabled,
-		nameProviderAutoScalingComputeMinInstanceSize,
-		nameProviderAutoScalingComputeMaxInstanceSize,
-		nameAutoScalingComputeScaleDownEnabled,
-	}
 )
