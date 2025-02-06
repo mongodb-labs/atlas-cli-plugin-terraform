@@ -8,6 +8,21 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
+const (
+	resourceType   = "resource"
+	cluster        = "mongodbatlas_cluster"
+	advCluster     = "mongodbatlas_advanced_cluster"
+	valClusterType = "REPLICASET"
+	valPriority    = 7
+	errFreeCluster = "free cluster (because no " + nRepSpecs + ")"
+	errRepSpecs    = "setting " + nRepSpecs
+)
+
+type attrVals struct {
+	req map[string]hclwrite.Tokens
+	opt map[string]hclwrite.Tokens
+}
+
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
 // Terraform configuration file into mongodbatlas_advanced_cluster schema v2 definitions.
 // All other resources and data sources are left untouched.
@@ -192,50 +207,3 @@ func popRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 	}
 	return attrVals{req: req, opt: opt}, nil
 }
-
-type attrVals struct {
-	req map[string]hclwrite.Tokens
-	opt map[string]hclwrite.Tokens
-}
-
-const (
-	resourceType = "resource"
-	cluster      = "mongodbatlas_cluster"
-	advCluster   = "mongodbatlas_advanced_cluster"
-
-	nRepSpecs                   = "replication_specs"
-	nConfig                     = "region_configs"
-	nConfigSrc                  = "regions_config"
-	nElectableSpecs             = "electable_specs"
-	nAutoScaling                = "auto_scaling"
-	nRegionNameSrc              = "provider_region_name"
-	nRegionName                 = "region_name"
-	nProviderName               = "provider_name"
-	nBackingProviderName        = "backing_provider_name"
-	nInstanceSizeSrc            = "provider_instance_size_name"
-	nInstanceSize               = "instance_size"
-	nClusterType                = "cluster_type"
-	nPriority                   = "priority"
-	nNumShards                  = "num_shards"
-	nBackupEnabled              = "backup_enabled"
-	nCloudBackup                = "cloud_backup"
-	nDiskSizeGB                 = "disk_size_gb"
-	nDiskGBEnabledSrc           = "auto_scaling_disk_gb_enabled"
-	nComputeEnabledSrc          = "auto_scaling_compute_enabled"
-	nComputeScaleDownEnabledSrc = "auto_scaling_compute_scale_down_enabled"
-	nComputeMinInstanceSizeSrc  = "provider_auto_scaling_compute_min_instance_size"
-	nComputeMaxInstanceSizeSrc  = "provider_auto_scaling_compute_max_instance_size"
-	nDiskGBEnabled              = "disk_gb_enabled"
-	nComputeEnabled             = "compute_enabled"
-	nComputeScaleDownEnabled    = "compute_scale_down_enabled"
-	nComputeMinInstanceSize     = "compute_min_instance_size"
-	nComputeMaxInstanceSize     = "compute_max_instance_size"
-	nNodeCount                  = "node_count"
-	nElectableNodes             = "electable_nodes"
-
-	valClusterType = "REPLICASET"
-	valPriority    = 7
-
-	errFreeCluster = "free cluster (because no " + nRepSpecs + ")"
-	errRepSpecs    = "setting " + nRepSpecs
-)
