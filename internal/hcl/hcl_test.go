@@ -35,15 +35,17 @@ func TestClusterToAdvancedCluster(t *testing.T) {
 	assert.NotEmpty(t, inputFiles)
 	for _, inputFile := range inputFiles {
 		testName := strings.TrimSuffix(filepath.Base(inputFile), inSuffix)
-		inConfig, err := afero.ReadFile(fs, inputFile)
-		require.NoError(t, err)
-		outConfig, err := hcl.ClusterToAdvancedCluster(inConfig)
-		if err == nil {
-			g.Assert(t, testName, outConfig)
-		} else {
-			errMsg, found := errMap[testName]
-			assert.True(t, found, "error not found for test %s", testName)
-			assert.Contains(t, err.Error(), errMsg)
-		}
+		t.Run(testName, func(t *testing.T) {
+			inConfig, err := afero.ReadFile(fs, inputFile)
+			require.NoError(t, err)
+			outConfig, err := hcl.ClusterToAdvancedCluster(inConfig)
+			if err == nil {
+				g.Assert(t, testName, outConfig)
+			} else {
+				errMsg, found := errMap[testName]
+				assert.True(t, found, "error not found for test %s", testName)
+				assert.Contains(t, err.Error(), errMsg)
+			}
+		})
 	}
 }
