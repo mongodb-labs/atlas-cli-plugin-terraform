@@ -3,8 +3,8 @@ package clu2adv
 import (
 	"fmt"
 
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/convert"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/file"
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 	"github.com/spf13/afero"
 )
 
@@ -30,7 +30,7 @@ func (o *opts) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", o.file, err)
 	}
-	outConfig, err := hcl.ClusterToAdvancedCluster(inConfig)
+	outConfig, err := convert.ClusterToAdvancedCluster(inConfig)
 	if err != nil {
 		return err
 	}
