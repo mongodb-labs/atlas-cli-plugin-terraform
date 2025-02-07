@@ -37,15 +37,25 @@ func SetAttrInt(body *hclwrite.Body, attrName string, number int) {
 	body.SetAttributeRaw(attrName, tokens)
 }
 
-// TokensArrayObject creates an array with a single object.
-func TokensArrayObject(file *hclwrite.File) hclwrite.Tokens {
+// TokensArray creates an array of objects.
+func TokensArray(file []*hclwrite.File) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")},
 	}
-	ret = append(ret, TokensObject(file)...)
+	for i := range file {
+		ret = append(ret, TokensObject(file[i])...)
+		if i < len(file)-1 {
+			ret = append(ret, &hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")})
+		}
+	}
 	ret = append(ret,
 		&hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")})
 	return ret
+}
+
+// TokensArraySingle creates an array of one object.
+func TokensArraySingle(file *hclwrite.File) hclwrite.Tokens {
+	return TokensArray([]*hclwrite.File{file})
 }
 
 // TokensObject creates an object.

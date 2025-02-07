@@ -1,5 +1,6 @@
 {
 	"configuration_file_error": "failed to parse Terraform config file",
 	"free_cluster_missing_attribute": "free cluster (because no replication_specs): attribute backing_provider_name not found",
-	"autoscaling_missing_attribute": "setting replication_specs: attribute provider_instance_size_name not found"
+	"autoscaling_missing_attribute": "setting replication_specs: attribute provider_instance_size_name not found",
+	"regions_config_missing": "setting replication_specs: regions_config not found"
 }

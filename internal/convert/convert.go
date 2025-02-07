@@ -81,8 +81,8 @@ func fillFreeTier(resourceb *hclwrite.Body) error {
 	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpec))
 
 	repSpecs := hclwrite.NewEmptyFile()
-	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArrayObject(config))
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArrayObject(repSpecs))
+	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArraySingle(config))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs))
 	return nil
 }
 
@@ -92,29 +92,37 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	if errRoot != nil {
 		return errRoot
 	}
-	repSpecsSrc := resourceb.FirstMatchingBlock(nRepSpecs, nil)
-	configSrc := repSpecsSrc.Body().FirstMatchingBlock(nConfigSrc, nil)
-	if configSrc == nil {
-		return fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
-	}
-
 	resourceb.RemoveAttribute(nNumShards) // num_shards in root is not relevant, only in replication_specs
 	// ok to fail as cloud_backup is optional
 	_ = hcl.MoveAttr(resourceb, resourceb, nCloudBackup, nBackupEnabled, errRepSpecs)
 
-	config, errConfig := getRegionConfigs(configSrc, root)
-	if errConfig != nil {
-		return errConfig
+	// at least one replication_specs exists here, if not it would be a free tier cluster
+	repSpecsSrc := resourceb.FirstMatchingBlock(nRepSpecs, nil)
+	var configs []*hclwrite.File
+	for {
+		configSrc := repSpecsSrc.Body().FirstMatchingBlock(nConfigSrc, nil)
+		if configSrc == nil {
+			break
+		}
+		config, err := getRegionConfigs(configSrc, root)
+		if err != nil {
+			return err
+		}
+		configs = append(configs, config)
+		repSpecsSrc.Body().RemoveBlock(configSrc)
+	}
+	if len(configs) == 0 {
+		return fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
 	repSpecs := hclwrite.NewEmptyFile()
-	repSpecs.Body().SetAttributeRaw(nConfig, config)
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArrayObject(repSpecs))
+	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArray(configs))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs))
 
 	resourceb.RemoveBlock(repSpecsSrc)
 	return nil
 }
 
-func getRegionConfigs(configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+func getRegionConfigs(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, error) {
 	file := hclwrite.NewEmptyFile()
 	fileb := file.Body()
 	fileb.SetAttributeRaw(nProviderName, root.req[nProviderName])
@@ -133,7 +141,7 @@ func getRegionConfigs(configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens
 		return nil, errElect
 	}
 	fileb.SetAttributeRaw(nElectableSpecs, electableSpecs)
-	return hcl.TokensArrayObject(file), nil
+	return file, nil
 }
 
 func getElectableSpecs(configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
