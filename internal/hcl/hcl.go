@@ -61,12 +61,12 @@ func TokensArraySingle(file *hclwrite.File) hclwrite.Tokens {
 // TokensObject creates an object.
 func TokensObject(file *hclwrite.File) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
-		{Type: hclsyntax.TokenOBrack, Bytes: []byte("{")},
+		{Type: hclsyntax.TokenOBrace, Bytes: []byte("{")},
 		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
 	ret = append(ret, file.BuildTokens(nil)...)
 	ret = append(ret,
-		&hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("}")})
+		&hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("}")})
 	return ret
 }
 
