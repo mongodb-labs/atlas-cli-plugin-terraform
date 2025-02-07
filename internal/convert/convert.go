@@ -114,6 +114,11 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	if len(configs) == 0 {
 		return fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
+
+	if len(configs) == 3 { // TODO: remove and make sort generic
+		configs[0], configs[1], configs[2] = configs[2], configs[0], configs[1]
+	}
+
 	repSpecs := hclwrite.NewEmptyFile()
 	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArray(configs))
 	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs))
