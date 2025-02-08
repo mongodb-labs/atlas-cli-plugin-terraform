@@ -183,6 +183,12 @@ func getElectableSpecs(configSrc *hclwrite.Block, root attrVals) (hclwrite.Token
 	if root.opt[nDiskSizeGB] != nil {
 		fileb.SetAttributeRaw(nDiskSizeGB, root.opt[nDiskSizeGB])
 	}
+	if root.opt[nEBSVolumeTypeSrc] != nil {
+		fileb.SetAttributeRaw(nEBSVolumeType, root.opt[nEBSVolumeTypeSrc])
+	}
+	if root.opt[nDiskIOPSSrc] != nil {
+		fileb.SetAttributeRaw(nDiskIOPS, root.opt[nDiskIOPSSrc])
+	}
 	return hcl.TokensObject(file), nil
 }
 
@@ -202,6 +208,15 @@ func getReadOnlyAnalyticsOpt(countName string, configSrc *hclwrite.Block, root a
 	}
 	fileb.SetAttributeRaw(nNodeCount, count.Expr().BuildTokens(nil))
 	fileb.SetAttributeRaw(nInstanceSize, root.req[nInstanceSizeSrc])
+	if root.opt[nDiskSizeGB] != nil {
+		fileb.SetAttributeRaw(nDiskSizeGB, root.opt[nDiskSizeGB])
+	}
+	if root.opt[nEBSVolumeTypeSrc] != nil {
+		fileb.SetAttributeRaw(nEBSVolumeType, root.opt[nEBSVolumeTypeSrc])
+	}
+	if root.opt[nDiskIOPSSrc] != nil {
+		fileb.SetAttributeRaw(nDiskIOPS, root.opt[nDiskIOPSSrc])
+	}
 	return hcl.TokensObject(file)
 }
 
@@ -271,6 +286,8 @@ func popRootAttrs(body *hclwrite.Body) (attrVals, error) {
 			nComputeMinInstanceSizeSrc,
 			nComputeMaxInstanceSizeSrc,
 			nComputeScaleDownEnabledSrc,
+			nEBSVolumeTypeSrc,
+			nDiskIOPSSrc,
 		}
 		req = make(map[string]hclwrite.Tokens)
 		opt = make(map[string]hclwrite.Tokens)
