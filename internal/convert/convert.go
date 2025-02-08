@@ -101,6 +101,19 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 
 	// at least one replication_specs exists here, if not it would be a free tier cluster
 	repSpecsSrc := resourceb.FirstMatchingBlock(nRepSpecs, nil)
+	configs, errConfigs := getRegionConfigs(repSpecsSrc, root)
+	if errConfigs != nil {
+		return errConfigs
+	}
+	repSpecs := hclwrite.NewEmptyFile()
+	repSpecs.Body().SetAttributeRaw(nConfig, configs)
+
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs))
+	resourceb.RemoveBlock(repSpecsSrc)
+	return nil
+}
+
+func getRegionConfigs(repSpecsSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
 	var configs []*hclwrite.File
 	for {
 		configSrc := repSpecsSrc.Body().FirstMatchingBlock(nConfigSrc, nil)
@@ -109,25 +122,19 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 		}
 		config, err := getRegionConfig(configSrc, root)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		configs = append(configs, config)
 		repSpecsSrc.Body().RemoveBlock(configSrc)
 	}
 	if len(configs) == 0 {
-		return fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
+		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
 
 	if len(configs) == 3 { // TODO: remove and make sort generic
 		configs[0], configs[1], configs[2] = configs[2], configs[0], configs[1]
 	}
-
-	repSpecs := hclwrite.NewEmptyFile()
-	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArray(configs))
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs))
-
-	resourceb.RemoveBlock(repSpecsSrc)
-	return nil
+	return hcl.TokensArray(configs), nil
 }
 
 func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, error) {
