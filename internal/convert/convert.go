@@ -196,8 +196,8 @@ func getReadOnlyAnalyticsOpt(countName string, configSrc *hclwrite.Block, root a
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
+		count = configSrc.Body().GetAttribute(countName)
 	)
-	count := configSrc.Body().GetAttribute(countName)
 	if count == nil {
 		return nil
 	}
