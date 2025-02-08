@@ -6,6 +6,8 @@ const (
 	nConfigSrc                  = "regions_config"
 	nElectableSpecs             = "electable_specs"
 	nAutoScaling                = "auto_scaling"
+	nReadOnlySpecs              = "read_only_specs"
+	nAnalyticsSpecs             = "analytics_specs"
 	nRegionNameSrc              = "provider_region_name"
 	nRegionName                 = "region_name"
 	nProviderName               = "provider_name"
@@ -30,4 +32,6 @@ const (
 	nComputeMaxInstanceSize     = "compute_max_instance_size"
 	nNodeCount                  = "node_count"
 	nElectableNodes             = "electable_nodes"
+	nReadOnlyNodes              = "read_only_nodes"
+	nAnalyticsNodes             = "analytics_nodes"
 )

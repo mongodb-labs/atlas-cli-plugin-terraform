@@ -45,8 +45,8 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 			continue
 		}
 		resourceb := resource.Body()
-		if err := checkDynamicBlock(resourceb); err != nil {
-			return nil, err
+		if errDyn := checkDynamicBlock(resourceb); errDyn != nil {
+			return nil, errDyn
 		}
 		labels[0] = advCluster
 		resource.SetLabels(labels)
@@ -156,15 +156,20 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	if err := setPriority(fileb, configSrc.Body().GetAttribute(nPriority)); err != nil {
 		return nil, err
 	}
-	autoScaling := getAutoScalingOpt(root.opt)
-	if autoScaling != nil {
-		fileb.SetAttributeRaw(nAutoScaling, autoScaling)
-	}
 	electableSpecs, errElect := getElectableSpecs(configSrc, root)
 	if errElect != nil {
 		return nil, errElect
 	}
 	fileb.SetAttributeRaw(nElectableSpecs, electableSpecs)
+	if readOnly := getReadOnlyAnalyticsOpt(nReadOnlyNodes, configSrc, root); readOnly != nil {
+		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
+	}
+	if analytics := getReadOnlyAnalyticsOpt(nAnalyticsNodes, configSrc, root); analytics != nil {
+		fileb.SetAttributeRaw(nAnalyticsSpecs, analytics)
+	}
+	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
+		fileb.SetAttributeRaw(nAutoScaling, autoScaling)
+	}
 	return file, nil
 }
 
@@ -179,6 +184,25 @@ func getElectableSpecs(configSrc *hclwrite.Block, root attrVals) (hclwrite.Token
 		fileb.SetAttributeRaw(nDiskSizeGB, root.opt[nDiskSizeGB])
 	}
 	return hcl.TokensObject(file), nil
+}
+
+func getReadOnlyAnalyticsOpt(countName string, configSrc *hclwrite.Block, root attrVals) hclwrite.Tokens {
+	var (
+		file  = hclwrite.NewEmptyFile()
+		fileb = file.Body()
+	)
+	count := configSrc.Body().GetAttribute(countName)
+	if count == nil {
+		return nil
+	}
+	countVal, errVal := hcl.GetAttrInt(count, errRepSpecs)
+	// don't include if read_only_nodes or analytics_nodes is 0
+	if countVal == 0 && errVal == nil {
+		return nil
+	}
+	fileb.SetAttributeRaw(nNodeCount, count.Expr().BuildTokens(nil))
+	fileb.SetAttributeRaw(nInstanceSize, root.req[nInstanceSizeSrc])
+	return hcl.TokensObject(file)
 }
 
 func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
@@ -238,6 +262,9 @@ func popRootAttrs(body *hclwrite.Body) (attrVals, error) {
 			nInstanceSizeSrc,
 		}
 		optNames = []string{
+			nElectableNodes,
+			nReadOnlyNodes,
+			nAnalyticsNodes,
 			nDiskSizeGB,
 			nDiskGBEnabledSrc,
 			nComputeEnabledSrc,
