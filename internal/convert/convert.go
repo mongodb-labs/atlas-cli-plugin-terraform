@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -44,6 +45,9 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 			continue
 		}
 		resourceb := resource.Body()
+		if err := checkDynamicBlock(resourceb); err != nil {
+			return nil, err
+		}
 		labels[0] = advCluster
 		resource.SetLabels(labels)
 
@@ -102,6 +106,9 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 
 	// at least one replication_specs exists here, if not it would be a free tier cluster
 	repSpecsSrc := resourceb.FirstMatchingBlock(nRepSpecs, nil)
+	if err := checkDynamicBlock(repSpecsSrc.Body()); err != nil {
+		return err
+	}
 	configs, errConfigs := getRegionConfigs(repSpecsSrc, root)
 	if errConfigs != nil {
 		return errConfigs
@@ -197,6 +204,15 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 		return nil
 	}
 	return hcl.TokensObject(file)
+}
+
+func checkDynamicBlock(body *hclwrite.Body) error {
+	for _, block := range body.Blocks() {
+		if block.Type() == "dynamic" {
+			return errors.New("dynamic blocks are not supported")
+		}
+	}
+	return nil
 }
 
 func setPriority(body *hclwrite.Body, priority *hclwrite.Attribute) error {

@@ -35,6 +35,7 @@ If you want to overwrite the output file if it exists, or even use the same outp
 
 - The plugin doesn't support `regions_config` without `electable_nodes` as there can be some issues with `priority` when they only have `analytics_nodes` and/or `electable_nodes`.
 - `priority` is required in `regions_config` and must be a resolved number between 7 and 1, e.g. `var.prioriy` is not supported. This is to allow reordering them by descending priority as this is expected in `mongodbatlas_advanced_cluster`.
+- `dynamic` blocks to generate `replication_specs`, `regions_config`, etc. are not supported.
 
 
 ## Contributing
