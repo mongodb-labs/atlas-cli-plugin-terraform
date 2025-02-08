@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
@@ -130,10 +131,11 @@ func getRegionConfigs(repSpecsSrc *hclwrite.Block, root attrVals) (hclwrite.Toke
 	if len(configs) == 0 {
 		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
-
-	if len(configs) == 3 { // TODO: remove and make sort generic
-		configs[0], configs[1], configs[2] = configs[2], configs[0], configs[1]
-	}
+	sort.Slice(configs, func(i, j int) bool {
+		pi, _ := hcl.GetAttrInt(configs[i].Body().GetAttribute(nPriority), errPriority)
+		pj, _ := hcl.GetAttrInt(configs[j].Body().GetAttribute(nPriority), errPriority)
+		return pi > pj
+	})
 	return hcl.TokensArray(configs), nil
 }
 
