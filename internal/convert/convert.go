@@ -13,9 +13,12 @@ const (
 	cluster        = "mongodbatlas_cluster"
 	advCluster     = "mongodbatlas_advanced_cluster"
 	valClusterType = "REPLICASET"
-	valPriority    = 7
+	valMaxPriority = 7
+	valMinPriority = 1
 	errFreeCluster = "free cluster (because no " + nRepSpecs + ")"
 	errRepSpecs    = "setting " + nRepSpecs
+	errConfigs     = "setting " + nConfig
+	errPriority    = "setting " + nPriority
 )
 
 type attrVals struct {
@@ -64,7 +67,7 @@ func fillFreeTier(resourceb *hclwrite.Body) error {
 	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
 	config := hclwrite.NewEmptyFile()
 	configb := config.Body()
-	hcl.SetAttrInt(configb, "priority", valPriority)
+	hcl.SetAttrInt(configb, nPriority, valMaxPriority)
 	if err := hcl.MoveAttr(resourceb, configb, nRegionNameSrc, nRegionName, errFreeCluster); err != nil {
 		return err
 	}
@@ -134,9 +137,19 @@ func getRegionConfigs(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File,
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nRegionName, nRegionName, errRepSpecs); err != nil {
 		return nil, err
 	}
-	if err := hcl.MoveAttr(configSrc.Body(), fileb, nPriority, nPriority, errRepSpecs); err != nil {
+	priority := configSrc.Body().GetAttribute(nPriority)
+	if priority == nil {
+		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
+	}
+	valPrioriy, err := hcl.GetAttrInt(priority, errPriority)
+	if err != nil {
 		return nil, err
 	}
+	if valPrioriy < valMinPriority || valPrioriy > valMaxPriority {
+		return nil, fmt.Errorf("%s: %s is %d but must be between %d and %d", errPriority, nPriority, valPrioriy, valMinPriority, valMaxPriority)
+	}
+	hcl.SetAttrInt(fileb, nPriority, valPrioriy)
+
 	autoScaling := getAutoScalingOpt(root.opt)
 	if autoScaling != nil {
 		fileb.SetAttributeRaw(nAutoScaling, autoScaling)

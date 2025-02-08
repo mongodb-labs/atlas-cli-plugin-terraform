@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // MoveAttr deletes an attribute from fromBody and adds it to toBody.
@@ -35,6 +36,23 @@ func SetAttrInt(body *hclwrite.Body, attrName string, number int) {
 		{Type: hclsyntax.TokenNumberLit, Bytes: []byte(strconv.Itoa(number))},
 	}
 	body.SetAttributeRaw(attrName, tokens)
+}
+
+// GetAttrInt tries to get an attribute value as an int.
+func GetAttrInt(attr *hclwrite.Attribute, errPrefix string) (int, error) {
+	expr, diags := hclsyntax.ParseExpression(attr.Expr().BuildTokens(nil).Bytes(), "", hcl.InitialPos)
+	if diags.HasErrors() {
+		return 0, fmt.Errorf("%s: failed to parse number: %s", errPrefix, diags.Error())
+	}
+	val, diags := expr.Value(nil)
+	if diags.HasErrors() {
+		return 0, fmt.Errorf("%s: failed to evaluate number: %s", errPrefix, diags.Error())
+	}
+	if !val.Type().Equals(cty.Number) {
+		return 0, fmt.Errorf("%s: attribute is not a number", errPrefix)
+	}
+	num, _ := val.AsBigFloat().Int64()
+	return int(num), nil
 }
 
 // TokensArray creates an array of objects.

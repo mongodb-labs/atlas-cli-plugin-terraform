@@ -15,9 +15,10 @@ Install the plugin by running:
 atlas plugin install github.com/mongodb-labs/atlas-cli-plugin-terraform
 ```
 
-## Usage
+## Convert cluster to advanced_cluster v2
 
-### Convert cluster to advanced_cluster v2
+### Usage
+
 If you want to convert a Terraform configuration from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` schema v2, use the following command:
 ```bash
 atlas terraform clusterToAdvancedCluster --file in.tf --output out.tf
@@ -29,6 +30,11 @@ atlas tf clu2adv -f in.tf -o out.tf
 ```
 
 If you want to overwrite the output file if it exists, or even use the same output file as the input file, use the `--overwriteOutput true` or the `-w` flag.
+
+### Limitations
+
+- The plugin doesn't support `regions_config` without `electable_nodes` as there can be some issues with `priority` when they only have `analytics_nodes` and/or `electable_nodes`.
+- `priority` is required in `regions_config` and must be a resolved number between 7 and 1, e.g. `var.prioriy` is not supported. This is to allow reordering them by descending priority as this is expected in `mongodbatlas_advanced_cluster`.
 
 
 ## Contributing
