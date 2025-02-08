@@ -91,7 +91,7 @@ func fillFreeTier(resourceb *hclwrite.Body) error {
 
 // fillReplicationSpecs is the entry point to convert clusters with replications_specs (all but free tier)
 func fillReplicationSpecs(resourceb *hclwrite.Body) error {
-	root, errRoot := popRootAttrs(resourceb, errRepSpecs)
+	root, errRoot := popRootAttrs(resourceb)
 	if errRoot != nil {
 		return errRoot
 	}
@@ -107,7 +107,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 		if configSrc == nil {
 			break
 		}
-		config, err := getRegionConfigs(configSrc, root)
+		config, err := getRegionConfig(configSrc, root)
 		if err != nil {
 			return err
 		}
@@ -130,26 +130,16 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	return nil
 }
 
-func getRegionConfigs(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, error) {
+func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, error) {
 	file := hclwrite.NewEmptyFile()
 	fileb := file.Body()
 	fileb.SetAttributeRaw(nProviderName, root.req[nProviderName])
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nRegionName, nRegionName, errRepSpecs); err != nil {
 		return nil, err
 	}
-	priority := configSrc.Body().GetAttribute(nPriority)
-	if priority == nil {
-		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
-	}
-	valPrioriy, err := hcl.GetAttrInt(priority, errPriority)
-	if err != nil {
+	if err := setPriority(fileb, configSrc.Body().GetAttribute(nPriority)); err != nil {
 		return nil, err
 	}
-	if valPrioriy < valMinPriority || valPrioriy > valMaxPriority {
-		return nil, fmt.Errorf("%s: %s is %d but must be between %d and %d", errPriority, nPriority, valPrioriy, valMinPriority, valMaxPriority)
-	}
-	hcl.SetAttrInt(fileb, nPriority, valPrioriy)
-
 	autoScaling := getAutoScalingOpt(root.opt)
 	if autoScaling != nil {
 		fileb.SetAttributeRaw(nAutoScaling, autoScaling)
@@ -200,8 +190,23 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 	return hcl.TokensObject(file)
 }
 
+func setPriority(body *hclwrite.Body, priority *hclwrite.Attribute) error {
+	if priority == nil {
+		return fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
+	}
+	valPrioriy, err := hcl.GetAttrInt(priority, errPriority)
+	if err != nil {
+		return err
+	}
+	if valPrioriy < valMinPriority || valPrioriy > valMaxPriority {
+		return fmt.Errorf("%s: %s is %d but must be between %d and %d", errPriority, nPriority, valPrioriy, valMinPriority, valMaxPriority)
+	}
+	hcl.SetAttrInt(body, nPriority, valPrioriy)
+	return nil
+}
+
 // popRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
-func popRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
+func popRootAttrs(body *hclwrite.Body) (attrVals, error) {
 	var (
 		reqNames = []string{
 			nProviderName,
@@ -219,14 +224,14 @@ func popRootAttrs(body *hclwrite.Body, errPrefix string) (attrVals, error) {
 		opt = make(map[string]hclwrite.Tokens)
 	)
 	for _, name := range reqNames {
-		tokens, err := hcl.PopAttr(body, name, errPrefix)
+		tokens, err := hcl.PopAttr(body, name, errRepSpecs)
 		if err != nil {
 			return attrVals{}, err
 		}
 		req[name] = tokens
 	}
 	for _, name := range optNames {
-		tokens, _ := hcl.PopAttr(body, name, errPrefix)
+		tokens, _ := hcl.PopAttr(body, name, errRepSpecs)
 		if tokens != nil {
 			opt[name] = tokens
 		}
