@@ -201,9 +201,8 @@ func getReadOnlyAnalyticsOpt(countName string, configSrc *hclwrite.Block, root a
 	if count == nil {
 		return nil
 	}
-	countVal, errVal := hcl.GetAttrInt(count, errRepSpecs)
 	// don't include if read_only_nodes or analytics_nodes is 0
-	if countVal == 0 && errVal == nil {
+	if countVal, errVal := hcl.GetAttrInt(count, errRepSpecs); countVal == 0 && errVal == nil {
 		return nil
 	}
 	fileb.SetAttributeRaw(nNodeCount, count.Expr().BuildTokens(nil))
