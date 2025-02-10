@@ -258,14 +258,14 @@ func setPriority(body *hclwrite.Body, priority *hclwrite.Attribute) error {
 	if priority == nil {
 		return fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
 	}
-	valPrioriy, err := hcl.GetAttrInt(priority, errPriority)
+	valPriority, err := hcl.GetAttrInt(priority, errPriority)
 	if err != nil {
 		return err
 	}
-	if valPrioriy < valMinPriority || valPrioriy > valMaxPriority {
-		return fmt.Errorf("%s: %s is %d but must be between %d and %d", errPriority, nPriority, valPrioriy, valMinPriority, valMaxPriority)
+	if valPriority < valMinPriority || valPriority > valMaxPriority {
+		return fmt.Errorf("%s: %s is %d but must be between %d and %d", errPriority, nPriority, valPriority, valMinPriority, valMaxPriority)
 	}
-	hcl.SetAttrInt(body, nPriority, valPrioriy)
+	hcl.SetAttrInt(body, nPriority, valPriority)
 	return nil
 }
 
