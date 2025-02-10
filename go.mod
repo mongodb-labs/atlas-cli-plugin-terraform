@@ -1,6 +1,6 @@
 module github.com/mongodb-labs/atlas-cli-plugin-terraform
 
-go 1.23.4
+go 1.23.6
 
 require (
 	github.com/hashicorp/hcl/v2 v2.23.0
