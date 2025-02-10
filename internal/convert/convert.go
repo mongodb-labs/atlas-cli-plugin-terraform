@@ -181,7 +181,6 @@ func getSpecs(countName string, configSrc *hclwrite.Block, root attrVals) (hclwr
 	)
 	if count == nil {
 		return nil, fmt.Errorf("%s: attribute %s not found", errRepSpecs, countName)
-
 	}
 	if countVal, errVal := hcl.GetAttrInt(count, errRepSpecs); countVal == 0 && errVal == nil {
 		return nil, fmt.Errorf("%s: attribute %s is 0", errRepSpecs, countName)
