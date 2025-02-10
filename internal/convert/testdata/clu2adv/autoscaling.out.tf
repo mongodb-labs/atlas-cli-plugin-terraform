@@ -16,17 +16,17 @@ resource "mongodbatlas_advanced_cluster" "autoscaling" {
       provider_name = "AWS"
       region_name   = "US_WEST_2"
       priority      = 7
+      electable_specs = {
+        node_count    = 3
+        instance_size = "M20"
+        disk_size_gb  = 100
+      }
       auto_scaling = {
         disk_gb_enabled            = true
         compute_enabled            = false
         compute_min_instance_size  = "M10"
         compute_max_instance_size  = "M40"
         compute_scale_down_enabled = local.scale_down
-      }
-      electable_specs = {
-        node_count    = 3
-        instance_size = "M20"
-        disk_size_gb  = 100
       }
     }]
   }]

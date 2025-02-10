@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // MoveAttr deletes an attribute from fromBody and adds it to toBody.
@@ -37,26 +38,53 @@ func SetAttrInt(body *hclwrite.Body, attrName string, number int) {
 	body.SetAttributeRaw(attrName, tokens)
 }
 
-// TokensArrayObject creates an array with a single object.
-func TokensArrayObject(file *hclwrite.File) hclwrite.Tokens {
+// GetAttrInt tries to get an attribute value as an int.
+func GetAttrInt(attr *hclwrite.Attribute, errPrefix string) (int, error) {
+	expr, diags := hclsyntax.ParseExpression(attr.Expr().BuildTokens(nil).Bytes(), "", hcl.InitialPos)
+	if diags.HasErrors() {
+		return 0, fmt.Errorf("%s: failed to parse number: %s", errPrefix, diags.Error())
+	}
+	val, diags := expr.Value(nil)
+	if diags.HasErrors() {
+		return 0, fmt.Errorf("%s: failed to evaluate number: %s", errPrefix, diags.Error())
+	}
+	if !val.Type().Equals(cty.Number) {
+		return 0, fmt.Errorf("%s: attribute is not a number", errPrefix)
+	}
+	num, _ := val.AsBigFloat().Int64()
+	return int(num), nil
+}
+
+// TokensArray creates an array of objects.
+func TokensArray(file []*hclwrite.File) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")},
 	}
-	ret = append(ret, TokensObject(file)...)
+	for i := range file {
+		ret = append(ret, TokensObject(file[i])...)
+		if i < len(file)-1 {
+			ret = append(ret, &hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")})
+		}
+	}
 	ret = append(ret,
 		&hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")})
 	return ret
 }
 
+// TokensArraySingle creates an array of one object.
+func TokensArraySingle(file *hclwrite.File) hclwrite.Tokens {
+	return TokensArray([]*hclwrite.File{file})
+}
+
 // TokensObject creates an object.
 func TokensObject(file *hclwrite.File) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
-		{Type: hclsyntax.TokenOBrack, Bytes: []byte("{")},
+		{Type: hclsyntax.TokenOBrace, Bytes: []byte("{")},
 		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
 	ret = append(ret, file.BuildTokens(nil)...)
 	ret = append(ret,
-		&hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("}")})
+		&hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("}")})
 	return ret
 }
 
