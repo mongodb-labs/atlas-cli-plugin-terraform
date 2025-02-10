@@ -156,15 +156,15 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	if err := setPriority(fileb, configSrc.Body().GetAttribute(nPriority)); err != nil {
 		return nil, err
 	}
-	electableSpecs, errElect := getElectableSpecs(configSrc, root)
-	if errElect != nil {
-		return nil, errElect
+	electableSpecs, errElec := getSpecs(nElectableNodes, configSrc, root)
+	if errElec != nil {
+		return nil, errElec
 	}
 	fileb.SetAttributeRaw(nElectableSpecs, electableSpecs)
-	if readOnly := getReadOnlyAnalyticsOpt(nReadOnlyNodes, configSrc, root); readOnly != nil {
+	if readOnly, _ := getSpecs(nReadOnlyNodes, configSrc, root); readOnly != nil {
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
-	if analytics := getReadOnlyAnalyticsOpt(nAnalyticsNodes, configSrc, root); analytics != nil {
+	if analytics, _ := getSpecs(nAnalyticsNodes, configSrc, root); analytics != nil {
 		fileb.SetAttributeRaw(nAnalyticsSpecs, analytics)
 	}
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
@@ -173,37 +173,18 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	return file, nil
 }
 
-func getElectableSpecs(configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
-	file := hclwrite.NewEmptyFile()
-	fileb := file.Body()
-	if err := hcl.MoveAttr(configSrc.Body(), fileb, nElectableNodes, nNodeCount, errRepSpecs); err != nil {
-		return nil, err
-	}
-	fileb.SetAttributeRaw(nInstanceSize, root.req[nInstanceSizeSrc])
-	if root.opt[nDiskSizeGB] != nil {
-		fileb.SetAttributeRaw(nDiskSizeGB, root.opt[nDiskSizeGB])
-	}
-	if root.opt[nEBSVolumeTypeSrc] != nil {
-		fileb.SetAttributeRaw(nEBSVolumeType, root.opt[nEBSVolumeTypeSrc])
-	}
-	if root.opt[nDiskIOPSSrc] != nil {
-		fileb.SetAttributeRaw(nDiskIOPS, root.opt[nDiskIOPSSrc])
-	}
-	return hcl.TokensObject(file), nil
-}
-
-func getReadOnlyAnalyticsOpt(countName string, configSrc *hclwrite.Block, root attrVals) hclwrite.Tokens {
+func getSpecs(countName string, configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
 		count = configSrc.Body().GetAttribute(countName)
 	)
 	if count == nil {
-		return nil
+		return nil, fmt.Errorf("%s: attribute %s not found", errRepSpecs, countName)
+
 	}
-	// don't include if read_only_nodes or analytics_nodes is 0
 	if countVal, errVal := hcl.GetAttrInt(count, errRepSpecs); countVal == 0 && errVal == nil {
-		return nil
+		return nil, fmt.Errorf("%s: attribute %s is 0", errRepSpecs, countName)
 	}
 	fileb.SetAttributeRaw(nNodeCount, count.Expr().BuildTokens(nil))
 	fileb.SetAttributeRaw(nInstanceSize, root.req[nInstanceSizeSrc])
@@ -216,7 +197,7 @@ func getReadOnlyAnalyticsOpt(countName string, configSrc *hclwrite.Block, root a
 	if root.opt[nDiskIOPSSrc] != nil {
 		fileb.SetAttributeRaw(nDiskIOPS, root.opt[nDiskIOPSSrc])
 	}
-	return hcl.TokensObject(file)
+	return hcl.TokensObject(file), nil
 }
 
 func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {

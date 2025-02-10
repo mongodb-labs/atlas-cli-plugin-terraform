@@ -43,7 +43,7 @@ func TestClusterToAdvancedCluster(t *testing.T) {
 				g.Assert(t, testName, outConfig)
 			} else {
 				errMsg, found := errMap[testName]
-				assert.True(t, found, "error not found in file %s for test %s", errFilename, testName)
+				assert.True(t, found, "error not found in file %s for test %s, errMsg: %v", errFilename, testName, err)
 				assert.Contains(t, err.Error(), errMsg)
 			}
 		})
