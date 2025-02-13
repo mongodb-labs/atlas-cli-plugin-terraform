@@ -72,13 +72,13 @@ func GetAttrString(attr *hclwrite.Attribute, errPrefix string) (string, error) {
 }
 
 // TokensArray creates an array of objects.
-func TokensArray(file []*hclwrite.File) hclwrite.Tokens {
+func TokensArray(bodies []*hclwrite.Body) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")},
 	}
-	for i := range file {
-		ret = append(ret, TokensObject(file[i])...)
-		if i < len(file)-1 {
+	for i := range bodies {
+		ret = append(ret, TokensObject(bodies[i])...)
+		if i < len(bodies)-1 {
 			ret = append(ret, &hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")})
 		}
 	}
@@ -88,17 +88,17 @@ func TokensArray(file []*hclwrite.File) hclwrite.Tokens {
 }
 
 // TokensArraySingle creates an array of one object.
-func TokensArraySingle(file *hclwrite.File) hclwrite.Tokens {
-	return TokensArray([]*hclwrite.File{file})
+func TokensArraySingle(body *hclwrite.Body) hclwrite.Tokens {
+	return TokensArray([]*hclwrite.Body{body})
 }
 
 // TokensObject creates an object.
-func TokensObject(file *hclwrite.File) hclwrite.Tokens {
+func TokensObject(body *hclwrite.Body) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrace, Bytes: []byte("{")},
 		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
-	ret = append(ret, file.BuildTokens(nil)...)
+	ret = append(ret, body.BuildTokens(nil)...)
 	ret = append(ret,
 		&hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("}")})
 	return ret
