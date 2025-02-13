@@ -79,14 +79,18 @@ func GetAttrString(attr *hclwrite.Attribute, errPrefix string) (string, error) {
 func TokensArray(bodies []*hclwrite.Body) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")},
+		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
 	for i := range bodies {
 		ret = append(ret, TokensObject(bodies[i])...)
 		if i < len(bodies)-1 {
-			ret = append(ret, &hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")})
+			ret = append(ret,
+				&hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")},
+				&hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
 		}
 	}
 	ret = append(ret,
+		&hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 		&hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")})
 	return ret
 }

@@ -2,17 +2,21 @@ resource "mongodbatlas_advanced_cluster" "basictags" {
   project_id   = var.project_id
   name         = "basictags"
   cluster_type = "REPLICASET"
-  replication_specs = [{
-    region_configs = [{
-      provider_name = "AWS"
-      region_name   = "US_EAST_1"
-      priority      = 7
-      electable_specs = {
-        node_count    = 3
-        instance_size = "M10"
-      }
-    }]
-  }]
+  replication_specs = [
+    {
+      region_configs = [
+        {
+          provider_name = "AWS"
+          region_name   = "US_EAST_1"
+          priority      = 7
+          electable_specs = {
+            node_count    = 3
+            instance_size = "M10"
+          }
+        }
+      ]
+    }
+  ]
   tags = {
     environment = "dev"
   }
@@ -25,17 +29,21 @@ resource "mongodbatlas_advanced_cluster" "basictimeouts" {
   project_id   = var.project_id
   name         = "basictimeouts"
   cluster_type = "REPLICASET"
-  replication_specs = [{
-    region_configs = [{
-      provider_name = "AWS"
-      region_name   = "US_EAST_1"
-      priority      = 7
-      electable_specs = {
-        node_count    = 3
-        instance_size = "M10"
-      }
-    }]
-  }]
+  replication_specs = [
+    {
+      region_configs = [
+        {
+          provider_name = "AWS"
+          region_name   = "US_EAST_1"
+          priority      = 7
+          electable_specs = {
+            node_count    = 3
+            instance_size = "M10"
+          }
+        }
+      ]
+    }
+  ]
   timeouts = {
     create = "60m"
   }
@@ -48,17 +56,21 @@ resource "mongodbatlas_advanced_cluster" "all" {
   project_id   = var.project_id
   name         = "all"
   cluster_type = "REPLICASET"
-  replication_specs = [{
-    region_configs = [{
-      provider_name = "AWS"
-      region_name   = "US_EAST_1"
-      priority      = 7
-      electable_specs = {
-        node_count    = 3
-        instance_size = "M10"
-      }
-    }]
-  }]
+  replication_specs = [
+    {
+      region_configs = [
+        {
+          provider_name = "AWS"
+          region_name   = "US_EAST_1"
+          priority      = 7
+          electable_specs = {
+            node_count    = 3
+            instance_size = "M10"
+          }
+        }
+      ]
+    }
+  ]
   tags = {
     environment = "dev"
     "Tag 2"     = "Value 2"
