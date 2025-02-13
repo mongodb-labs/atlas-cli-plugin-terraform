@@ -4,6 +4,9 @@ const (
 	nRepSpecs                   = "replication_specs"
 	nConfig                     = "region_configs"
 	nConfigSrc                  = "regions_config"
+	nTags                       = "tags"
+	nLabels                     = "labels"
+	nTimeouts                   = "timeouts"
 	nElectableSpecs             = "electable_specs"
 	nAutoScaling                = "auto_scaling"
 	nReadOnlySpecs              = "read_only_specs"
@@ -38,4 +41,6 @@ const (
 	nElectableNodes             = "electable_nodes"
 	nReadOnlyNodes              = "read_only_nodes"
 	nAnalyticsNodes             = "analytics_nodes"
+	nKey                        = "key"
+	nValue                      = "value"
 )

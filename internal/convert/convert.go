@@ -115,8 +115,15 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	}
 	repSpecs := hclwrite.NewEmptyFile()
 	repSpecs.Body().SetAttributeRaw(nConfig, configs)
-
 	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs))
+	tags, errTags := getTagsLabelsOpt(nTags, resourceb)
+	if errTags != nil {
+		return errTags
+	}
+	if tags != nil {
+		resourceb.SetAttributeRaw(nTags, tags)
+	}
+
 	resourceb.RemoveBlock(repSpecsSrc)
 	return nil
 }
@@ -222,6 +229,36 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 		return nil
 	}
 	return hcl.TokensObject(file)
+}
+
+func getTagsLabelsOpt(attrName string, resourceb *hclwrite.Body) (hclwrite.Tokens, error) {
+	var (
+		file  = hclwrite.NewEmptyFile()
+		fileb = file.Body()
+		found = false
+	)
+	for {
+		block := resourceb.FirstMatchingBlock(attrName, nil)
+		if block == nil {
+			break
+		}
+		key := block.Body().GetAttribute(nKey)
+		value := block.Body().GetAttribute(nValue)
+		if key == nil || value == nil {
+			return nil, fmt.Errorf("%s: %s or %s not found", attrName, nKey, nValue)
+		}
+		keyStr, err := hcl.GetAttrString(key, "unresolved key in "+attrName)
+		if err != nil {
+			return nil, err
+		}
+		fileb.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
+		resourceb.RemoveBlock(block)
+		found = true
+	}
+	if !found {
+		return nil, nil
+	}
+	return hcl.TokensObject(file), nil
 }
 
 func checkDynamicBlock(body *hclwrite.Body) error {

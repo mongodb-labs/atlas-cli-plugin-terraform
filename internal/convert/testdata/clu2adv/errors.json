@@ -8,5 +8,6 @@
 	"regions_config_out_of_range_priority": "setting priority: priority is 0 but must be between 1 and 7",
 	"regions_config_unresolved_priority": "setting priority: failed to evaluate number",
 	"replication_specs_unsupported_dynamic": "dynamic blocks are not supported",
-	"regions_config_unsupported_dynamic": "dynamic blocks are not supported"
+	"regions_config_unsupported_dynamic": "dynamic blocks are not supported",
+	"tags_unresolved_key": "unresolved key in tags"
 }

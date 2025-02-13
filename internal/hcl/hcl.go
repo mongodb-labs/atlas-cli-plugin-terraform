@@ -55,6 +55,22 @@ func GetAttrInt(attr *hclwrite.Attribute, errPrefix string) (int, error) {
 	return int(num), nil
 }
 
+// GetAttrString tries to get an attribute value as a string.
+func GetAttrString(attr *hclwrite.Attribute, errPrefix string) (string, error) {
+	expr, diags := hclsyntax.ParseExpression(attr.Expr().BuildTokens(nil).Bytes(), "", hcl.InitialPos)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("%s: failed to parse string: %s", errPrefix, diags.Error())
+	}
+	val, diags := expr.Value(nil)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("%s: failed to evaluate string: %s", errPrefix, diags.Error())
+	}
+	if !val.Type().Equals(cty.String) {
+		return "", fmt.Errorf("%s: attribute is not a string", errPrefix)
+	}
+	return val.AsString(), nil
+}
+
 // TokensArray creates an array of objects.
 func TokensArray(file []*hclwrite.File) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
