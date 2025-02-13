@@ -98,14 +98,23 @@ func TokensArraySingle(body *hclwrite.Body) hclwrite.Tokens {
 
 // TokensObject creates an object.
 func TokensObject(body *hclwrite.Body) hclwrite.Tokens {
+	tokens := RemoveLeadingNewline(body.BuildTokens(nil))
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrace, Bytes: []byte("{")},
 		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
-	ret = append(ret, body.BuildTokens(nil)...)
+	ret = append(ret, tokens...)
 	ret = append(ret,
 		&hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("}")})
 	return ret
+}
+
+// RemoveLeadingNewline removes the first newline if it exists to make the output prettier.
+func RemoveLeadingNewline(tokens hclwrite.Tokens) hclwrite.Tokens {
+	if len(tokens) > 0 && tokens[0].Type == hclsyntax.TokenNewline {
+		return tokens[1:]
+	}
+	return tokens
 }
 
 // AppendComment adds a comment at the end of the body.

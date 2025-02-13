@@ -68,6 +68,7 @@ resource "mongodbatlas_cluster" "all" {
     value = "label val 2"
   }
   timeouts {
+    # comments in timeouts are also copied
     create = "60m"
     update = "50m"
     delete = "30m"
