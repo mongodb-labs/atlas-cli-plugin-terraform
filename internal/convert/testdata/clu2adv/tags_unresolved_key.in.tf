@@ -14,7 +14,7 @@ resource "mongodbatlas_cluster" "basictags" {
   }
   tags {
     # key must be a resolved string because it will be the key in the advanced_cluster map
-    key   = var.env
-    value = "dev"
+    key   = var.tag_key
+    value = "value"
   }
 }
