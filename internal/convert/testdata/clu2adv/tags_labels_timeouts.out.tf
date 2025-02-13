@@ -62,11 +62,11 @@ resource "mongodbatlas_advanced_cluster" "all" {
   }]
   tags = {
     environment = "dev"
-    Tag 2       = "Value 2"
+    "Tag 2"     = "Value 2"
   }
   labels = {
-    label1  = "Val label 1"
-    Label 2 = "label val 2"
+    label1    = "Val label 1"
+    "Label 2" = "label val 2"
   }
   timeouts = {
 
