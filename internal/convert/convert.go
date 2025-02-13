@@ -123,6 +123,13 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	if tags != nil {
 		resourceb.SetAttributeRaw(nTags, tags)
 	}
+	labels, errLabels := getTagsLabelsOpt(nLabels, resourceb)
+	if errLabels != nil {
+		return errLabels
+	}
+	if labels != nil {
+		resourceb.SetAttributeRaw(nLabels, labels)
+	}
 	fillTimeoutsOpt(resourceb)
 	resourceb.RemoveBlock(repSpecsSrc)
 	return nil
