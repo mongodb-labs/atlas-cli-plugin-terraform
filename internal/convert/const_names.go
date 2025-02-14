@@ -7,6 +7,7 @@ const (
 	nTags                       = "tags"
 	nLabels                     = "labels"
 	nTimeouts                   = "timeouts"
+	nAdvancedConfiguration      = "advanced_configuration"
 	nElectableSpecs             = "electable_specs"
 	nAutoScaling                = "auto_scaling"
 	nReadOnlySpecs              = "read_only_specs"

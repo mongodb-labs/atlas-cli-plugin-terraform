@@ -130,7 +130,8 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	if labels != nil {
 		resourceb.SetAttributeRaw(nLabels, labels)
 	}
-	fillTimeoutsOpt(resourceb)
+	fillBlockOpt(resourceb, nTimeouts)
+	fillBlockOpt(resourceb, nAdvancedConfiguration)
 	resourceb.RemoveBlock(repSpecsSrc)
 	return nil
 }
@@ -269,13 +270,13 @@ func getTagsLabelsOpt(attrName string, resourceb *hclwrite.Body) (hclwrite.Token
 	return hcl.TokensObject(fileb), nil
 }
 
-func fillTimeoutsOpt(resourceb *hclwrite.Body) {
-	block := resourceb.FirstMatchingBlock(nTimeouts, nil)
+func fillBlockOpt(resourceb *hclwrite.Body, name string) {
+	block := resourceb.FirstMatchingBlock(name, nil)
 	if block == nil {
 		return
 	}
 	resourceb.RemoveBlock(block)
-	resourceb.SetAttributeRaw(nTimeouts, hcl.TokensObject(block.Body()))
+	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
 }
 
 func checkDynamicBlock(body *hclwrite.Body) error {
