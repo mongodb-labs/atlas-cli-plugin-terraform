@@ -116,14 +116,14 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	repSpecs := hclwrite.NewEmptyFile()
 	repSpecs.Body().SetAttributeRaw(nConfig, configs)
 	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs.Body()))
-	tags, errTags := getTagsLabelsOpt(nTags, resourceb)
+	tags, errTags := getTagsLabelsOpt(resourceb, nTags)
 	if errTags != nil {
 		return errTags
 	}
 	if tags != nil {
 		resourceb.SetAttributeRaw(nTags, tags)
 	}
-	labels, errLabels := getTagsLabelsOpt(nLabels, resourceb)
+	labels, errLabels := getTagsLabelsOpt(resourceb, nLabels)
 	if errLabels != nil {
 		return errLabels
 	}
@@ -131,7 +131,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 		resourceb.SetAttributeRaw(nLabels, labels)
 	}
 	fillBlockOpt(resourceb, nTimeouts)
-	fillBlockOpt(resourceb, nAdvancedConfiguration)
+	fillBlockOpt(resourceb, nAdvConf)
 	resourceb.RemoveBlock(repSpecsSrc)
 	return nil
 }
@@ -171,15 +171,15 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	if err := setPriority(fileb, configSrc.Body().GetAttribute(nPriority)); err != nil {
 		return nil, err
 	}
-	electableSpecs, errElec := getSpecs(nElectableNodes, configSrc, root)
+	electableSpecs, errElec := getSpecs(configSrc, nElectableNodes, root)
 	if errElec != nil {
 		return nil, errElec
 	}
 	fileb.SetAttributeRaw(nElectableSpecs, electableSpecs)
-	if readOnly, _ := getSpecs(nReadOnlyNodes, configSrc, root); readOnly != nil {
+	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root); readOnly != nil {
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
-	if analytics, _ := getSpecs(nAnalyticsNodes, configSrc, root); analytics != nil {
+	if analytics, _ := getSpecs(configSrc, nAnalyticsNodes, root); analytics != nil {
 		fileb.SetAttributeRaw(nAnalyticsSpecs, analytics)
 	}
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
@@ -188,7 +188,7 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	return file, nil
 }
 
-func getSpecs(countName string, configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals) (hclwrite.Tokens, error) {
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
@@ -240,23 +240,23 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 	return hcl.TokensObject(fileb)
 }
 
-func getTagsLabelsOpt(attrName string, resourceb *hclwrite.Body) (hclwrite.Tokens, error) {
+func getTagsLabelsOpt(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
 		found = false
 	)
 	for {
-		block := resourceb.FirstMatchingBlock(attrName, nil)
+		block := resourceb.FirstMatchingBlock(name, nil)
 		if block == nil {
 			break
 		}
 		key := block.Body().GetAttribute(nKey)
 		value := block.Body().GetAttribute(nValue)
 		if key == nil || value == nil {
-			return nil, fmt.Errorf("%s: %s or %s not found", attrName, nKey, nValue)
+			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
 		}
-		keyStr, err := hcl.GetAttrString(key, "unresolved key in "+attrName)
+		keyStr, err := hcl.GetAttrString(key, "unresolved key in "+name)
 		if err != nil {
 			return nil, err
 		}
