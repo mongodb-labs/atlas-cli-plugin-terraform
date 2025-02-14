@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 	"github.com/zclconf/go-cty/cty"
@@ -258,11 +261,7 @@ func getTagsLabelsOpt(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, e
 		if key == nil || value == nil {
 			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
 		}
-		keyStr, err := hcl.GetAttrString(key, "unresolved key in "+name)
-		if err != nil {
-			return nil, err
-		}
-		fileb.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
+		setKeyValue(fileb, key, value)
 		resourceb.RemoveBlock(block)
 		found = true
 	}
@@ -288,6 +287,19 @@ func checkDynamicBlock(body *hclwrite.Body) error {
 		}
 	}
 	return nil
+}
+
+func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
+	keyStr, err := hcl.GetAttrString(key, "")
+	if err == nil {
+		if !hclsyntax.ValidIdentifier(keyStr) {
+			keyStr = strconv.Quote(keyStr)
+		}
+	} else {
+		keyStr = strings.TrimSpace(string(key.Expr().BuildTokens(nil).Bytes()))
+		keyStr = "(" + keyStr + ")" // wrap in parentheses so unresolved expressions can be used as attribute names
+	}
+	body.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
 }
 
 func setPriority(body *hclwrite.Body, priority *hclwrite.Attribute) error {

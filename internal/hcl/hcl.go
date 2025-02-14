@@ -68,11 +68,7 @@ func GetAttrString(attr *hclwrite.Attribute, errPrefix string) (string, error) {
 	if !val.Type().Equals(cty.String) {
 		return "", fmt.Errorf("%s: attribute is not a string", errPrefix)
 	}
-	str := val.AsString()
-	if !hclsyntax.ValidIdentifier(str) {
-		str = strconv.Quote(str)
-	}
-	return str, nil
+	return val.AsString(), nil
 }
 
 // TokensArray creates an array of objects.

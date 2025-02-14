@@ -72,8 +72,9 @@ resource "mongodbatlas_advanced_cluster" "all" {
     }
   ]
   tags = {
-    environment = "dev"
-    "Tag 2"     = "Value 2"
+    environment   = "dev"
+    (var.tag_key) = var.tag_value
+    "Tag 2"       = "Value 2"
   }
   labels = {
     label1    = "Val label 1"

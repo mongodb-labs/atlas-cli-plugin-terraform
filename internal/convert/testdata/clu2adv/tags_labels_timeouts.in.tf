@@ -56,6 +56,10 @@ resource "mongodbatlas_cluster" "all" {
     value = "dev"
   }
   tags {
+    key   = var.tag_key # unresolved attributes are supported and enclosed in parentheses
+    value = var.tag_value
+  }
+  tags {
     key   = "Tag 2"
     value = "Value 2"
   }
