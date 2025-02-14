@@ -55,37 +55,66 @@ func GetAttrInt(attr *hclwrite.Attribute, errPrefix string) (int, error) {
 	return int(num), nil
 }
 
+// GetAttrString tries to get an attribute value as a string.
+func GetAttrString(attr *hclwrite.Attribute, errPrefix string) (string, error) {
+	expr, diags := hclsyntax.ParseExpression(attr.Expr().BuildTokens(nil).Bytes(), "", hcl.InitialPos)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("%s: failed to parse string: %s", errPrefix, diags.Error())
+	}
+	val, diags := expr.Value(nil)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("%s: failed to evaluate string: %s", errPrefix, diags.Error())
+	}
+	if !val.Type().Equals(cty.String) {
+		return "", fmt.Errorf("%s: attribute is not a string", errPrefix)
+	}
+	return val.AsString(), nil
+}
+
 // TokensArray creates an array of objects.
-func TokensArray(file []*hclwrite.File) hclwrite.Tokens {
+func TokensArray(bodies []*hclwrite.Body) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")},
+		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
-	for i := range file {
-		ret = append(ret, TokensObject(file[i])...)
-		if i < len(file)-1 {
-			ret = append(ret, &hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")})
+	for i := range bodies {
+		ret = append(ret, TokensObject(bodies[i])...)
+		if i < len(bodies)-1 {
+			ret = append(ret,
+				&hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")},
+				&hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
 		}
 	}
 	ret = append(ret,
+		&hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 		&hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")})
 	return ret
 }
 
 // TokensArraySingle creates an array of one object.
-func TokensArraySingle(file *hclwrite.File) hclwrite.Tokens {
-	return TokensArray([]*hclwrite.File{file})
+func TokensArraySingle(body *hclwrite.Body) hclwrite.Tokens {
+	return TokensArray([]*hclwrite.Body{body})
 }
 
 // TokensObject creates an object.
-func TokensObject(file *hclwrite.File) hclwrite.Tokens {
+func TokensObject(body *hclwrite.Body) hclwrite.Tokens {
+	tokens := RemoveLeadingNewline(body.BuildTokens(nil))
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOBrace, Bytes: []byte("{")},
 		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
-	ret = append(ret, file.BuildTokens(nil)...)
+	ret = append(ret, tokens...)
 	ret = append(ret,
 		&hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("}")})
 	return ret
+}
+
+// RemoveLeadingNewline removes the first newline if it exists to make the output prettier.
+func RemoveLeadingNewline(tokens hclwrite.Tokens) hclwrite.Tokens {
+	if len(tokens) > 0 && tokens[0].Type == hclsyntax.TokenNewline {
+		return tokens[1:]
+	}
+	return tokens
 }
 
 // AppendComment adds a comment at the end of the body.

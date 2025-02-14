@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 	"github.com/zclconf/go-cty/cty"
@@ -86,11 +89,11 @@ func fillFreeTier(resourceb *hclwrite.Body) error {
 	if err := hcl.MoveAttr(resourceb, electableSpec.Body(), nInstanceSizeSrc, nInstanceSize, errFreeCluster); err != nil {
 		return err
 	}
-	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpec))
+	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpec.Body()))
 
 	repSpecs := hclwrite.NewEmptyFile()
-	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArraySingle(config))
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs))
+	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArraySingle(configb))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs.Body()))
 	return nil
 }
 
@@ -115,14 +118,31 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	}
 	repSpecs := hclwrite.NewEmptyFile()
 	repSpecs.Body().SetAttributeRaw(nConfig, configs)
-
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs.Body()))
+	tags, errTags := getTagsLabelsOpt(resourceb, nTags)
+	if errTags != nil {
+		return errTags
+	}
+	if tags != nil {
+		resourceb.SetAttributeRaw(nTags, tags)
+	}
+	labels, errLabels := getTagsLabelsOpt(resourceb, nLabels)
+	if errLabels != nil {
+		return errLabels
+	}
+	if labels != nil {
+		resourceb.SetAttributeRaw(nLabels, labels)
+	}
+	fillBlockOpt(resourceb, nTimeouts)
+	fillBlockOpt(resourceb, nAdvConf)
+	fillBlockOpt(resourceb, nBiConnector)
+	fillBlockOpt(resourceb, nPinnedFCV)
 	resourceb.RemoveBlock(repSpecsSrc)
 	return nil
 }
 
 func getRegionConfigs(repSpecsSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
-	var configs []*hclwrite.File
+	var configs []*hclwrite.Body
 	for {
 		configSrc := repSpecsSrc.Body().FirstMatchingBlock(nConfigSrc, nil)
 		if configSrc == nil {
@@ -132,15 +152,15 @@ func getRegionConfigs(repSpecsSrc *hclwrite.Block, root attrVals) (hclwrite.Toke
 		if err != nil {
 			return nil, err
 		}
-		configs = append(configs, config)
+		configs = append(configs, config.Body())
 		repSpecsSrc.Body().RemoveBlock(configSrc)
 	}
 	if len(configs) == 0 {
 		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
 	sort.Slice(configs, func(i, j int) bool {
-		pi, _ := hcl.GetAttrInt(configs[i].Body().GetAttribute(nPriority), errPriority)
-		pj, _ := hcl.GetAttrInt(configs[j].Body().GetAttribute(nPriority), errPriority)
+		pi, _ := hcl.GetAttrInt(configs[i].GetAttribute(nPriority), errPriority)
+		pj, _ := hcl.GetAttrInt(configs[j].GetAttribute(nPriority), errPriority)
 		return pi > pj
 	})
 	return hcl.TokensArray(configs), nil
@@ -156,15 +176,15 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	if err := setPriority(fileb, configSrc.Body().GetAttribute(nPriority)); err != nil {
 		return nil, err
 	}
-	electableSpecs, errElec := getSpecs(nElectableNodes, configSrc, root)
+	electableSpecs, errElec := getSpecs(configSrc, nElectableNodes, root)
 	if errElec != nil {
 		return nil, errElec
 	}
 	fileb.SetAttributeRaw(nElectableSpecs, electableSpecs)
-	if readOnly, _ := getSpecs(nReadOnlyNodes, configSrc, root); readOnly != nil {
+	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root); readOnly != nil {
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
-	if analytics, _ := getSpecs(nAnalyticsNodes, configSrc, root); analytics != nil {
+	if analytics, _ := getSpecs(configSrc, nAnalyticsNodes, root); analytics != nil {
 		fileb.SetAttributeRaw(nAnalyticsSpecs, analytics)
 	}
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
@@ -173,7 +193,7 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	return file, nil
 }
 
-func getSpecs(countName string, configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals) (hclwrite.Tokens, error) {
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
@@ -196,7 +216,7 @@ func getSpecs(countName string, configSrc *hclwrite.Block, root attrVals) (hclwr
 	if root.opt[nDiskIOPSSrc] != nil {
 		fileb.SetAttributeRaw(nDiskIOPS, root.opt[nDiskIOPSSrc])
 	}
-	return hcl.TokensObject(file), nil
+	return hcl.TokensObject(fileb), nil
 }
 
 func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
@@ -209,19 +229,55 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 			{nComputeScaleDownEnabledSrc, nComputeScaleDownEnabled},
 		}
 		file  = hclwrite.NewEmptyFile()
+		fileb = file.Body()
 		found = false
 	)
 	for _, tuple := range names {
 		src, dst := tuple[0], tuple[1]
 		if tokens := opt[src]; tokens != nil {
-			file.Body().SetAttributeRaw(dst, tokens)
+			fileb.SetAttributeRaw(dst, tokens)
 			found = true
 		}
 	}
 	if !found {
 		return nil
 	}
-	return hcl.TokensObject(file)
+	return hcl.TokensObject(fileb)
+}
+
+func getTagsLabelsOpt(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
+	var (
+		file  = hclwrite.NewEmptyFile()
+		fileb = file.Body()
+		found = false
+	)
+	for {
+		block := resourceb.FirstMatchingBlock(name, nil)
+		if block == nil {
+			break
+		}
+		key := block.Body().GetAttribute(nKey)
+		value := block.Body().GetAttribute(nValue)
+		if key == nil || value == nil {
+			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
+		}
+		setKeyValue(fileb, key, value)
+		resourceb.RemoveBlock(block)
+		found = true
+	}
+	if !found {
+		return nil, nil
+	}
+	return hcl.TokensObject(fileb), nil
+}
+
+func fillBlockOpt(resourceb *hclwrite.Body, name string) {
+	block := resourceb.FirstMatchingBlock(name, nil)
+	if block == nil {
+		return
+	}
+	resourceb.RemoveBlock(block)
+	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
 }
 
 func checkDynamicBlock(body *hclwrite.Body) error {
@@ -231,6 +287,19 @@ func checkDynamicBlock(body *hclwrite.Body) error {
 		}
 	}
 	return nil
+}
+
+func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
+	keyStr, err := hcl.GetAttrString(key, "")
+	if err == nil {
+		if !hclsyntax.ValidIdentifier(keyStr) {
+			keyStr = strconv.Quote(keyStr) // wrap in quotes so invalid identifiers (e.g. with blanks) can be used as attribute names
+		}
+	} else {
+		keyStr = strings.TrimSpace(string(key.Expr().BuildTokens(nil).Bytes()))
+		keyStr = "(" + keyStr + ")" // wrap in parentheses so unresolved expressions can be used as attribute names
+	}
+	body.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
 }
 
 func setPriority(body *hclwrite.Body, priority *hclwrite.Attribute) error {
