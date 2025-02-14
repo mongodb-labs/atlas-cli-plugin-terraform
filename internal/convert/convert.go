@@ -133,6 +133,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	fillBlockOpt(resourceb, nTimeouts)
 	fillBlockOpt(resourceb, nAdvConf)
 	fillBlockOpt(resourceb, nBiConnector)
+	fillBlockOpt(resourceb, nPinnedFCV)
 	resourceb.RemoveBlock(repSpecsSrc)
 	return nil
 }
