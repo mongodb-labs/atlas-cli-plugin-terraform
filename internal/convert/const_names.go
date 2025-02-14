@@ -8,6 +8,7 @@ const (
 	nLabels                     = "labels"
 	nTimeouts                   = "timeouts"
 	nAdvConf                    = "advanced_configuration"
+	nBiConnector                = "bi_connector_config"
 	nElectableSpecs             = "electable_specs"
 	nAutoScaling                = "auto_scaling"
 	nReadOnlySpecs              = "read_only_specs"
