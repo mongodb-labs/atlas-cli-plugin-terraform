@@ -16,11 +16,13 @@ Install the plugin by running:
 atlas plugin install github.com/mongodb-labs/atlas-cli-plugin-terraform
 ```
 
-## Convert cluster to advanced_cluster v2
+## Convert mongodbatlas_cluster to mongodbatlas_advanced_cluster (preview provider v2)
 
 ### Usage
 
-If you want to convert a Terraform configuration from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` schema v2, use the following command:
+**Note**: In order to use the **Preview for MongoDB Atlas Provider v2** of `mongodbatlas_advanced_cluster`, you need to set the environment variable `MONGODB_ATLAS_PREVIEW_PROVIDER_V2_ADVANCED_CLUSTER` to `true`.
+
+If you want to convert a Terraform configuration from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster`, use the following command:
 ```bash
 atlas terraform clusterToAdvancedCluster --file in.tf --output out.tf
 ```
@@ -35,7 +37,8 @@ If you want to overwrite the output file if it exists, or even use the same outp
 ### Limitations
 
 - The plugin doesn't support `regions_config` without `electable_nodes` as there can be some issues with `priority` when they only have `analytics_nodes` and/or `electable_nodes`.
-- `priority` is required in `regions_config` and must be a resolved number between 7 and 1, e.g. `var.priority` is not supported. This is to allow reordering them by descending priority as this is expected in `mongodbatlas_advanced_cluster`.
+- [`priority`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#priority-1) is required in `regions_config` and must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions) between 7 and 1, e.g. `var.priority` is not supported. This is to allow reordering them by descending priority as this is expected in `mongodbatlas_advanced_cluster`.
+- [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`.
 - `dynamic` blocks to generate `replication_specs`, `regions_config`, etc. are not supported.
 
 ## Contributing

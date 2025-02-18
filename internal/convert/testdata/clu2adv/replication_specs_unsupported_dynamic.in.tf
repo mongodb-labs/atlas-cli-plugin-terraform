@@ -1,6 +1,6 @@
 
 resource "mongodbatlas_cluster" "geo" {
-  project_id                  = "66d979971ec97b7de1ef8777"
+  project_id                  = var.project_id
   name                        = "geo"
   cluster_type                = "GEOSHARDED"
   num_shards                  = 1

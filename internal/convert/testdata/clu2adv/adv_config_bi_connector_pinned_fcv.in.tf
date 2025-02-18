@@ -16,7 +16,6 @@ resource "mongodbatlas_cluster" "this" {
   pinned_fcv {
     # comments in pinned_fcv are kept
     expiration_date = var.fcv_date
-    version         = var.fcv_date
   }
   replication_specs {
     num_shards = 1

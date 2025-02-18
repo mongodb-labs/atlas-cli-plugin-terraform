@@ -24,6 +24,7 @@ const (
 	errRepSpecs    = "setting " + nRepSpecs
 	errConfigs     = "setting " + nConfig
 	errPriority    = "setting " + nPriority
+	errNumShards   = "setting " + nNumShards
 )
 
 type attrVals struct {
@@ -34,8 +35,8 @@ type attrVals struct {
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
 // Terraform configuration file into mongodbatlas_advanced_cluster schema v2 definitions.
 // All other resources and data sources are left untouched.
-// Note: hclwrite.Tokens are used instead of cty.Value so expressions like var.region can be preserved.
-// cty.Value only supports resolved values.
+// Note: hclwrite.Tokens are used instead of cty.Value so expressions with interpolations like var.region can be preserved.
+// cty.Value only supports literal expressions.
 func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	parser, err := hcl.GetParser(config)
 	if err != nil {
@@ -55,9 +56,9 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 		resource.SetLabels(labels)
 
 		if resourceb.FirstMatchingBlock(nRepSpecs, nil) != nil {
-			err = fillReplicationSpecs(resourceb)
+			err = fillCluster(resourceb)
 		} else {
-			err = fillFreeTier(resourceb)
+			err = fillFreeTierCluster(resourceb)
 		}
 		if err != nil {
 			return nil, err
@@ -70,8 +71,8 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	return parser.Bytes(), nil
 }
 
-// fillFreeTier is the entry point to convert clusters in free tier
-func fillFreeTier(resourceb *hclwrite.Body) error {
+// fillFreeTierCluster is the entry point to convert clusters in free tier
+func fillFreeTierCluster(resourceb *hclwrite.Body) error {
 	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
 	config := hclwrite.NewEmptyFile()
 	configb := config.Body()
@@ -97,8 +98,8 @@ func fillFreeTier(resourceb *hclwrite.Body) error {
 	return nil
 }
 
-// fillReplicationSpecs is the entry point to convert clusters with replications_specs (all but free tier)
-func fillReplicationSpecs(resourceb *hclwrite.Body) error {
+// fillCluster is the entry point to convert clusters with replications_specs (all but free tier)
+func fillCluster(resourceb *hclwrite.Body) error {
 	root, errRoot := popRootAttrs(resourceb)
 	if errRoot != nil {
 		return errRoot
@@ -106,64 +107,119 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	resourceb.RemoveAttribute(nNumShards) // num_shards in root is not relevant, only in replication_specs
 	// ok to fail as cloud_backup is optional
 	_ = hcl.MoveAttr(resourceb, resourceb, nCloudBackup, nBackupEnabled, errRepSpecs)
-
-	// at least one replication_specs exists here, if not it would be a free tier cluster
-	repSpecsSrc := resourceb.FirstMatchingBlock(nRepSpecs, nil)
-	if err := checkDynamicBlock(repSpecsSrc.Body()); err != nil {
+	if err := fillReplicationSpecs(resourceb, root); err != nil {
 		return err
 	}
-	configs, errConfigs := getRegionConfigs(repSpecsSrc, root)
-	if errConfigs != nil {
-		return errConfigs
+	if err := fillTagsLabelsOpt(resourceb, nTags); err != nil {
+		return err
 	}
-	repSpecs := hclwrite.NewEmptyFile()
-	repSpecs.Body().SetAttributeRaw(nConfig, configs)
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs.Body()))
-	tags, errTags := getTagsLabelsOpt(resourceb, nTags)
-	if errTags != nil {
-		return errTags
-	}
-	if tags != nil {
-		resourceb.SetAttributeRaw(nTags, tags)
-	}
-	labels, errLabels := getTagsLabelsOpt(resourceb, nLabels)
-	if errLabels != nil {
-		return errLabels
-	}
-	if labels != nil {
-		resourceb.SetAttributeRaw(nLabels, labels)
+	if err := fillTagsLabelsOpt(resourceb, nLabels); err != nil {
+		return err
 	}
 	fillBlockOpt(resourceb, nTimeouts)
 	fillBlockOpt(resourceb, nAdvConf)
 	fillBlockOpt(resourceb, nBiConnector)
 	fillBlockOpt(resourceb, nPinnedFCV)
-	resourceb.RemoveBlock(repSpecsSrc)
 	return nil
 }
 
-func getRegionConfigs(repSpecsSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
+	// at least one replication_specs exists here, if not it would be a free tier cluster
+	var specbs []*hclwrite.Body
+	for {
+		var (
+			specSrc = resourceb.FirstMatchingBlock(nRepSpecs, nil)
+			spec    = hclwrite.NewEmptyFile()
+			specb   = spec.Body()
+		)
+		if specSrc == nil {
+			break
+		}
+		specbSrc := specSrc.Body()
+		if err := checkDynamicBlock(specbSrc); err != nil {
+			return err
+		}
+		// ok to fail as zone_name is optional
+		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
+		shards := specbSrc.GetAttribute(nNumShards)
+		if shards == nil {
+			return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
+		}
+		shardsVal, err := hcl.GetAttrInt(shards, errNumShards)
+		if err != nil {
+			return err
+		}
+		if err := fillRegionConfigs(specb, specbSrc, root); err != nil {
+			return err
+		}
+		for range shardsVal {
+			specbs = append(specbs, specb)
+		}
+		resourceb.RemoveBlock(specSrc)
+	}
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(specbs))
+	return nil
+}
+
+func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
+	var (
+		file  = hclwrite.NewEmptyFile()
+		fileb = file.Body()
+		found = false
+	)
+	for {
+		block := resourceb.FirstMatchingBlock(name, nil)
+		if block == nil {
+			break
+		}
+		key := block.Body().GetAttribute(nKey)
+		value := block.Body().GetAttribute(nValue)
+		if key == nil || value == nil {
+			return fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
+		}
+		setKeyValue(fileb, key, value)
+		resourceb.RemoveBlock(block)
+		found = true
+	}
+	if found {
+		resourceb.SetAttributeRaw(name, hcl.TokensObject(fileb))
+	}
+	return nil
+}
+
+func fillBlockOpt(resourceb *hclwrite.Body, name string) {
+	block := resourceb.FirstMatchingBlock(name, nil)
+	if block == nil {
+		return
+	}
+	resourceb.RemoveBlock(block)
+	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
+}
+
+func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 	var configs []*hclwrite.Body
 	for {
-		configSrc := repSpecsSrc.Body().FirstMatchingBlock(nConfigSrc, nil)
+		configSrc := specbSrc.FirstMatchingBlock(nConfigSrc, nil)
 		if configSrc == nil {
 			break
 		}
 		config, err := getRegionConfig(configSrc, root)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		configs = append(configs, config.Body())
-		repSpecsSrc.Body().RemoveBlock(configSrc)
+		specbSrc.RemoveBlock(configSrc)
 	}
 	if len(configs) == 0 {
-		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
+		return fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
 	sort.Slice(configs, func(i, j int) bool {
 		pi, _ := hcl.GetAttrInt(configs[i].GetAttribute(nPriority), errPriority)
 		pj, _ := hcl.GetAttrInt(configs[j].GetAttribute(nPriority), errPriority)
 		return pi > pj
 	})
-	return hcl.TokensArray(configs), nil
+	specb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
+	return nil
 }
 
 func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, error) {
@@ -245,41 +301,6 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 	return hcl.TokensObject(fileb)
 }
 
-func getTagsLabelsOpt(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
-	var (
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
-		found = false
-	)
-	for {
-		block := resourceb.FirstMatchingBlock(name, nil)
-		if block == nil {
-			break
-		}
-		key := block.Body().GetAttribute(nKey)
-		value := block.Body().GetAttribute(nValue)
-		if key == nil || value == nil {
-			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
-		}
-		setKeyValue(fileb, key, value)
-		resourceb.RemoveBlock(block)
-		found = true
-	}
-	if !found {
-		return nil, nil
-	}
-	return hcl.TokensObject(fileb), nil
-}
-
-func fillBlockOpt(resourceb *hclwrite.Body, name string) {
-	block := resourceb.FirstMatchingBlock(name, nil)
-	if block == nil {
-		return
-	}
-	resourceb.RemoveBlock(block)
-	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
-}
-
 func checkDynamicBlock(body *hclwrite.Body) error {
 	for _, block := range body.Blocks() {
 		if block.Type() == "dynamic" {
@@ -297,7 +318,7 @@ func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
 		}
 	} else {
 		keyStr = strings.TrimSpace(string(key.Expr().BuildTokens(nil).Bytes()))
-		keyStr = "(" + keyStr + ")" // wrap in parentheses so unresolved expressions can be used as attribute names
+		keyStr = "(" + keyStr + ")" // wrap in parentheses so non-literal expressions can be used as attribute names
 	}
 	body.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
 }
