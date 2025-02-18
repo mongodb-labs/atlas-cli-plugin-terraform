@@ -16,11 +16,13 @@ Install the plugin by running:
 atlas plugin install github.com/mongodb-labs/atlas-cli-plugin-terraform
 ```
 
-## Convert cluster to advanced_cluster v2
+## Convert mongodbatlas_cluster to mongodbatlas_advanced_cluster (preview provider v2)
 
 ### Usage
 
-If you want to convert a Terraform configuration from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` schema v2, use the following command:
+**Note**: In order to use the **Preview for MongoDB Atlas Provider v2** of `mongodbatlas_advanced_cluster`, you need to set the environment variable `MONGODB_ATLAS_PREVIEW_PROVIDER_V2_ADVANCED_CLUSTER` to `true`.
+
+If you want to convert a Terraform configuration from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster`, use the following command:
 ```bash
 atlas terraform clusterToAdvancedCluster --file in.tf --output out.tf
 ```
