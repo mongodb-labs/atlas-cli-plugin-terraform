@@ -35,8 +35,8 @@ If you want to overwrite the output file if it exists, or even use the same outp
 ### Limitations
 
 - The plugin doesn't support `regions_config` without `electable_nodes` as there can be some issues with `priority` when they only have `analytics_nodes` and/or `electable_nodes`.
-- `priority` is required in `regions_config` and must be a resolved number between 7 and 1, e.g. `var.priority` is not supported. This is to allow reordering them by descending priority as this is expected in `mongodbatlas_advanced_cluster`.
-- `num_shards` is required in `replication_specs` and must be a resolved number, e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`.
+- [`priority`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#priority-1) is required in `regions_config` and must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions) between 7 and 1, e.g. `var.priority` is not supported. This is to allow reordering them by descending priority as this is expected in `mongodbatlas_advanced_cluster`.
+- [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`.
 - `dynamic` blocks to generate `replication_specs`, `regions_config`, etc. are not supported.
 
 ## Contributing

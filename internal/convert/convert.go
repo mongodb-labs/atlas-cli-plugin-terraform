@@ -35,8 +35,8 @@ type attrVals struct {
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
 // Terraform configuration file into mongodbatlas_advanced_cluster schema v2 definitions.
 // All other resources and data sources are left untouched.
-// Note: hclwrite.Tokens are used instead of cty.Value so expressions like var.region can be preserved.
-// cty.Value only supports resolved values.
+// Note: hclwrite.Tokens are used instead of cty.Value so expressions with interpolations like var.region can be preserved.
+// cty.Value only supports literal expressions.
 func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	parser, err := hcl.GetParser(config)
 	if err != nil {
@@ -318,7 +318,7 @@ func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
 		}
 	} else {
 		keyStr = strings.TrimSpace(string(key.Expr().BuildTokens(nil).Bytes()))
-		keyStr = "(" + keyStr + ")" // wrap in parentheses so unresolved expressions can be used as attribute names
+		keyStr = "(" + keyStr + ")" // wrap in parentheses so non-literal expressions can be used as attribute names
 	}
 	body.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
 }
