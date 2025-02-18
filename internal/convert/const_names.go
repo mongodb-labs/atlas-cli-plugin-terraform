@@ -44,6 +44,7 @@ const (
 	nElectableNodes             = "electable_nodes"
 	nReadOnlyNodes              = "read_only_nodes"
 	nAnalyticsNodes             = "analytics_nodes"
+	nZoneName                   = "zone_name"
 	nKey                        = "key"
 	nValue                      = "value"
 )

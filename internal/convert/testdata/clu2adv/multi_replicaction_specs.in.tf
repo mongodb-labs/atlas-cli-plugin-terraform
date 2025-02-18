@@ -1,5 +1,5 @@
 resource "mongodbatlas_cluster" "multirep" {
-  project_id                  = "66d979971ec97b7de1ef8777"
+  project_id                  = var.project_id
   name                        = "multirep"
   disk_size_gb                = 80
   num_shards                  = 1
@@ -7,7 +7,6 @@ resource "mongodbatlas_cluster" "multirep" {
   cluster_type                = "GEOSHARDED"
   provider_name               = "AWS"
   provider_instance_size_name = "M10"
-
   replication_specs {
     zone_name  = "Zone 1"
     num_shards = 1

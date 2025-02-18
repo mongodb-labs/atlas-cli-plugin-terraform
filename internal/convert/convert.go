@@ -55,9 +55,9 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 		resource.SetLabels(labels)
 
 		if resourceb.FirstMatchingBlock(nRepSpecs, nil) != nil {
-			err = fillReplicationSpecs(resourceb)
+			err = fillCluster(resourceb)
 		} else {
-			err = fillFreeTier(resourceb)
+			err = fillFreeTierCluster(resourceb)
 		}
 		if err != nil {
 			return nil, err
@@ -70,8 +70,8 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 	return parser.Bytes(), nil
 }
 
-// fillFreeTier is the entry point to convert clusters in free tier
-func fillFreeTier(resourceb *hclwrite.Body) error {
+// fillFreeTierCluster is the entry point to convert clusters in free tier
+func fillFreeTierCluster(resourceb *hclwrite.Body) error {
 	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
 	config := hclwrite.NewEmptyFile()
 	configb := config.Body()
@@ -97,8 +97,8 @@ func fillFreeTier(resourceb *hclwrite.Body) error {
 	return nil
 }
 
-// fillReplicationSpecs is the entry point to convert clusters with replications_specs (all but free tier)
-func fillReplicationSpecs(resourceb *hclwrite.Body) error {
+// fillCluster is the entry point to convert clusters with replications_specs (all but free tier)
+func fillCluster(resourceb *hclwrite.Body) error {
 	root, errRoot := popRootAttrs(resourceb)
 	if errRoot != nil {
 		return errRoot
@@ -106,19 +106,9 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	resourceb.RemoveAttribute(nNumShards) // num_shards in root is not relevant, only in replication_specs
 	// ok to fail as cloud_backup is optional
 	_ = hcl.MoveAttr(resourceb, resourceb, nCloudBackup, nBackupEnabled, errRepSpecs)
-
-	// at least one replication_specs exists here, if not it would be a free tier cluster
-	repSpecsSrc := resourceb.FirstMatchingBlock(nRepSpecs, nil)
-	if err := checkDynamicBlock(repSpecsSrc.Body()); err != nil {
+	if err := fillReplicationSpecs(resourceb, root); err != nil {
 		return err
 	}
-	configs, errConfigs := getRegionConfigs(repSpecsSrc, root)
-	if errConfigs != nil {
-		return errConfigs
-	}
-	repSpecs := hclwrite.NewEmptyFile()
-	repSpecs.Body().SetAttributeRaw(nConfig, configs)
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs.Body()))
 	tags, errTags := getTagsLabelsOpt(resourceb, nTags)
 	if errTags != nil {
 		return errTags
@@ -137,7 +127,35 @@ func fillReplicationSpecs(resourceb *hclwrite.Body) error {
 	fillBlockOpt(resourceb, nAdvConf)
 	fillBlockOpt(resourceb, nBiConnector)
 	fillBlockOpt(resourceb, nPinnedFCV)
-	resourceb.RemoveBlock(repSpecsSrc)
+	return nil
+}
+
+func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
+	// at least one replication_specs exists here, if not it would be a free tier cluster
+	var specbs []*hclwrite.Body
+	for {
+		var (
+			specSrc = resourceb.FirstMatchingBlock(nRepSpecs, nil)
+			spec    = hclwrite.NewEmptyFile()
+			specb   = spec.Body()
+		)
+		if specSrc == nil {
+			break
+		}
+		if err := checkDynamicBlock(specSrc.Body()); err != nil {
+			return err
+		}
+		configs, err := getRegionConfigs(specSrc, root)
+		if err != nil {
+			return err
+		}
+		// ok to fail as zone_name is optional
+		_ = hcl.MoveAttr(specSrc.Body(), specb, nZoneName, nZoneName, errRepSpecs)
+		specb.SetAttributeRaw(nConfig, configs)
+		specbs = append(specbs, specb)
+		resourceb.RemoveBlock(specSrc)
+	}
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(specbs))
 	return nil
 }
 

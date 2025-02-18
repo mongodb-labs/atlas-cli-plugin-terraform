@@ -1,16 +1,16 @@
 resource "mongodbatlas_advanced_cluster" "multirep" {
   project_id     = var.project_id
   name           = "multirep"
-  backup_enabled = false
   cluster_type   = "GEOSHARDED"
+  backup_enabled = false
   replication_specs = [
     {
       zone_name = "Zone 1"
       region_configs = [
         {
+          provider_name = "AWS"
           region_name   = "US_EAST_1"
           priority      = 7
-          provider_name = "AWS"
           electable_specs = {
             node_count    = 3
             instance_size = "M10"
@@ -20,12 +20,12 @@ resource "mongodbatlas_advanced_cluster" "multirep" {
       ]
     },
     {
-      zone_name = "Zone 2",
+      zone_name = "Zone 2"
       region_configs = [
         {
+          provider_name = "AWS"
           region_name   = "US_WEST_2"
           priority      = 7
-          provider_name = "AWS"
           electable_specs = {
             node_count    = 3
             instance_size = "M10"
