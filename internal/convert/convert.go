@@ -139,19 +139,17 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 		if err := checkDynamicBlock(specbSrc); err != nil {
 			return err
 		}
-		configs, err := getRegionConfigs(specSrc, root)
-		if err != nil {
-			return err
-		}
 		// ok to fail as zone_name is optional
 		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
-		specb.SetAttributeRaw(nConfig, configs)
 		shards := specbSrc.GetAttribute(nNumShards)
 		if shards == nil {
 			return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
 		}
 		shardsVal, err := hcl.GetAttrInt(shards, errNumShards)
 		if err != nil {
+			return err
+		}
+		if err := fillRegionConfigs(specb, specbSrc, root); err != nil {
 			return err
 		}
 		for range shardsVal {
@@ -198,29 +196,30 @@ func fillBlockOpt(resourceb *hclwrite.Body, name string) {
 	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
 }
 
-func getRegionConfigs(repSpecsSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 	var configs []*hclwrite.Body
 	for {
-		configSrc := repSpecsSrc.Body().FirstMatchingBlock(nConfigSrc, nil)
+		configSrc := specbSrc.FirstMatchingBlock(nConfigSrc, nil)
 		if configSrc == nil {
 			break
 		}
 		config, err := getRegionConfig(configSrc, root)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		configs = append(configs, config.Body())
-		repSpecsSrc.Body().RemoveBlock(configSrc)
+		specbSrc.RemoveBlock(configSrc)
 	}
 	if len(configs) == 0 {
-		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
+		return fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
 	sort.Slice(configs, func(i, j int) bool {
 		pi, _ := hcl.GetAttrInt(configs[i].GetAttribute(nPriority), errPriority)
 		pj, _ := hcl.GetAttrInt(configs[j].GetAttribute(nPriority), errPriority)
 		return pi > pj
 	})
-	return hcl.TokensArray(configs), nil
+	specb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
+	return nil
 }
 
 func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, error) {
