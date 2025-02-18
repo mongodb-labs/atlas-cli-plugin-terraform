@@ -24,6 +24,7 @@ const (
 	errRepSpecs    = "setting " + nRepSpecs
 	errConfigs     = "setting " + nConfig
 	errPriority    = "setting " + nPriority
+	errNumShards   = "setting " + nNumShards
 )
 
 type attrVals struct {
@@ -157,7 +158,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 		if shards == nil {
 			return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
 		}
-		shardsVal, err := hcl.GetAttrInt(shards, errRepSpecs)
+		shardsVal, err := hcl.GetAttrInt(shards, errNumShards)
 		if err != nil {
 			return err
 		}
