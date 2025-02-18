@@ -110,19 +110,11 @@ func fillCluster(resourceb *hclwrite.Body) error {
 	if err := fillReplicationSpecs(resourceb, root); err != nil {
 		return err
 	}
-	tags, errTags := getTagsLabelsOpt(resourceb, nTags)
-	if errTags != nil {
-		return errTags
+	if err := fillTagsLabelsOpt(resourceb, nTags); err != nil {
+		return err
 	}
-	if tags != nil {
-		resourceb.SetAttributeRaw(nTags, tags)
-	}
-	labels, errLabels := getTagsLabelsOpt(resourceb, nLabels)
-	if errLabels != nil {
-		return errLabels
-	}
-	if labels != nil {
-		resourceb.SetAttributeRaw(nLabels, labels)
+	if err := fillTagsLabelsOpt(resourceb, nLabels); err != nil {
+		return err
 	}
 	fillBlockOpt(resourceb, nTimeouts)
 	fillBlockOpt(resourceb, nAdvConf)
@@ -169,6 +161,41 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 	}
 	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(specbs))
 	return nil
+}
+
+func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
+	var (
+		file  = hclwrite.NewEmptyFile()
+		fileb = file.Body()
+		found = false
+	)
+	for {
+		block := resourceb.FirstMatchingBlock(name, nil)
+		if block == nil {
+			break
+		}
+		key := block.Body().GetAttribute(nKey)
+		value := block.Body().GetAttribute(nValue)
+		if key == nil || value == nil {
+			return fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
+		}
+		setKeyValue(fileb, key, value)
+		resourceb.RemoveBlock(block)
+		found = true
+	}
+	if found {
+		resourceb.SetAttributeRaw(name, hcl.TokensObject(fileb))
+	}
+	return nil
+}
+
+func fillBlockOpt(resourceb *hclwrite.Body, name string) {
+	block := resourceb.FirstMatchingBlock(name, nil)
+	if block == nil {
+		return
+	}
+	resourceb.RemoveBlock(block)
+	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
 }
 
 func getRegionConfigs(repSpecsSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
@@ -273,41 +300,6 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 		return nil
 	}
 	return hcl.TokensObject(fileb)
-}
-
-func getTagsLabelsOpt(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
-	var (
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
-		found = false
-	)
-	for {
-		block := resourceb.FirstMatchingBlock(name, nil)
-		if block == nil {
-			break
-		}
-		key := block.Body().GetAttribute(nKey)
-		value := block.Body().GetAttribute(nValue)
-		if key == nil || value == nil {
-			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
-		}
-		setKeyValue(fileb, key, value)
-		resourceb.RemoveBlock(block)
-		found = true
-	}
-	if !found {
-		return nil, nil
-	}
-	return hcl.TokensObject(fileb), nil
-}
-
-func fillBlockOpt(resourceb *hclwrite.Body, name string) {
-	block := resourceb.FirstMatchingBlock(name, nil)
-	if block == nil {
-		return
-	}
-	resourceb.RemoveBlock(block)
-	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
 }
 
 func checkDynamicBlock(body *hclwrite.Body) error {
