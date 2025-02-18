@@ -142,7 +142,8 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 		if specSrc == nil {
 			break
 		}
-		if err := checkDynamicBlock(specSrc.Body()); err != nil {
+		specbSrc := specSrc.Body()
+		if err := checkDynamicBlock(specbSrc); err != nil {
 			return err
 		}
 		configs, err := getRegionConfigs(specSrc, root)
@@ -150,9 +151,19 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 			return err
 		}
 		// ok to fail as zone_name is optional
-		_ = hcl.MoveAttr(specSrc.Body(), specb, nZoneName, nZoneName, errRepSpecs)
+		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
 		specb.SetAttributeRaw(nConfig, configs)
-		specbs = append(specbs, specb)
+		shards := specbSrc.GetAttribute(nNumShards)
+		if shards == nil {
+			return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
+		}
+		shardsVal, err := hcl.GetAttrInt(shards, errRepSpecs)
+		if err != nil {
+			return err
+		}
+		for range shardsVal {
+			specbs = append(specbs, specb)
+		}
 		resourceb.RemoveBlock(specSrc)
 	}
 	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(specbs))
