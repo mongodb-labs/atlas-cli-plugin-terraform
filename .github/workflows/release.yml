@@ -51,9 +51,19 @@ jobs:
           GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
           VERSION: ${{ inputs.version_number }}
         run: make generate-all-manifests
+      - name: Log in to MongoDB Docker registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+        with:
+          registry: ${{ secrets.ARTIFACTORY_REGISTRY }}
+          username: ${{ secrets.ARTIFACTORY_USER }}
+          password: ${{ secrets.ARTIFACTORY_PASSWORD }}
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@90a3faa9d0182683851fbfa97ca1a2cb983bfca3
         with:
           args: release --clean        
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHENTICODE_KEY_NAME: ${{ secrets.AUTHENTICODE_KEY_NAME }}
+          ARTIFACTORY_REGISTRY: ${{ secrets.ARTIFACTORY_REGISTRY }}
+          ARTIFACTORY_SIGN_USER: ${{ secrets.ARTIFACTORY_SIGN_USER }}
+          ARTIFACTORY_SIGN_PASSWORD: ${{ secrets.ARTIFACTORY_SIGN_PASSWORD }}
