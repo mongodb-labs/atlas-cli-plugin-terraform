@@ -34,6 +34,8 @@ atlas tf clu2adv -f in.tf -o out.tf
 
 If you want to overwrite the output file if it exists, or even use the same output file as the input file, use the `--replaceOutput true` or the `-r` flag.
 
+If you want to keep the plugin running and update the output file as you change the input file, use the `--watch true` or the `-w` flag. You can have input and output files open in an editor and see easily how changes to the input file affect the output file.
+
 ### Limitations
 
 - The plugin doesn't support `regions_config` without `electable_nodes` as there can be some issues with `priority` when they only have `analytics_nodes` and/or `electable_nodes`.
