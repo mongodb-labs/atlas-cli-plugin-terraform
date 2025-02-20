@@ -46,8 +46,7 @@ func (o *opts) generateFile(allowParseErrors bool) error {
 	outConfig, err := convert.ClusterToAdvancedCluster(inConfig)
 	if err != nil {
 		if allowParseErrors {
-			prefix := []byte("# CONVERT ERROR: " + err.Error() + "\n\n")
-			outConfig = append([]byte(nil), prefix...)
+			outConfig = []byte("# CONVERT ERROR: " + err.Error() + "\n\n")
 			outConfig = append(outConfig, inConfig...)
 		} else {
 			return err
