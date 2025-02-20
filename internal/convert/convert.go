@@ -87,16 +87,16 @@ func convertDataSource(block *hclwrite.Block) bool {
 	if block.Type() != dataSourceType {
 		return false
 	}
-	switch getResourceName(block) {
-	case cluster:
-		setResourceName(block, advCluster)
-		return true
-	case clusterPlural:
-		setResourceName(block, advClusterPlural)
-		return true
-	default:
-		return false
+	convertMap := map[string]string{
+		cluster:       advCluster,
+		clusterPlural: advClusterPlural,
 	}
+	if newName, found := convertMap[getResourceName(block)]; found {
+		setResourceName(block, newName)
+		block.Body().SetAttributeValue(nUseRepSpecsPerShard, cty.True)
+		return true
+	}
+	return false
 }
 
 // fillFreeTierCluster is the entry point to convert clusters in free tier
