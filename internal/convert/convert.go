@@ -62,17 +62,14 @@ func ClusterToAdvancedCluster(config []byte) ([]byte, error) {
 }
 
 func convertResource(resource *hclwrite.Block) (bool, error) {
-	labels := resource.Labels()
-	resourceName := labels[0]
-	if resource.Type() != resourceType || resourceName != cluster {
+	if resource.Type() != resourceType || getResourceName(resource) != cluster {
 		return false, nil
 	}
+	setResourceName(resource, advCluster)
 	resourceb := resource.Body()
 	if errDyn := checkDynamicBlock(resourceb); errDyn != nil {
 		return false, errDyn
 	}
-	labels[0] = advCluster
-	resource.SetLabels(labels)
 
 	var err error
 	if resourceb.FirstMatchingBlock(nRepSpecs, nil) != nil {
@@ -90,19 +87,16 @@ func convertDataSource(resource *hclwrite.Block) bool {
 	if resource.Type() != dataSourceType {
 		return false
 	}
-	labels := resource.Labels()
-	resourceName := labels[0]
-	if resourceName == cluster {
-		labels[0] = advCluster
-		resource.SetLabels(labels)
+	switch getResourceName(resource) {
+	case cluster:
+		setResourceName(resource, advCluster)
 		return true
-	}
-	if resourceName == clusterPlural {
-		labels[0] = advClusterPlural
-		resource.SetLabels(labels)
+	case clusterPlural:
+		setResourceName(resource, advClusterPlural)
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // fillFreeTierCluster is the entry point to convert clusters in free tier
@@ -333,6 +327,16 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 		return nil
 	}
 	return hcl.TokensObject(fileb)
+}
+
+func setResourceName(resource *hclwrite.Block, name string) {
+	labels := resource.Labels()
+	labels[0] = name
+	resource.SetLabels(labels)
+}
+
+func getResourceName(resource *hclwrite.Block) string {
+	return resource.Labels()[0]
 }
 
 func checkDynamicBlock(body *hclwrite.Body) error {
