@@ -12,7 +12,7 @@ type opts struct {
 	fs              afero.Fs
 	file            string
 	output          string
-	overwriteOutput bool
+	replaceOutput bool
 }
 
 func (o *opts) PreRun() error {

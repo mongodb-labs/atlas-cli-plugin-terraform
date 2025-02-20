@@ -32,7 +32,7 @@ you can also use shorter aliases, e.g.:
 atlas tf clu2adv -f in.tf -o out.tf
 ```
 
-If you want to overwrite the output file if it exists, or even use the same output file as the input file, use the `--overwriteOutput true` or the `-w` flag.
+If you want to overwrite the output file if it exists, or even use the same output file as the input file, use the `--replaceOutput true` or the `-r` flag.
 
 ### Limitations
 
