@@ -331,12 +331,19 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 
 func setResourceName(resource *hclwrite.Block, name string) {
 	labels := resource.Labels()
+	if len(labels) == 0 {
+		return
+	}
 	labels[0] = name
 	resource.SetLabels(labels)
 }
 
 func getResourceName(resource *hclwrite.Block) string {
-	return resource.Labels()[0]
+	labels := resource.Labels()
+	if len(labels) == 0 {
+		return ""
+	}
+	return labels[0]
 }
 
 func checkDynamicBlock(body *hclwrite.Body) error {
