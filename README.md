@@ -32,7 +32,9 @@ you can also use shorter aliases, e.g.:
 atlas tf clu2adv -f in.tf -o out.tf
 ```
 
-If you want to overwrite the output file if it exists, or even use the same output file as the input file, use the `--overwriteOutput true` or the `-w` flag.
+If you want to overwrite the output file if it exists, or even use the same output file as the input file, use the `--replaceOutput true` or the `-r` flag.
+
+You can use the `--watch true` or the `-w` flag to keep the plugin running and watching for changes in the input file. You can have input and output files open in an editor and see easily how changes to the input file affect the output file.
 
 ### Limitations
 

@@ -23,6 +23,7 @@ func Builder() *cobra.Command {
 	_ = cmd.MarkFlagRequired("file")
 	cmd.Flags().StringVarP(&o.output, "output", "o", "", "output file")
 	_ = cmd.MarkFlagRequired("output")
-	cmd.Flags().BoolVarP(&o.overwriteOutput, "overwriteOutput", "w", false, "overwrite output file if exists")
+	cmd.Flags().BoolVarP(&o.replaceOutput, "replaceOutput", "r", false, "replace output file if exists")
+	cmd.Flags().BoolVarP(&o.watch, "watch", "w", false, "keeps the plugin running and watches the input file for changes")
 	return cmd
 }
