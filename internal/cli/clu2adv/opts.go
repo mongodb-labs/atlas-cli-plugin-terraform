@@ -64,8 +64,7 @@ func (o *opts) watchFile() error {
 		return nil
 	}
 	defer watcher.Close()
-	err = watcher.Add(o.file)
-	if err != nil {
+	if err = watcher.Add(o.file); err != nil {
 		return err
 	}
 	watcherError := errors.New("watcher has been closed")
