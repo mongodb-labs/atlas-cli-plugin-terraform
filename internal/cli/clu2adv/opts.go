@@ -64,26 +64,33 @@ func (o *opts) watchFile() error {
 		return nil
 	}
 	defer watcher.Close()
-	if err = watcher.Add(o.file); err != nil {
+	if err := watcher.Add(o.file); err != nil {
 		return err
 	}
-	watcherError := errors.New("watcher has been closed")
 	for {
-		select {
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return watcherError
-			}
-			if event.Has(fsnotify.Write) {
-				if err := o.generateFile(true); err != nil {
-					return err
-				}
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return watcherError
-			}
+		if err := o.waitForFileEvent(watcher); err != nil {
 			return err
 		}
 	}
+}
+
+func (o *opts) waitForFileEvent(watcher *fsnotify.Watcher) error {
+	watcherError := errors.New("watcher has been closed")
+	select {
+	case event, ok := <-watcher.Events:
+		if !ok {
+			return watcherError
+		}
+		if event.Has(fsnotify.Write) {
+			if err := o.generateFile(true); err != nil {
+				return err
+			}
+		}
+	case err, ok := <-watcher.Errors:
+		if !ok {
+			return watcherError
+		}
+		return err
+	}
+	return nil
 }
