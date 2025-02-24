@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli/adv2"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli/clu2adv"
 	"github.com/spf13/cobra"
 )
@@ -15,7 +14,7 @@ func main() {
 		Short:   "Utilities for Terraform's MongoDB Atlas Provider",
 		Aliases: []string{"tf"},
 	}
-	terraformCmd.AddCommand(clu2adv.Builder(), adv2.Builder())
+	terraformCmd.AddCommand(clu2adv.Builder())
 
 	completionOption := &cobra.CompletionOptions{
 		DisableDefaultCmd:   true,
