@@ -372,6 +372,8 @@ func setResourceName(resource *hclwrite.Block, name string) {
 	resource.SetLabels(labels)
 }
 
+// getResourceName returns the first label of a block, if it exists.
+// e.g. in resource "mongodbatlas_cluster" "mycluster", the first label is "mongodbatlas_cluster".
 func getResourceName(resource *hclwrite.Block) string {
 	labels := resource.Labels()
 	if len(labels) == 0 {
@@ -380,6 +382,8 @@ func getResourceName(resource *hclwrite.Block) string {
 	return labels[0]
 }
 
+// getResourceLabel returns the second label of a block, if it exists.
+// e.g. in resource "mongodbatlas_cluster" "mycluster", the second label is "mycluster".
 func getResourceLabel(resource *hclwrite.Block) string {
 	labels := resource.Labels()
 	if len(labels) <= 1 {
