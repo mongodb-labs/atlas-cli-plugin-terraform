@@ -14,12 +14,13 @@ func TestClu2AdvParams(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	var (
-		prefix         = cwd + "/testdata/"
-		fileIn         = prefix + "clu2adv.in.tf"
-		fileOut        = prefix + "clu2adv.out.tf"
-		fileExpected   = prefix + "clu2adv.expected.tf"
-		fileUnexisting = prefix + "clu2adv.unexisting.tf"
-		fs             = afero.NewOsFs()
+		prefix            = cwd + "/testdata/"
+		fileIn            = prefix + "clu2adv.in.tf"
+		fileOut           = prefix + "clu2adv.out.tf"
+		fileExpected      = prefix + "clu2adv.expected.tf"
+		fileExpectedMoved = prefix + "clu2adv.expected_moved.tf"
+		fileUnexisting    = prefix + "clu2adv.unexisting.tf"
+		fs                = afero.NewOsFs()
 	)
 	tests := map[string]struct {
 		expectedErrContains string
@@ -48,6 +49,10 @@ func TestClu2AdvParams(t *testing.T) {
 		"basic use": {
 			args:       []string{"--file", fileIn, "--output", fileOut},
 			assertFunc: func(t *testing.T) { t.Helper(); e2e.CompareFiles(t, fs, fileOut, fileExpected) },
+		},
+		"include moved": {
+			args:       []string{"--file", fileIn, "--output", fileOut, "--includeMoved"},
+			assertFunc: func(t *testing.T) { t.Helper(); e2e.CompareFiles(t, fs, fileOut, fileExpectedMoved) },
 		},
 	}
 	for name, tc := range tests {
