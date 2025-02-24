@@ -30,6 +30,12 @@ func PopAttr(body *hclwrite.Body, attrName, errPrefix string) (hclwrite.Tokens, 
 	return tokens, nil
 }
 
+// SetAttrExpr sets an attribute to an expression (possibly with interpolations) without quotes.
+func SetAttrExpr(body *hclwrite.Body, attrName, expresion string) {
+	tokens := hclwrite.Tokens{{Type: hclsyntax.TokenIdent, Bytes: []byte(expresion)}}
+	body.SetAttributeRaw(attrName, tokens)
+}
+
 // SetAttrInt sets an attribute to a number.
 func SetAttrInt(body *hclwrite.Body, attrName string, number int) {
 	tokens := hclwrite.Tokens{

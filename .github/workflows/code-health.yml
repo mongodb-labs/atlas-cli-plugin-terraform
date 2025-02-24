@@ -20,6 +20,20 @@ jobs:
       run: make build
     - name: Unit Test
       run: make test
+
+  e2e:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+    - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34
+      with:
+        go-version-file: 'go.mod'
+    - name: setup Atlas CLI
+      uses: mongodb/atlas-github-action@15663d068c40a8582d881560961fce9d45e0df9a
+    - name: E2E Test
+      run: make test-e2e
+    
   lint:
     runs-on: ubuntu-latest
     permissions: {}

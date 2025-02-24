@@ -25,11 +25,15 @@ clean: ## Clean binary folders
 
 .PHONY: test
 test: ## Run unit tests
-	go test ./... -timeout=30s -parallel=4 -race
+	go test ./internal/... -timeout=30s -parallel=4 -race
 
 .PHONY: test-update
 test-update: ## Run unit tests and update the golden files
-	go test ./... -timeout=30s -parallel=4 -race -update
+	go test ./internal/... -timeout=30s -parallel=4 -race -update
+
+.PHONY: test-e2e
+test-e2e: local ## Run E2E tests (running the plugin binary)
+	ATLAS_CLI_EXTRA_PLUGIN_DIRECTORY="${PWD}/bin-plugin" go test ./test/... -timeout=30s -parallel=4 -race
 
 .PHONY: local
 local: clean build ## Allow to run the plugin locally
