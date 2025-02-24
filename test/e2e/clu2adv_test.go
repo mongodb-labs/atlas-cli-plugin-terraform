@@ -47,7 +47,7 @@ func TestClu2AdvParams(t *testing.T) {
 		},
 		"basic use": {
 			args:       []string{"--file", fileIn, "--output", fileOut},
-			assertFunc: func(t *testing.T) { e2e.CompareFiles(t, fs, fileOut, fileExpected) },
+			assertFunc: func(t *testing.T) { t.Helper(); e2e.CompareFiles(t, fs, fileOut, fileExpected) },
 		},
 	}
 	for name, tc := range tests {
