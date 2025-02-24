@@ -26,7 +26,7 @@ resource "mongodbatlas_advanced_cluster" "cluster" {
 }
 
 # Moved blocks
-# Note: Remember to remove or coment out the old cluster definitions.
+# Note: Remember to remove or comment out the old cluster definitions.
 
 moved {
   from = mongodbatlas_cluster.cluster
