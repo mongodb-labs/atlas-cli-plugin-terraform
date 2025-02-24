@@ -103,6 +103,7 @@ resource "another_resource" "another" {
 }
 
 # Moved blocks
+# Note: Remember to remove or coment out the old cluster definitions.
 
 moved {
   from = mongodbatlas_cluster.cluster1
