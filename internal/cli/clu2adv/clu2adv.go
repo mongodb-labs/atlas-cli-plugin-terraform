@@ -1,6 +1,7 @@
 package clu2adv
 
 import (
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/flag"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -19,11 +20,12 @@ func Builder() *cobra.Command {
 			return o.Run()
 		},
 	}
-	cmd.Flags().StringVarP(&o.file, "file", "f", "", "input file")
-	_ = cmd.MarkFlagRequired("file")
-	cmd.Flags().StringVarP(&o.output, "output", "o", "", "output file")
-	_ = cmd.MarkFlagRequired("output")
-	cmd.Flags().BoolVarP(&o.replaceOutput, "replaceOutput", "r", false, "replace output file if exists")
-	cmd.Flags().BoolVarP(&o.watch, "watch", "w", false, "keeps the plugin running and watches the input file for changes")
+	cmd.Flags().StringVarP(&o.file, flag.File, flag.FileShort, "", "input file")
+	_ = cmd.MarkFlagRequired(flag.File)
+	cmd.Flags().StringVarP(&o.output, flag.Output, flag.OutputShort, "", "output file")
+	_ = cmd.MarkFlagRequired(flag.Output)
+	cmd.Flags().BoolVarP(&o.replaceOutput, flag.ReplaceOutput, flag.ReplaceOutputShort, false, "replace output file if exists")
+	cmd.Flags().BoolVarP(&o.watch, flag.Watch, flag.WatchShort, false, "keeps the plugin running and watches the input file for changes")
+	cmd.Flags().BoolVarP(&o.includeMoved, flag.IncludeMoved, flag.IncludeMovedShort, false, "include moved blocks in the output file")
 	return cmd
 }
