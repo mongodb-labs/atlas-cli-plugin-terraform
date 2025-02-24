@@ -16,6 +16,7 @@ type opts struct {
 	output        string
 	replaceOutput bool
 	watch         bool
+	includeMoved  bool
 }
 
 func (o *opts) PreRun() error {
@@ -43,7 +44,7 @@ func (o *opts) generateFile(allowParseErrors bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", o.file, err)
 	}
-	outConfig, err := convert.ClusterToAdvancedCluster(inConfig)
+	outConfig, err := convert.ClusterToAdvancedCluster(inConfig, o.includeMoved)
 	if err != nil {
 		if allowParseErrors {
 			outConfig = []byte("# CONVERT ERROR: " + err.Error() + "\n\n")

@@ -38,7 +38,8 @@ func TestClusterToAdvancedCluster(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			inConfig, err := afero.ReadFile(fs, inputFile)
 			require.NoError(t, err)
-			outConfig, err := convert.ClusterToAdvancedCluster(inConfig)
+			includeMoved := strings.Contains(testName, "includeMoved")
+			outConfig, err := convert.ClusterToAdvancedCluster(inConfig, includeMoved)
 			if err == nil {
 				g.Assert(t, testName, outConfig)
 			} else {
