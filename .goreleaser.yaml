@@ -5,7 +5,7 @@ version: 2
 
 before:
   hooks:
-    - curl https://pgp.mongodb.com/atlas-cli.asc -o signature.asc
+    - curl https://pgp.mongodb.com/atlas-cli-plugin-terraform.asc -o signature.asc
 
 builds:
   - id: linux
