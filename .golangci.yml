@@ -97,8 +97,8 @@ linters:
     - exhaustive
     - makezero
     - noctx
-    - tenv
     - testpackage
+    - usetesting
 run:
   timeout: 10m
   tests: true
