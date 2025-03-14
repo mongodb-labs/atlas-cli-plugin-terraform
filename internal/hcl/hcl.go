@@ -130,13 +130,16 @@ func TokensMerge(t1, t2 hclwrite.Tokens) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenIdent, Bytes: []byte("merge")},
 		{Type: hclsyntax.TokenOParen, Bytes: []byte("(")},
+		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 	}
 	ret = append(ret, t1...)
 	ret = append(ret,
 		&hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")},
 		&hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
 	ret = append(ret, t2...)
-	ret = append(ret, &hclwrite.Token{Type: hclsyntax.TokenCParen, Bytes: []byte(")")})
+	ret = append(ret,
+		&hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
+		&hclwrite.Token{Type: hclsyntax.TokenCParen, Bytes: []byte(")")})
 	return ret
 }
 
