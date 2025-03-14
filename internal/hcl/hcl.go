@@ -115,6 +115,17 @@ func TokensObject(body *hclwrite.Body) hclwrite.Tokens {
 	return ret
 }
 
+// TokensObjectFromString creates an object with a string, which normally contains an expression.
+func TokensObjectFromString(expr string) hclwrite.Tokens {
+	return hclwrite.Tokens{
+		{Type: hclsyntax.TokenOBrace, Bytes: []byte("{")},
+		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(expr)},
+		{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
+		&hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("}")},
+	}
+}
+
 // RemoveLeadingNewline removes the first newline if it exists to make the output prettier.
 func RemoveLeadingNewline(tokens hclwrite.Tokens) hclwrite.Tokens {
 	if len(tokens) > 0 && tokens[0].Type == hclsyntax.TokenNewline {
@@ -133,7 +144,7 @@ func AppendComment(body *hclwrite.Body, comment string) {
 
 // GetParser returns a parser for the given config and checks HCL syntax is valid
 func GetParser(config []byte) (*hclwrite.File, error) {
-	parser, diags := hclwrite.ParseConfig(config, "", hcl.Pos{Line: 1, Column: 1})
+	parser, diags := hclwrite.ParseConfig(config, "", hcl.InitialPos)
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to parse Terraform config file: %s", diags.Error())
 	}

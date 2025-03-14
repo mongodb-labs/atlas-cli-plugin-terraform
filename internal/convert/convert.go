@@ -238,7 +238,24 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 		return err
 	}
 	if d.forEach != nil {
-		resourceb.SetAttributeRaw(name, d.forEach.Expr().BuildTokens(nil))
+		key := d.content.Body().GetAttribute(nKey)
+		value := d.content.Body().GetAttribute(nValue)
+		if key == nil || value == nil {
+			return fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
+		}
+		collectionExpr := strings.TrimSpace(string(d.forEach.Expr().BuildTokens(nil).Bytes()))
+		keyExpr := strings.TrimSpace(strings.ReplaceAll(string(key.Expr().BuildTokens(nil).Bytes()),
+			fmt.Sprintf("%s.%s", name, nKey), nKey))
+		valueExpr := strings.TrimSpace(strings.ReplaceAll(string(value.Expr().BuildTokens(nil).Bytes()),
+			fmt.Sprintf("%s.%s", name, nValue), nValue))
+		if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
+			hcl.SetAttrExpr(resourceb, name, collectionExpr)
+			resourceb.RemoveBlock(d.block)
+			return nil
+		}
+		forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
+			collectionExpr, keyExpr, valueExpr))
+		resourceb.SetAttributeRaw(name, hcl.TokensObjectFromString(forExpr))
 		resourceb.RemoveBlock(d.block)
 		return nil
 	}
@@ -419,6 +436,7 @@ func checkDynamicBlock(body *hclwrite.Body) error {
 type dynamicBlock struct {
 	block   *hclwrite.Block
 	forEach *hclwrite.Attribute
+	content *hclwrite.Block
 }
 
 func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
@@ -426,13 +444,19 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 		if block.Type() != nDynamic || name != getResourceName(block) {
 			continue
 		}
-		forEach := block.Body().GetAttribute(nForEach)
+		blockb := block.Body()
+		forEach := blockb.GetAttribute(nForEach)
 		if forEach == nil {
 			return dynamicBlock{}, fmt.Errorf("dynamic block %s: attribute %s not found", name, nForEach)
+		}
+		content := blockb.FirstMatchingBlock(nContent, nil)
+		if content == nil {
+			return dynamicBlock{}, fmt.Errorf("dynamic block %s: block %s not found", name, nContent)
 		}
 		return dynamicBlock{
 			forEach: forEach,
 			block:   block,
+			content: content,
 		}, nil
 	}
 	return dynamicBlock{}, nil
