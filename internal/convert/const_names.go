@@ -51,4 +51,6 @@ const (
 	nMoved                      = "moved"
 	nFrom                       = "from"
 	nTo                         = "to"
+	nDynamic                    = "dynamic"
+	nForEach                    = "for_each"
 )

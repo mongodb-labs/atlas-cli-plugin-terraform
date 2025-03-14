@@ -1,8 +1,8 @@
 package convert
 
 import (
-	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +34,10 @@ const (
 	commentConfirmReferences = "Please confirm that all references to this resource are updated."
 	commentMovedBlock        = "Moved blocks"
 	commentRemovedOld        = "Note: Remember to remove or comment out the old cluster definitions."
+)
+
+var (
+	dynamicBlockAllowList = []string{nTags, nLabels}
 )
 
 type attrVals struct {
@@ -229,6 +233,15 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 		fileb = file.Body()
 		found = false
 	)
+	d, err := getDynamicBlock(resourceb, name)
+	if err != nil {
+		return err
+	}
+	if d.forEach != nil {
+		resourceb.SetAttributeRaw(name, d.forEach.Expr().BuildTokens(nil))
+		resourceb.RemoveBlock(d.block)
+		return nil
+	}
 	for {
 		block := resourceb.FirstMatchingBlock(name, nil)
 		if block == nil {
@@ -394,11 +407,35 @@ func getResourceLabel(resource *hclwrite.Block) string {
 
 func checkDynamicBlock(body *hclwrite.Body) error {
 	for _, block := range body.Blocks() {
-		if block.Type() == "dynamic" {
-			return errors.New("dynamic blocks are not supported")
+		name := getResourceName(block)
+		if block.Type() != nDynamic || slices.Contains(dynamicBlockAllowList, name) {
+			continue
 		}
+		return fmt.Errorf("dynamic blocks are not supported for %s", name)
 	}
 	return nil
+}
+
+type dynamicBlock struct {
+	block   *hclwrite.Block
+	forEach *hclwrite.Attribute
+}
+
+func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
+	for _, block := range body.Blocks() {
+		if block.Type() != nDynamic || name != getResourceName(block) {
+			continue
+		}
+		forEach := block.Body().GetAttribute(nForEach)
+		if forEach == nil {
+			return dynamicBlock{}, fmt.Errorf("dynamic block %s: attribute %s not found", name, nForEach)
+		}
+		return dynamicBlock{
+			forEach: forEach,
+			block:   block,
+		}, nil
+	}
+	return dynamicBlock{}, nil
 }
 
 func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
