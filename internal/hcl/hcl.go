@@ -126,6 +126,20 @@ func TokensObjectFromString(expr string) hclwrite.Tokens {
 	}
 }
 
+func TokensMerge(t1, t2 hclwrite.Tokens) hclwrite.Tokens {
+	ret := hclwrite.Tokens{
+		{Type: hclsyntax.TokenIdent, Bytes: []byte("merge")},
+		{Type: hclsyntax.TokenOParen, Bytes: []byte("(")},
+	}
+	ret = append(ret, t1...)
+	ret = append(ret,
+		&hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")},
+		&hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
+	ret = append(ret, t2...)
+	ret = append(ret, &hclwrite.Token{Type: hclsyntax.TokenCParen, Bytes: []byte(")")})
+	return ret
+}
+
 // RemoveLeadingNewline removes the first newline if it exists to make the output prettier.
 func RemoveLeadingNewline(tokens hclwrite.Tokens) hclwrite.Tokens {
 	if len(tokens) > 0 && tokens[0].Type == hclsyntax.TokenNewline {

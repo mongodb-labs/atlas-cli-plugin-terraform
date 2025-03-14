@@ -229,14 +229,15 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 
 func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 	var (
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
-		found = false
+		file            = hclwrite.NewEmptyFile()
+		fileb           = file.Body()
+		foundIndividual = false
 	)
 	d, err := getDynamicBlock(resourceb, name)
 	if err != nil {
 		return err
 	}
+	var tokenDynamic hclwrite.Tokens
 	if d.forEach != nil {
 		key := d.content.Body().GetAttribute(nKey)
 		value := d.content.Body().GetAttribute(nValue)
@@ -255,9 +256,8 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 		}
 		forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
 			collectionExpr, keyExpr, valueExpr))
-		resourceb.SetAttributeRaw(name, hcl.TokensObjectFromString(forExpr))
+		tokenDynamic = hcl.TokensObjectFromString(forExpr)
 		resourceb.RemoveBlock(d.block)
-		return nil
 	}
 	for {
 		block := resourceb.FirstMatchingBlock(name, nil)
@@ -271,10 +271,19 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 		}
 		setKeyValue(fileb, key, value)
 		resourceb.RemoveBlock(block)
-		found = true
+		foundIndividual = true
 	}
-	if found {
+
+	if foundIndividual && tokenDynamic != nil {
+		resourceb.SetAttributeRaw(name, hcl.TokensMerge(tokenDynamic, hcl.TokensObject(fileb)))
+		return nil
+	}
+
+	if foundIndividual {
 		resourceb.SetAttributeRaw(name, hcl.TokensObject(fileb))
+	}
+	if tokenDynamic != nil {
+		resourceb.SetAttributeRaw(name, tokenDynamic)
 	}
 	return nil
 }
