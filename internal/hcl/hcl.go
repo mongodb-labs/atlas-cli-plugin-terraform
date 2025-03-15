@@ -114,7 +114,7 @@ func TokensObjectFromExpr(expr string) hclwrite.Tokens {
 	return encloseBraces(tokens)
 }
 
-// TokensFuncMerge created the tokens for the HCL merge function.
+// TokensFuncMerge creates the tokens for the HCL merge function.
 func TokensFuncMerge(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 	params := hclwrite.Tokens{tokenNewLine}
 	params = append(params, joinTokens(tokens...)...)

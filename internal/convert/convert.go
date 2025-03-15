@@ -266,12 +266,12 @@ func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwr
 		fmt.Sprintf("%s.%s", name, nValue), nValue))
 	forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
 		collectionExpr, keyExpr, valueExpr))
-	tokenDynamic := hcl.TokensObjectFromExpr(forExpr)
+	tokens := hcl.TokensObjectFromExpr(forExpr)
 	if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
-		tokenDynamic = hcl.TokensFromExpr(collectionExpr)
+		tokens = hcl.TokensFromExpr(collectionExpr)
 	}
 	resourceb.RemoveBlock(d.block)
-	return tokenDynamic, nil
+	return tokens, nil
 }
 
 func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
