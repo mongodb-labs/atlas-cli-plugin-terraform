@@ -228,36 +228,58 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 }
 
 func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
-	var (
-		file            = hclwrite.NewEmptyFile()
-		fileb           = file.Body()
-		foundIndividual = false
-	)
-	d, err := getDynamicBlock(resourceb, name)
+	tokensDynamic, err := extractTagsLabelsDynamicBlock(resourceb, name)
 	if err != nil {
 		return err
 	}
-	var tokenDynamic hclwrite.Tokens
-	if d.forEach != nil {
-		key := d.content.Body().GetAttribute(nKey)
-		value := d.content.Body().GetAttribute(nValue)
-		if key == nil || value == nil {
-			return fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
-		}
-		collectionExpr := strings.TrimSpace(string(d.forEach.Expr().BuildTokens(nil).Bytes()))
-		keyExpr := strings.TrimSpace(strings.ReplaceAll(string(key.Expr().BuildTokens(nil).Bytes()),
-			fmt.Sprintf("%s.%s", name, nKey), nKey))
-		valueExpr := strings.TrimSpace(strings.ReplaceAll(string(value.Expr().BuildTokens(nil).Bytes()),
-			fmt.Sprintf("%s.%s", name, nValue), nValue))
-		if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
-			tokenDynamic = hcl.TokensFromString(collectionExpr)
-		} else {
-			forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
-				collectionExpr, keyExpr, valueExpr))
-			tokenDynamic = hcl.TokensObjectFromString(forExpr)
-		}
-		resourceb.RemoveBlock(d.block)
+	tokensIndividual, err := extractTagsLabelsIndividual(resourceb, name)
+	if err != nil {
+		return err
 	}
+	if tokensDynamic != nil && tokensIndividual != nil {
+		resourceb.SetAttributeRaw(name, hcl.TokensFuncMerge(tokensDynamic, tokensIndividual))
+		return nil
+	}
+	if tokensDynamic != nil {
+		resourceb.SetAttributeRaw(name, tokensDynamic)
+	}
+	if tokensIndividual != nil {
+		resourceb.SetAttributeRaw(name, tokensIndividual)
+	}
+	return nil
+}
+
+func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
+	d, err := getDynamicBlock(resourceb, name)
+	if err != nil || d.forEach == nil {
+		return nil, err
+	}
+	key := d.content.Body().GetAttribute(nKey)
+	value := d.content.Body().GetAttribute(nValue)
+	if key == nil || value == nil {
+		return nil, fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
+	}
+	collectionExpr := strings.TrimSpace(string(d.forEach.Expr().BuildTokens(nil).Bytes()))
+	keyExpr := strings.TrimSpace(strings.ReplaceAll(string(key.Expr().BuildTokens(nil).Bytes()),
+		fmt.Sprintf("%s.%s", name, nKey), nKey))
+	valueExpr := strings.TrimSpace(strings.ReplaceAll(string(value.Expr().BuildTokens(nil).Bytes()),
+		fmt.Sprintf("%s.%s", name, nValue), nValue))
+	forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
+		collectionExpr, keyExpr, valueExpr))
+	tokenDynamic := hcl.TokensObjectFromExpr(forExpr)
+	if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
+		tokenDynamic = hcl.TokensFromString(collectionExpr)
+	}
+	resourceb.RemoveBlock(d.block)
+	return tokenDynamic, nil
+}
+
+func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
+	var (
+		file  = hclwrite.NewEmptyFile()
+		fileb = file.Body()
+		found = false
+	)
 	for {
 		block := resourceb.FirstMatchingBlock(name, nil)
 		if block == nil {
@@ -266,25 +288,16 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 		key := block.Body().GetAttribute(nKey)
 		value := block.Body().GetAttribute(nValue)
 		if key == nil || value == nil {
-			return fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
+			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
 		}
 		setKeyValue(fileb, key, value)
 		resourceb.RemoveBlock(block)
-		foundIndividual = true
+		found = true
 	}
-
-	if foundIndividual && tokenDynamic != nil {
-		resourceb.SetAttributeRaw(name, hcl.TokensMerge(tokenDynamic, hcl.TokensObject(fileb)))
-		return nil
+	if !found {
+		return nil, nil
 	}
-
-	if foundIndividual {
-		resourceb.SetAttributeRaw(name, hcl.TokensObject(fileb))
-	}
-	if tokenDynamic != nil {
-		resourceb.SetAttributeRaw(name, tokenDynamic)
-	}
-	return nil
+	return hcl.TokensObject(fileb), nil
 }
 
 func fillBlockOpt(resourceb *hclwrite.Body, name string) {
