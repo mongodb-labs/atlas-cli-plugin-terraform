@@ -15,6 +15,16 @@ Install the plugin by running:
 ```bash
 atlas plugin install github.com/mongodb-labs/atlas-cli-plugin-terraform
 ```
+ 
+If you have it installed and want to update it to the lastest version, run:
+```bash
+atlas plugin update mongodb-labs/atlas-cli-plugin-terraform
+```
+
+If you want to see the list of installed plugins or check if this plugin is installed, run:
+```bash
+atlas plugin list
+```
 
 ## Convert mongodbatlas_cluster to mongodbatlas_advanced_cluster (preview provider 2.0.0)
 
