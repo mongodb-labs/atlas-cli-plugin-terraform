@@ -44,6 +44,37 @@ resource "mongodbatlas_cluster" "expression" {
   }
 }
 
+resource "mongodbatlas_cluster" "simplified_individual" {
+  project_id                  = var.project_id
+  name                        = "cluster"
+  cluster_type                = "REPLICASET"
+  provider_name               = "AWS"
+  provider_instance_size_name = "M10"
+  replication_specs {
+    num_shards = 1
+    regions_config {
+      region_name     = "US_EAST_1"
+      electable_nodes = 3
+      priority        = 7
+    }
+  }
+  tags { // using individual tags apart from simplified version in dynamic tags
+    key   = "tag1"
+    value = var.tag1val
+  }
+  dynamic "tags" {
+    for_each = var.tags
+    content { // simplified version where var can be used directly
+      key   = tags.key
+      value = tags.value
+    }
+  }
+  tags {
+    key   = "tag 2"
+    value = var.tag2val
+  }
+}
+
 resource "mongodbatlas_cluster" "expression_individual" {
   project_id                  = var.project_id
   name                        = "cluster"
@@ -58,7 +89,7 @@ resource "mongodbatlas_cluster" "expression_individual" {
       priority        = 7
     }
   }
-  tags { // using individual tags apart from dynamic tags
+  tags { // using individual tags apart from expressions in dynamic tags
     key   = "tag1"
     value = var.tag1val
   }

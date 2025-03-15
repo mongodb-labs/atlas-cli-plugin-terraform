@@ -250,13 +250,12 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 		valueExpr := strings.TrimSpace(strings.ReplaceAll(string(value.Expr().BuildTokens(nil).Bytes()),
 			fmt.Sprintf("%s.%s", name, nValue), nValue))
 		if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
-			hcl.SetAttrExpr(resourceb, name, collectionExpr)
-			resourceb.RemoveBlock(d.block)
-			return nil
+			tokenDynamic = hcl.TokensFromString(collectionExpr)
+		} else {
+			forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
+				collectionExpr, keyExpr, valueExpr))
+			tokenDynamic = hcl.TokensObjectFromString(forExpr)
 		}
-		forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
-			collectionExpr, keyExpr, valueExpr))
-		tokenDynamic = hcl.TokensObjectFromString(forExpr)
 		resourceb.RemoveBlock(d.block)
 	}
 	for {

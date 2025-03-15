@@ -126,6 +126,12 @@ func TokensObjectFromString(expr string) hclwrite.Tokens {
 	}
 }
 
+func TokensFromString(expr string) hclwrite.Tokens {
+	return hclwrite.Tokens{
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(expr)},
+	}
+}
+
 func TokensMerge(t1, t2 hclwrite.Tokens) hclwrite.Tokens {
 	ret := hclwrite.Tokens{
 		{Type: hclsyntax.TokenIdent, Bytes: []byte("merge")},
