@@ -16,7 +16,7 @@ Install the plugin by running:
 atlas plugin install github.com/mongodb-labs/atlas-cli-plugin-terraform
 ```
  
-If you have it installed and want to update it to the lastest version, run:
+If you have it installed and want to update it to the latest version, run:
 ```bash
 atlas plugin update mongodb-labs/atlas-cli-plugin-terraform
 ```
