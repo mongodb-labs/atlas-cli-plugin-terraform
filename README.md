@@ -48,6 +48,8 @@ If you want to overwrite the output file if it exists, or even use the same outp
 
 You can use the `--watch` or the `-w` flag to keep the plugin running and watching for changes in the input file. You can have input and output files open in an editor and see easily how changes to the input file affect the output file.
 
+You can find [here](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/tree/main/internal/convert/testdata/clu2adv) some examples of input files (suffix .in.tf) and the corresponding output files (suffix .out.tf).
+
 ### Dynamic blocks
 
 `dynamic` blocks are used to generate multiple nested blocks based on a set of values. 
