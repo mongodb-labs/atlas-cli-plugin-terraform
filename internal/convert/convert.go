@@ -46,7 +46,7 @@ type attrVals struct {
 }
 
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
-// Terraform configuration file into mongodbatlas_advanced_cluster schema v2 definitions.
+// Terraform configuration file into mongodbatlas_advanced_cluster schema 2.0.0.
 // All other resources and data sources are left untouched.
 // Note: hclwrite.Tokens are used instead of cty.Value so expressions with interpolations like var.region can be preserved.
 // cty.Value only supports literal expressions.
