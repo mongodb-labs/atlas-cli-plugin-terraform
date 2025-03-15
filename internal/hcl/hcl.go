@@ -101,15 +101,15 @@ func TokensObject(body *hclwrite.Body) hclwrite.Tokens {
 	return encloseBraces(tokens)
 }
 
-// TokensFromString creates the tokens for an expression provided as a string.
-func TokensFromString(expr string) hclwrite.Tokens {
+// TokensFromExpr creates the tokens for an expression provided as a string.
+func TokensFromExpr(expr string) hclwrite.Tokens {
 	return hclwrite.Tokens{{Type: hclsyntax.TokenIdent, Bytes: []byte(expr)}}
 }
 
 // TokensObjectFromExpr creates an object with an expression.
 func TokensObjectFromExpr(expr string) hclwrite.Tokens {
 	tokens := hclwrite.Tokens{tokenNewLine}
-	tokens = append(tokens, TokensFromString(expr)...)
+	tokens = append(tokens, TokensFromExpr(expr)...)
 	tokens = append(tokens, tokenNewLine)
 	return encloseBraces(tokens)
 }

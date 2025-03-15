@@ -261,14 +261,14 @@ func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwr
 	}
 	collectionExpr := strings.TrimSpace(string(d.forEach.Expr().BuildTokens(nil).Bytes()))
 	keyExpr := strings.TrimSpace(strings.ReplaceAll(string(key.Expr().BuildTokens(nil).Bytes()),
-		fmt.Sprintf("%s.%s", name, nKey), nKey))
+		fmt.Sprintf("%s.%s", name, nKey), nKey)) // e.g. occurrences of tags.key are changed to key to be valid in the for expression
 	valueExpr := strings.TrimSpace(strings.ReplaceAll(string(value.Expr().BuildTokens(nil).Bytes()),
 		fmt.Sprintf("%s.%s", name, nValue), nValue))
 	forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
 		collectionExpr, keyExpr, valueExpr))
 	tokenDynamic := hcl.TokensObjectFromExpr(forExpr)
 	if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
-		tokenDynamic = hcl.TokensFromString(collectionExpr)
+		tokenDynamic = hcl.TokensFromExpr(collectionExpr)
 	}
 	resourceb.RemoveBlock(d.block)
 	return tokenDynamic, nil
@@ -474,11 +474,7 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 		if content == nil {
 			return dynamicBlock{}, fmt.Errorf("dynamic block %s: block %s not found", name, nContent)
 		}
-		return dynamicBlock{
-			forEach: forEach,
-			block:   block,
-			content: content,
-		}, nil
+		return dynamicBlock{forEach: forEach, block: block, content: content}, nil
 	}
 	return dynamicBlock{}, nil
 }
