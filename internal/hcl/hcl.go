@@ -3,6 +3,7 @@ package hcl
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -34,6 +35,11 @@ func PopAttr(body *hclwrite.Body, attrName, errPrefix string) (hclwrite.Tokens, 
 func SetAttrExpr(body *hclwrite.Body, attrName, expresion string) {
 	tokens := hclwrite.Tokens{{Type: hclsyntax.TokenIdent, Bytes: []byte(expresion)}}
 	body.SetAttributeRaw(attrName, tokens)
+}
+
+// GetAttrExpr returns the expression of an attribute as a string.
+func GetAttrExpr(attr *hclwrite.Attribute) string {
+	return strings.TrimSpace(string(attr.Expr().BuildTokens(nil).Bytes()))
 }
 
 // SetAttrInt sets an attribute to a number.

@@ -259,13 +259,10 @@ func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwr
 	if key == nil || value == nil {
 		return nil, fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
 	}
-	collectionExpr := strings.TrimSpace(string(d.forEach.Expr().BuildTokens(nil).Bytes()))
-	keyExpr := strings.TrimSpace(strings.ReplaceAll(string(key.Expr().BuildTokens(nil).Bytes()),
-		fmt.Sprintf("%s.%s", name, nKey), nKey)) // e.g. occurrences of tags.key are changed to key to be valid in the for expression
-	valueExpr := strings.TrimSpace(strings.ReplaceAll(string(value.Expr().BuildTokens(nil).Bytes()),
-		fmt.Sprintf("%s.%s", name, nValue), nValue))
-	forExpr := strings.TrimSpace(fmt.Sprintf("for key, value in %s : %s => %s",
-		collectionExpr, keyExpr, valueExpr))
+	keyExpr := replaceDynamicBlockExpr(key, name, nKey)
+	valueExpr := replaceDynamicBlockExpr(value, name, nValue)
+	collectionExpr := hcl.GetAttrExpr(d.forEach)
+	forExpr := fmt.Sprintf("for key, value in %s : %s => %s", collectionExpr, keyExpr, valueExpr)
 	tokens := hcl.TokensObjectFromExpr(forExpr)
 	if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
 		tokens = hcl.TokensFromExpr(collectionExpr)
@@ -477,6 +474,11 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 		return dynamicBlock{forEach: forEach, block: block, content: content}, nil
 	}
 	return dynamicBlock{}, nil
+}
+
+func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
+	expr := hcl.GetAttrExpr(attr)
+	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
 }
 
 func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
