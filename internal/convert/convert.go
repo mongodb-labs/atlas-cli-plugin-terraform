@@ -1,8 +1,8 @@
 package convert
 
 import (
-	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,13 +36,17 @@ const (
 	commentRemovedOld        = "Note: Remember to remove or comment out the old cluster definitions."
 )
 
+var (
+	dynamicBlockAllowList = []string{nTags, nLabels}
+)
+
 type attrVals struct {
 	req map[string]hclwrite.Tokens
 	opt map[string]hclwrite.Tokens
 }
 
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
-// Terraform configuration file into mongodbatlas_advanced_cluster schema v2 definitions.
+// Terraform configuration file into mongodbatlas_advanced_cluster schema 2.0.0.
 // All other resources and data sources are left untouched.
 // Note: hclwrite.Tokens are used instead of cty.Value so expressions with interpolations like var.region can be preserved.
 // cty.Value only supports literal expressions.
@@ -224,6 +228,50 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 }
 
 func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
+	tokensDynamic, err := extractTagsLabelsDynamicBlock(resourceb, name)
+	if err != nil {
+		return err
+	}
+	tokensIndividual, err := extractTagsLabelsIndividual(resourceb, name)
+	if err != nil {
+		return err
+	}
+	if tokensDynamic != nil && tokensIndividual != nil {
+		resourceb.SetAttributeRaw(name, hcl.TokensFuncMerge(tokensDynamic, tokensIndividual))
+		return nil
+	}
+	if tokensDynamic != nil {
+		resourceb.SetAttributeRaw(name, tokensDynamic)
+	}
+	if tokensIndividual != nil {
+		resourceb.SetAttributeRaw(name, tokensIndividual)
+	}
+	return nil
+}
+
+func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
+	d, err := getDynamicBlock(resourceb, name)
+	if err != nil || d.forEach == nil {
+		return nil, err
+	}
+	key := d.content.Body().GetAttribute(nKey)
+	value := d.content.Body().GetAttribute(nValue)
+	if key == nil || value == nil {
+		return nil, fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
+	}
+	keyExpr := replaceDynamicBlockExpr(key, name, nKey)
+	valueExpr := replaceDynamicBlockExpr(value, name, nValue)
+	collectionExpr := hcl.GetAttrExpr(d.forEach)
+	forExpr := fmt.Sprintf("for key, value in %s : %s => %s", collectionExpr, keyExpr, valueExpr)
+	tokens := hcl.TokensObjectFromExpr(forExpr)
+	if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
+		tokens = hcl.TokensFromExpr(collectionExpr)
+	}
+	resourceb.RemoveBlock(d.block)
+	return tokens, nil
+}
+
+func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
@@ -237,16 +285,16 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 		key := block.Body().GetAttribute(nKey)
 		value := block.Body().GetAttribute(nValue)
 		if key == nil || value == nil {
-			return fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
+			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
 		}
 		setKeyValue(fileb, key, value)
 		resourceb.RemoveBlock(block)
 		found = true
 	}
-	if found {
-		resourceb.SetAttributeRaw(name, hcl.TokensObject(fileb))
+	if !found {
+		return nil, nil
 	}
-	return nil
+	return hcl.TokensObject(fileb), nil
 }
 
 func fillBlockOpt(resourceb *hclwrite.Body, name string) {
@@ -394,11 +442,43 @@ func getResourceLabel(resource *hclwrite.Block) string {
 
 func checkDynamicBlock(body *hclwrite.Body) error {
 	for _, block := range body.Blocks() {
-		if block.Type() == "dynamic" {
-			return errors.New("dynamic blocks are not supported")
+		name := getResourceName(block)
+		if block.Type() != nDynamic || slices.Contains(dynamicBlockAllowList, name) {
+			continue
 		}
+		return fmt.Errorf("dynamic blocks are not supported for %s", name)
 	}
 	return nil
+}
+
+type dynamicBlock struct {
+	block   *hclwrite.Block
+	forEach *hclwrite.Attribute
+	content *hclwrite.Block
+}
+
+func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
+	for _, block := range body.Blocks() {
+		if block.Type() != nDynamic || name != getResourceName(block) {
+			continue
+		}
+		blockb := block.Body()
+		forEach := blockb.GetAttribute(nForEach)
+		if forEach == nil {
+			return dynamicBlock{}, fmt.Errorf("dynamic block %s: attribute %s not found", name, nForEach)
+		}
+		content := blockb.FirstMatchingBlock(nContent, nil)
+		if content == nil {
+			return dynamicBlock{}, fmt.Errorf("dynamic block %s: block %s not found", name, nContent)
+		}
+		return dynamicBlock{forEach: forEach, block: block, content: content}, nil
+	}
+	return dynamicBlock{}, nil
+}
+
+func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
+	expr := hcl.GetAttrExpr(attr)
+	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
 }
 
 func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
