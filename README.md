@@ -57,7 +57,8 @@ Given the different ways of using dynamic blocks, we recommend reviewing the out
 
 #### Dynamic blocks in tags and labels
 
-You can use `dynamic` blocks for `tags` and `labels`. You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, e.g.:
+You can use `dynamic` blocks for `tags` and `labels`. The plugin assumes that `for_each` has an expression which is evaluated to a map of strings.
+You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, e.g.:
 ```hcl
 tags {
 	key   = "environment"
