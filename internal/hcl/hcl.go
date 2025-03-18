@@ -31,12 +31,6 @@ func PopAttr(body *hclwrite.Body, attrName, errPrefix string) (hclwrite.Tokens, 
 	return tokens, nil
 }
 
-// SetAttrExpr sets an attribute to an expression (possibly with interpolations) without quotes.
-func SetAttrExpr(body *hclwrite.Body, attrName, expresion string) {
-	tokens := hclwrite.Tokens{{Type: hclsyntax.TokenIdent, Bytes: []byte(expresion)}}
-	body.SetAttributeRaw(attrName, tokens)
-}
-
 // GetAttrExpr returns the expression of an attribute as a string.
 func GetAttrExpr(attr *hclwrite.Attribute) string {
 	return strings.TrimSpace(string(attr.Expr().BuildTokens(nil).Bytes()))
@@ -85,14 +79,11 @@ func GetAttrString(attr *hclwrite.Attribute, errPrefix string) (string, error) {
 
 // TokensArray creates an array of objects.
 func TokensArray(bodies []*hclwrite.Body) hclwrite.Tokens {
-	ret := hclwrite.Tokens{tokenNewLine}
 	tokens := make([]hclwrite.Tokens, 0)
 	for i := range bodies {
 		tokens = append(tokens, TokensObject(bodies[i]))
 	}
-	ret = append(ret, joinTokens(tokens...)...)
-	ret = append(ret, tokenNewLine)
-	return EncloseBrackets(ret)
+	return EncloseBrackets(EncloseNewLines(joinTokens(tokens...)))
 }
 
 // TokensArraySingle creates an array of one object.
@@ -114,18 +105,13 @@ func TokensFromExpr(expr string) hclwrite.Tokens {
 
 // TokensObjectFromExpr creates an object with an expression.
 func TokensObjectFromExpr(expr string) hclwrite.Tokens {
-	tokens := hclwrite.Tokens{tokenNewLine}
-	tokens = append(tokens, TokensFromExpr(expr)...)
-	tokens = append(tokens, tokenNewLine)
-	return EncloseBraces(tokens)
+	return EncloseBraces(EncloseNewLines(TokensFromExpr(expr)))
 }
 
 // TokensFuncMerge creates the tokens for the HCL merge function.
 func TokensFuncMerge(tokens ...hclwrite.Tokens) hclwrite.Tokens {
-	params := hclwrite.Tokens{tokenNewLine}
-	params = append(params, joinTokens(tokens...)...)
-	params = append(params, tokenNewLine)
-	ret := hclwrite.Tokens{{Type: hclsyntax.TokenIdent, Bytes: []byte("merge")}}
+	params := EncloseNewLines(joinTokens(tokens...))
+	ret := TokensFromExpr("merge")
 	return append(ret, EncloseParens(params)...)
 }
 
@@ -189,4 +175,11 @@ func EncloseBrackets(tokens hclwrite.Tokens) hclwrite.Tokens {
 	ret := hclwrite.Tokens{{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")}}
 	ret = append(ret, tokens...)
 	return append(ret, &hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")})
+}
+
+// EncloseNewLines encloses tokens with newlines at the beginning and end.
+func EncloseNewLines(tokens hclwrite.Tokens) hclwrite.Tokens {
+	ret := hclwrite.Tokens{tokenNewLine}
+	ret = append(ret, tokens...)
+	return append(ret, tokenNewLine)
 }

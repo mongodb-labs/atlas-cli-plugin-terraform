@@ -129,8 +129,8 @@ func fillMovedBlocks(body *hclwrite.Body, moveLabels []string) {
 	for i, moveLabel := range moveLabels {
 		block := body.AppendNewBlock(nMoved, nil)
 		blockb := block.Body()
-		hcl.SetAttrExpr(blockb, nFrom, fmt.Sprintf("%s.%s", cluster, moveLabel))
-		hcl.SetAttrExpr(blockb, nTo, fmt.Sprintf("%s.%s", advCluster, moveLabel))
+		blockb.SetAttributeRaw(nFrom, hcl.TokensFromExpr(fmt.Sprintf("%s.%s", cluster, moveLabel)))
+		blockb.SetAttributeRaw(nTo, hcl.TokensFromExpr(fmt.Sprintf("%s.%s", advCluster, moveLabel)))
 		if i < len(moveLabels)-1 {
 			body.AppendNewline()
 		}
