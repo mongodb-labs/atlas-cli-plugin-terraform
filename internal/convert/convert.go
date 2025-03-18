@@ -204,8 +204,14 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 		specbSrc := specSrc.Body()
 		// ok to fail as zone_name is optional
 		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
-		if hasDynamicBlock, err := fillRegionConfigsDynamicBlock(specb, specbSrc, root); err != nil || hasDynamicBlock {
+		d, err := fillRegionConfigsDynamicBlock(specbSrc, root)
+		if err != nil {
 			return err
+		}
+		if d.IsPresent() {
+			resourceb.RemoveBlock(specSrc)
+			resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
+			return nil
 		}
 		shards := specbSrc.GetAttribute(nNumShards)
 		if shards == nil {
@@ -251,7 +257,7 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 
 func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
 	d, err := getDynamicBlock(resourceb, name)
-	if err != nil || d.forEach == nil {
+	if err != nil || !d.IsPresent() {
 		return nil, err
 	}
 	key := d.content.Body().GetAttribute(nKey)
@@ -306,12 +312,13 @@ func fillBlockOpt(resourceb *hclwrite.Body, name string) {
 	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
 }
 
-func fillRegionConfigsDynamicBlock(specb, specbSrc *hclwrite.Body, root attrVals) (bool, error) {
+func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dynamicBlock, error) {
 	d, err := getDynamicBlock(specbSrc, nConfigSrc)
-	if err != nil || d.forEach == nil {
-		return false, err
+	if err != nil || !d.IsPresent() {
+		return dynamicBlock{}, err
 	}
-	return true, nil
+	d.tokens = hcl.EncloseBrackets(hcl.EncloseNewLines(hcl.TokensFromExpr("for statement")))
+	return d, nil
 }
 
 func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
@@ -463,6 +470,11 @@ type dynamicBlock struct {
 	block   *hclwrite.Block
 	forEach *hclwrite.Attribute
 	content *hclwrite.Block
+	tokens  hclwrite.Tokens
+}
+
+func (d dynamicBlock) IsPresent() bool {
+	return d.block != nil
 }
 
 func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
