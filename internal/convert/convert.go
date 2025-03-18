@@ -368,11 +368,9 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nPriority, nPriority, errRepSpecs); err != nil {
 		return nil, err
 	}
-	electable, errElec := getSpecs(configSrc, nElectableNodes, root)
-	if errElec != nil {
-		return nil, errElec
+	if electable, _ := getSpecs(configSrc, nElectableNodes, root); electable != nil {
+		fileb.SetAttributeRaw(nElectableSpecs, electable)
 	}
-	fileb.SetAttributeRaw(nElectableSpecs, electable)
 	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root); readOnly != nil {
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
