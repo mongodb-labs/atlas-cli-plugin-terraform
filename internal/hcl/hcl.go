@@ -92,7 +92,7 @@ func TokensArray(bodies []*hclwrite.Body) hclwrite.Tokens {
 	}
 	ret = append(ret, joinTokens(tokens...)...)
 	ret = append(ret, tokenNewLine)
-	return encloseBrackets(ret)
+	return EncloseBrackets(ret)
 }
 
 // TokensArraySingle creates an array of one object.
@@ -104,7 +104,7 @@ func TokensArraySingle(body *hclwrite.Body) hclwrite.Tokens {
 func TokensObject(body *hclwrite.Body) hclwrite.Tokens {
 	tokens := hclwrite.Tokens{tokenNewLine}
 	tokens = append(tokens, RemoveLeadingNewline(body.BuildTokens(nil))...)
-	return encloseBraces(tokens)
+	return EncloseBraces(tokens)
 }
 
 // TokensFromExpr creates the tokens for an expression provided as a string.
@@ -117,7 +117,7 @@ func TokensObjectFromExpr(expr string) hclwrite.Tokens {
 	tokens := hclwrite.Tokens{tokenNewLine}
 	tokens = append(tokens, TokensFromExpr(expr)...)
 	tokens = append(tokens, tokenNewLine)
-	return encloseBraces(tokens)
+	return EncloseBraces(tokens)
 }
 
 // TokensFuncMerge creates the tokens for the HCL merge function.
@@ -126,7 +126,7 @@ func TokensFuncMerge(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 	params = append(params, joinTokens(tokens...)...)
 	params = append(params, tokenNewLine)
 	ret := hclwrite.Tokens{{Type: hclsyntax.TokenIdent, Bytes: []byte("merge")}}
-	return append(ret, encloseParens(params)...)
+	return append(ret, EncloseParens(params)...)
 }
 
 // RemoveLeadingNewline removes the first newline if it exists to make the output prettier.
@@ -170,22 +170,22 @@ func joinTokens(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 	return ret
 }
 
-// encloseParens encloses tokens with parentheses, ( ).
-func encloseParens(tokens hclwrite.Tokens) hclwrite.Tokens {
+// EncloseParens encloses tokens with parentheses, ( ).
+func EncloseParens(tokens hclwrite.Tokens) hclwrite.Tokens {
 	ret := hclwrite.Tokens{{Type: hclsyntax.TokenOParen, Bytes: []byte("(")}}
 	ret = append(ret, tokens...)
 	return append(ret, &hclwrite.Token{Type: hclsyntax.TokenCParen, Bytes: []byte(")")})
 }
 
-// encloseBraces encloses tokens with curly braces, { }.
-func encloseBraces(tokens hclwrite.Tokens) hclwrite.Tokens {
+// EncloseBraces encloses tokens with curly braces, { }.
+func EncloseBraces(tokens hclwrite.Tokens) hclwrite.Tokens {
 	ret := hclwrite.Tokens{{Type: hclsyntax.TokenOBrace, Bytes: []byte("{")}}
 	ret = append(ret, tokens...)
 	return append(ret, &hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("}")})
 }
 
-// encloseBrackets encloses tokens with square brackets, [ ].
-func encloseBrackets(tokens hclwrite.Tokens) hclwrite.Tokens {
+// EncloseBrackets encloses tokens with square brackets, [ ].
+func EncloseBrackets(tokens hclwrite.Tokens) hclwrite.Tokens {
 	ret := hclwrite.Tokens{{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")}}
 	ret = append(ret, tokens...)
 	return append(ret, &hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")})
