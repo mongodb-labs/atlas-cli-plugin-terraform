@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	dynamicBlockAllowList = []string{nTags, nLabels}
+	dynamicBlockAllowList = []string{nTags, nLabels, nConfigSrc}
 )
 
 type attrVals struct {
