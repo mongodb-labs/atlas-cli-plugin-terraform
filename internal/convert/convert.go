@@ -264,8 +264,8 @@ func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwr
 	if key == nil || value == nil {
 		return nil, fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
 	}
-	keyExpr := replaceDynamicBlockExpr(key, name, nKey)
-	valueExpr := replaceDynamicBlockExpr(value, name, nValue)
+	keyExpr := replaceDynamicBlockExpr(key, nKey, name, "")
+	valueExpr := replaceDynamicBlockExpr(value, nValue, name, "")
 	collectionExpr := hcl.GetAttrExpr(d.forEach)
 	forExpr := fmt.Sprintf("for key, value in %s : %s => %s", collectionExpr, keyExpr, valueExpr)
 	tokens := hcl.TokensObjectFromExpr(forExpr)
@@ -316,7 +316,23 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
 	}
-	d.tokens = hcl.EncloseBrackets(hcl.EncloseNewLines(hcl.TokensFromExpr("for statement")))
+	const nRegion = "region"
+	configSrc := d.content
+	configSrcb := configSrc.Body()
+
+	oldPrefix := fmt.Sprintf("%s.%s", nConfigSrc, nValue)
+	// Change value references in all attributes, e.g. regions_config.value.electable_nodes to region.electable_nodes
+	for name, attr := range configSrcb.Attributes() {
+		expr := replaceDynamicBlockExpr(attr, name, oldPrefix, nRegion)
+		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
+	}
+
+	region, err := getRegionConfig(configSrc, root)
+	if err != nil {
+		return dynamicBlock{}, err
+	}
+
+	d.tokens = hcl.EncloseBrackets(hcl.EncloseNewLines(hcl.TokensObject(region.Body())))
 	return d, nil
 }
 
@@ -495,9 +511,13 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 	return dynamicBlock{}, nil
 }
 
-func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
+func replaceDynamicBlockExpr(attr *hclwrite.Attribute, attrName, oldPrefix, newPrefix string) string {
 	expr := hcl.GetAttrExpr(attr)
-	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
+	newStr := attrName
+	if newPrefix != "" {
+		newStr = fmt.Sprintf("%s.%s", newPrefix, attrName)
+	}
+	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", oldPrefix, attrName), newStr)
 }
 
 func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
