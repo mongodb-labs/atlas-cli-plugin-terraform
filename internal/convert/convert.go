@@ -22,7 +22,6 @@ const (
 	advClusterPlural = "mongodbatlas_advanced_clusters"
 	valClusterType   = "REPLICASET"
 	valMaxPriority   = 7
-	valMinPriority   = 1
 
 	errFreeCluster = "free cluster (because no " + nRepSpecs + ")"
 	errRepSpecs    = "setting " + nRepSpecs
@@ -354,14 +353,14 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nRegionName, nRegionName, errRepSpecs); err != nil {
 		return nil, err
 	}
-	if err := setPriority(fileb, configSrc.Body().GetAttribute(nPriority)); err != nil {
+	if err := hcl.MoveAttr(configSrc.Body(), fileb, nPriority, nPriority, errRepSpecs); err != nil {
 		return nil, err
 	}
-	electableSpecs, errElec := getSpecs(configSrc, nElectableNodes, root)
+	electable, errElec := getSpecs(configSrc, nElectableNodes, root)
 	if errElec != nil {
 		return nil, errElec
 	}
-	fileb.SetAttributeRaw(nElectableSpecs, electableSpecs)
+	fileb.SetAttributeRaw(nElectableSpecs, electable)
 	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root); readOnly != nil {
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
@@ -512,21 +511,6 @@ func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
 		keyStr = "(" + keyStr + ")" // wrap in parentheses so non-literal expressions can be used as attribute names
 	}
 	body.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
-}
-
-func setPriority(body *hclwrite.Body, priority *hclwrite.Attribute) error {
-	if priority == nil {
-		return fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
-	}
-	valPriority, err := hcl.GetAttrInt(priority, errPriority)
-	if err != nil {
-		return err
-	}
-	if valPriority < valMinPriority || valPriority > valMaxPriority {
-		return fmt.Errorf("%s: %s is %d but must be between %d and %d", errPriority, nPriority, valPriority, valMinPriority, valMaxPriority)
-	}
-	hcl.SetAttrInt(body, nPriority, valPriority)
-	return nil
 }
 
 // popRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
