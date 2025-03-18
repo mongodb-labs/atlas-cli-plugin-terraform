@@ -201,8 +201,6 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 			break
 		}
 		specbSrc := specSrc.Body()
-		// ok to fail as zone_name is optional
-		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
 		d, err := fillRegionConfigsDynamicBlock(specbSrc, root)
 		if err != nil {
 			return err
@@ -212,6 +210,8 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 			resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
 			return nil
 		}
+		// ok to fail as zone_name is optional
+		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
 		shards := specbSrc.GetAttribute(nNumShards)
 		if shards == nil {
 			return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
@@ -316,6 +316,11 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
 	}
+	shards := specbSrc.GetAttribute(nNumShards)
+	if shards == nil {
+		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
+	}
+	zoneName := hcl.GetAttrExpr(specbSrc.GetAttribute(nZoneName))
 	const nRegion = "region"
 	configSrc := d.content
 	configSrcb := configSrc.Body()
@@ -326,13 +331,32 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 		expr := replaceDynamicBlockExpr(attr, name, oldPrefix, nRegion)
 		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
-
 	region, err := getRegionConfig(configSrc, root)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
+	forOuter := fmt.Sprintf("for i in range(%s) :", hcl.GetAttrExpr(shards))
+	repSpec := hclwrite.NewEmptyFile()
+	repSpecb := repSpec.Body()
+	if zoneName != "" {
+		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneName))
+	}
+	config := region.BuildTokens(nil)
+	config = append(config, hcl.TokenNewLine())
+	config = hcl.EncloseBraces(config, true)
+	config = append(config, hcl.TokensFromExpr("if region.priority == priority")...)
+	forRegion := hcl.TokensFromExpr(fmt.Sprintf("for region in %s :", hcl.GetAttrExpr(d.forEach)))
+	forRegion = append(forRegion, config...)
 
-	d.tokens = hcl.EncloseBrackets(hcl.EncloseNewLines(hcl.TokensObject(region.Body())))
+	priorityContent := hcl.EncloseBrackets(hcl.EncloseNewLines(forRegion))
+	priorityBlock := hcl.TokensFromExpr("for priority in range(7, 0, -1) : ")
+	priorityBlock = append(priorityBlock, priorityContent...)
+	repSpecb.SetAttributeRaw(nConfig, hcl.TokensFuncFlatten(priorityBlock))
+
+	tokens := hcl.TokensFromExpr(forOuter)
+	tokens = append(tokens, hcl.EncloseBraces(repSpec.BuildTokens(nil), true)...)
+	tokens = hcl.EncloseBrackets(hcl.EncloseNewLines(tokens))
+	d.tokens = tokens
 	return d, nil
 }
 

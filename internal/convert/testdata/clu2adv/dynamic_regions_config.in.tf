@@ -6,6 +6,7 @@ resource "mongodbatlas_cluster" "dynamic_regions_config" {
   provider_instance_size_name = "M10"
   replication_specs {
     num_shards = var.replication_specs.num_shards
+    zone_name  = "Zone 1"
     dynamic "regions_config" {
       for_each = var.replication_specs.regions_config
       content {
