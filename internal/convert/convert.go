@@ -353,11 +353,7 @@ func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 	if len(configs) == 0 {
 		return fmt.Errorf("%s: %s not found", errRepSpecs, nConfigSrc)
 	}
-	sort.Slice(configs, func(i, j int) bool {
-		pi, _ := hcl.GetAttrInt(configs[i].GetAttribute(nPriority), errPriority)
-		pj, _ := hcl.GetAttrInt(configs[j].GetAttribute(nPriority), errPriority)
-		return pi > pj
-	})
+	configs = sortConfigsByPriority(configs)
 	specb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
 	return nil
 }
@@ -518,6 +514,20 @@ func replaceDynamicBlockExpr(attr *hclwrite.Attribute, attrName, oldPrefix, newP
 		newStr = fmt.Sprintf("%s.%s", newPrefix, attrName)
 	}
 	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", oldPrefix, attrName), newStr)
+}
+
+func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
+	for _, config := range configs {
+		if _, err := hcl.GetAttrInt(config.GetAttribute(nPriority), errPriority); err != nil {
+			return configs // don't sort priorities if any is not a numerical literal
+		}
+	}
+	sort.Slice(configs, func(i, j int) bool {
+		pi, _ := hcl.GetAttrInt(configs[i].GetAttribute(nPriority), errPriority)
+		pj, _ := hcl.GetAttrInt(configs[j].GetAttribute(nPriority), errPriority)
+		return pi > pj
+	})
+	return configs
 }
 
 func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
