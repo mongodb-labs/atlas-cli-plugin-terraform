@@ -86,7 +86,7 @@ func TokensArray(bodies []*hclwrite.Body) hclwrite.Tokens {
 	for i := range bodies {
 		tokens = append(tokens, TokensObject(bodies[i]))
 	}
-	return EncloseBrackets(EncloseNewLines(joinTokens(tokens...)))
+	return EncloseBracketsNewLines(joinTokens(tokens...))
 }
 
 // TokensArraySingle creates an array of one object.
@@ -121,7 +121,7 @@ func TokensFuncMerge(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 // TokensFuncFlatten creates the tokens for the HCL flatten function.
 func TokensFuncFlatten(tokens hclwrite.Tokens) hclwrite.Tokens {
 	ret := TokensFromExpr("flatten")
-	return append(ret, EncloseParens(EncloseBrackets(EncloseNewLines(tokens)))...)
+	return append(ret, EncloseParens(EncloseBracketsNewLines(tokens))...)
 }
 
 // RemoveLeadingNewline removes the first newline if it exists to make the output prettier.
@@ -190,6 +190,11 @@ func EncloseNewLines(tokens hclwrite.Tokens) hclwrite.Tokens {
 	ret := hclwrite.Tokens{tokenNewLine}
 	ret = append(ret, tokens...)
 	return append(ret, tokenNewLine)
+}
+
+// EncloseBracketsNewLines encloses tokens with square brackets and newlines, [ \n ... \n ].
+func EncloseBracketsNewLines(tokens hclwrite.Tokens) hclwrite.Tokens {
+	return EncloseBrackets(EncloseNewLines(tokens))
 }
 
 var tokenNewLine = &hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")}

@@ -335,7 +335,7 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 
 	tokens := hcl.TokensFromExpr(fmt.Sprintf("for i in range(%s) :", hcl.GetAttrExpr(shards)))
 	tokens = append(tokens, hcl.EncloseBraces(repSpec.BuildTokens(nil), true)...)
-	d.tokens = hcl.EncloseBrackets(hcl.EncloseNewLines(tokens))
+	d.tokens = hcl.EncloseBracketsNewLines(tokens)
 	return d, nil
 }
 
@@ -538,7 +538,7 @@ func getDynamicBlockRegionConfigsRegionArray(d dynamicBlock, root attrVals) (hcl
 	tokens := hcl.TokensFromExpr(fmt.Sprintf("for %s in %s :", nRegion, hcl.GetAttrExpr(d.forEach)))
 	tokens = append(tokens, hcl.EncloseBraces(region.BuildTokens(nil), true)...)
 	tokens = append(tokens, hcl.TokensFromExpr(fmt.Sprintf("if %s == %s", nPriority, priorityStr))...)
-	return hcl.EncloseBrackets(hcl.EncloseNewLines(tokens)), nil
+	return hcl.EncloseBracketsNewLines(tokens), nil
 }
 
 // transformDynamicBlockReferences changes value references in all attributes, e.g. regions_config.value.electable_nodes to region.electable_nodes
