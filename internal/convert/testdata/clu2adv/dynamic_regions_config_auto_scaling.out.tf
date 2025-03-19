@@ -36,6 +36,13 @@ resource "mongodbatlas_advanced_cluster" "cluster" {
               ebs_volume_type = var.provider_volume_type
               disk_iops       = var.provider_disk_iops
             } : null
+            analytics_specs = region.analytics_nodes > 0 ? {
+              node_count      = region.analytics_nodes
+              instance_size   = var.provider_instance_size_name
+              disk_size_gb    = var.disk_size_gb
+              ebs_volume_type = var.provider_volume_type
+              disk_iops       = var.provider_disk_iops
+            } : null
             auto_scaling = {
               disk_gb_enabled = var.auto_scaling_disk_gb_enabled
             }

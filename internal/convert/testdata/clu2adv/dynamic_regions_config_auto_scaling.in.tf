@@ -25,6 +25,7 @@ resource "mongodbatlas_cluster" "cluster" {
       content {
         region_name     = regions_config.value.region_name
         electable_nodes = regions_config.value.electable_nodes
+        analytics_nodes = regions_config.value.analytics_nodes
         priority        = regions_config.value.priority
         read_only_nodes = regions_config.value.read_only_nodes
       }
