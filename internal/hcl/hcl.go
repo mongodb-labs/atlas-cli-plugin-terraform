@@ -134,10 +134,14 @@ func RemoveLeadingNewline(tokens hclwrite.Tokens) hclwrite.Tokens {
 
 // AppendComment adds a comment at the end of the body.
 func AppendComment(body *hclwrite.Body, comment string) {
-	tokens := hclwrite.Tokens{
+	body.AppendUnstructuredTokens(TokensComment(comment))
+}
+
+// TokensComment returns the tokens for a comment.
+func TokensComment(comment string) hclwrite.Tokens {
+	return hclwrite.Tokens{
 		&hclwrite.Token{Type: hclsyntax.TokenComment, Bytes: []byte("# " + comment + "\n")},
 	}
-	body.AppendUnstructuredTokens(tokens)
 }
 
 // GetParser returns a parser for the given config and checks HCL syntax is valid

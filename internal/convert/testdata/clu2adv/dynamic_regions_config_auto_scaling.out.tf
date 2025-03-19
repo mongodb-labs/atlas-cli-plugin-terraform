@@ -17,6 +17,7 @@ resource "mongodbatlas_advanced_cluster" "cluster" {
   replication_specs = [
     for i in range(var.replication_specs.num_shards) : {
       region_configs = flatten([
+        # Regions must be sorted by priority in descending order.
         for priority in range(7, 0, -1) : [
           for region in var.replication_specs.regions_config : {
             provider_name = var.provider_name

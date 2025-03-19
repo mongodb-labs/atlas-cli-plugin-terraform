@@ -33,6 +33,7 @@ const (
 	commentConfirmReferences = "Please review the changes and confirm that references to this resource are updated."
 	commentMovedBlock        = "Moved blocks"
 	commentRemovedOld        = "Note: Remember to remove or comment out the old cluster definitions."
+	commentPriorityFor       = "Regions must be sorted by priority in descending order."
 )
 
 var (
@@ -326,7 +327,8 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-	priorityFor := hcl.TokensFromExpr(fmt.Sprintf("for %s in range(%d, %d, -1) : ", nPriority, valMaxPriority, valMinPriority))
+	priorityFor := hcl.TokensComment(commentPriorityFor)
+	priorityFor = append(priorityFor, hcl.TokensFromExpr(fmt.Sprintf("for %s in range(%d, %d, -1) : ", nPriority, valMaxPriority, valMinPriority))...)
 	priorityFor = append(priorityFor, regionFor...)
 	repSpecb.SetAttributeRaw(nConfig, hcl.TokensFuncFlatten(priorityFor))
 

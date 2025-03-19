@@ -6,6 +6,7 @@ resource "mongodbatlas_advanced_cluster" "dynamic_regions_config" {
     for i in range(var.replication_specs.num_shards) : {
       zone_name = var.zone_name
       region_configs = flatten([
+        # Regions must be sorted by priority in descending order.
         for priority in range(7, 0, -1) : [
           for region in var.replication_specs.regions_config : {
             provider_name = "AWS"
