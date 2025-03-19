@@ -76,7 +76,8 @@ dynamic "tags" {
 #### Dynamic blocks in regions_config
 
 You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` or `set` of objects.
-Dynamic block and individual blocks for `regions_config` are not supported at the same time in a `replication_specs`. This is an example of how to use dynamic blocks in `regions_config`:
+Dynamic block and individual blocks for `regions_config` are not supported at the same time in a `replication_specs`. If you need this use case, please send us feedback.
+This is an example of how to use dynamic blocks in `regions_config`:
 ```hcl
   replication_specs {
     num_shards = var.replication_specs.num_shards
@@ -96,7 +97,7 @@ Dynamic block and individual blocks for `regions_config` are not supported at th
 ### Limitations
 
 - [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`. This limitation doesn't apply if you're using `dynamic` blocks in `regions_config` or `replication_specs`.
-- `dynamic` blocks are currently supported only for `tags`, `labels` and `regions_config`. **Coming soon**: support for `replication_specs`.
+- `dynamic` blocks are currently supported only for `tags`, `labels` and `regions_config`. See their limitations in their corresponding dynamic block sections above. **Coming soon**: support for `replication_specs`.
 
 ## Feedback
 
