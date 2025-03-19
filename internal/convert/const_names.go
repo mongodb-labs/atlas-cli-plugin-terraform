@@ -54,4 +54,5 @@ const (
 	nDynamic                    = "dynamic"
 	nForEach                    = "for_each"
 	nContent                    = "content"
+	nRegion                     = "region"
 )

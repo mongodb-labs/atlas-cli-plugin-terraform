@@ -18,3 +18,24 @@ resource "mongodbatlas_cluster" "ar" {
     }
   }
 }
+
+resource "mongodbatlas_cluster" "ar_not_electable" {
+  project_id                  = var.project_id
+  name                        = "ar"
+  cluster_type                = "REPLICASET"
+  provider_name               = "AWS"
+  provider_instance_size_name = "M10"
+  disk_size_gb                = 90
+  provider_volume_type        = "PROVISIONED"
+  provider_disk_iops          = 100
+  replication_specs {
+    num_shards = 1
+    regions_config {
+      region_name     = "US_EAST_1"
+      priority        = 7
+      electable_nodes = 0
+      analytics_nodes = 2
+      read_only_nodes = 1
+    }
+  }
+}

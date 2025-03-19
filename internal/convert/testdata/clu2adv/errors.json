@@ -3,12 +3,8 @@
 	"free_cluster_missing_attribute": "free cluster (because no replication_specs): attribute backing_provider_name not found",
 	"autoscaling_missing_attribute": "setting replication_specs: attribute provider_instance_size_name not found",
 	"replication_specs_missing_regions_config": "setting replication_specs: regions_config not found",
-	"regions_config_missing_electable_nodes": "setting replication_specs: attribute electable_nodes not found",
-	"regions_config_missing_priority": "setting replication_specs: priority not found",
-	"regions_config_out_of_range_priority": "setting priority: priority is 0 but must be between 1 and 7",
-	"regions_config_non_literal_priority": "setting priority: failed to evaluate number",
+	"regions_config_missing_priority": "setting replication_specs: attribute priority not found",
 	"replication_specs_unsupported_dynamic": "dynamic blocks are not supported",
-	"regions_config_unsupported_dynamic": "dynamic blocks are not supported",
 	"replication_specs_non_literal_num_shards": "setting num_shards: failed to evaluate number",
 	"replication_specs_missing_num_shards": "num_shards not found"
 }

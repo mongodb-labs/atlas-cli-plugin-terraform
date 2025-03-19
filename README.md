@@ -57,7 +57,8 @@ Given the different ways of using dynamic blocks, we recommend reviewing the out
 
 #### Dynamic blocks in tags and labels
 
-You can use `dynamic` blocks for `tags` and `labels`. You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, e.g.:
+You can use `dynamic` blocks for `tags` and `labels`. The plugin assumes that `for_each` has an expression which is evaluated to a `map` of strings.
+You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, e.g.:
 ```hcl
 tags {
 	key   = "environment"
@@ -72,12 +73,37 @@ dynamic "tags" {
 }
 ```
 
+#### Dynamic blocks in regions_config
+
+You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` or `set` of objects.
+This is an example of how to use dynamic blocks in `regions_config`:
+```hcl
+  replication_specs {
+    num_shards = var.replication_specs.num_shards
+    zone_name  = var.replication_specs.zone_name # only needed if you're using zones
+    dynamic "regions_config" {
+      for_each = var.replication_specs.regions_config
+      content {
+        priority        = regions_config.value.priority
+        region_name     = regions_config.value.region_name
+        electable_nodes = regions_config.value.electable_nodes
+        read_only_nodes = regions_config.value.read_only_nodes
+      }
+    }
+  }
+```
+Dynamic block and individual blocks for `regions_config` are not supported at the same time. If you need this use case, please send us [feedback](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues). There are currently two main approaches to handle this:
+- (Recommended) Remove the individual `regions_config` blocks and add their information to the variable you're using in the `for_each` expression, e.g. using [concat](https://developer.hashicorp.com/terraform/language/functions/concat) if you're using a list or [setunion](https://developer.hashicorp.com/terraform/language/functions/setunion) for sets. In this way, you don't need to change the generated `mongodb_advanced_cluster` configuration.
+- Change the generated `mongodb_advanced_cluster` configuration to join the individual blocks to the code generated for the `dynamic` block. This approach is more error-prone.
+
 ### Limitations
 
-- The plugin doesn't support `regions_config` without `electable_nodes` as there can be some issues with `priority` when they only have `analytics_nodes` and/or `electable_nodes`.
-- [`priority`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#priority-1) is required in `regions_config` and must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions) between 7 and 1, e.g. `var.priority` is not supported. This is to allow reordering them by descending priority as this is expected in `mongodbatlas_advanced_cluster`.
-- [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`.
-- `dynamic` blocks are currently supported only for `tags` and `labels`. **Coming soon**: support for `replication_specs` and `regions_config`.
+- [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`. This limitation doesn't apply if you're using `dynamic` blocks in `regions_config` or `replication_specs`.
+- `dynamic` blocks are currently supported only for `tags`, `labels` and `regions_config`. See limitations for `regions_config` support in [its section](#dynamic-blocks-in-regions_config) above. **Coming soon**: support for `replication_specs`.
+
+## Feedback
+
+If you find any issues or have any suggestions, please open an [issue](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues) in this repository.
 
 ## Contributing
 
