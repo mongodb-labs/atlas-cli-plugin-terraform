@@ -80,10 +80,6 @@ func GetAttrString(attr *hclwrite.Attribute, errPrefix string) (string, error) {
 	return val.AsString(), nil
 }
 
-func TokenNewLine() *hclwrite.Token {
-	return &hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")}
-}
-
 // TokensArray creates an array of objects.
 func TokensArray(bodies []*hclwrite.Body) hclwrite.Tokens {
 	tokens := make([]hclwrite.Tokens, 0)
@@ -100,7 +96,7 @@ func TokensArraySingle(body *hclwrite.Body) hclwrite.Tokens {
 
 // TokensObject creates an object.
 func TokensObject(body *hclwrite.Body) hclwrite.Tokens {
-	tokens := hclwrite.Tokens{TokenNewLine()}
+	tokens := hclwrite.Tokens{tokenNewLine}
 	tokens = append(tokens, RemoveLeadingNewline(body.BuildTokens(nil))...)
 	return EncloseBraces(tokens, false)
 }
@@ -159,9 +155,7 @@ func joinTokens(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 	for i := range tokens {
 		ret = append(ret, tokens[i]...)
 		if i < len(tokens)-1 {
-			ret = append(ret,
-				&hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")},
-				TokenNewLine())
+			ret = append(ret, &hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")}, tokenNewLine)
 		}
 	}
 	return ret
@@ -178,7 +172,7 @@ func EncloseParens(tokens hclwrite.Tokens) hclwrite.Tokens {
 func EncloseBraces(tokens hclwrite.Tokens, initialNewLine bool) hclwrite.Tokens {
 	ret := hclwrite.Tokens{{Type: hclsyntax.TokenOBrace, Bytes: []byte("{")}}
 	if initialNewLine {
-		ret = append(ret, TokenNewLine())
+		ret = append(ret, tokenNewLine)
 	}
 	ret = append(ret, tokens...)
 	return append(ret, &hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("}")})
@@ -193,7 +187,9 @@ func EncloseBrackets(tokens hclwrite.Tokens) hclwrite.Tokens {
 
 // EncloseNewLines encloses tokens with newlines at the beginning and end.
 func EncloseNewLines(tokens hclwrite.Tokens) hclwrite.Tokens {
-	ret := hclwrite.Tokens{TokenNewLine()}
+	ret := hclwrite.Tokens{tokenNewLine}
 	ret = append(ret, tokens...)
-	return append(ret, TokenNewLine())
+	return append(ret, tokenNewLine)
 }
+
+var tokenNewLine = &hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")}
