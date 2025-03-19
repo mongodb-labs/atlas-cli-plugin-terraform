@@ -202,7 +202,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 			break
 		}
 		specbSrc := specSrc.Body()
-		d, err := fillRegionConfigsDynamicBlock(specbSrc, root)
+		d, err := fillReplicationSpecsWithDynamicRegionConfigs(specbSrc, root)
 		if err != nil {
 			return err
 		}
@@ -312,8 +312,8 @@ func fillBlockOpt(resourceb *hclwrite.Body, name string) {
 	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
 }
 
-// fillRegionConfigsDynamicBlock is used for dynamic blocks in region_configs
-func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dynamicBlock, error) {
+// fillReplicationSpecsWithDynamicRegionConfigs is used for dynamic blocks in region_configs
+func fillReplicationSpecsWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals) (dynamicBlock, error) {
 	d, err := getDynamicBlock(specbSrc, nConfigSrc)
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
