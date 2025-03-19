@@ -76,7 +76,7 @@ dynamic "tags" {
 #### Dynamic blocks in regions_config
 
 You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` or `set` of objects.
-Dynamic block and individual blocks for `regions_config` are not supported at the same time in a `replication_specs`. If you need this use case, please send us feedback.
+Dynamic block and individual blocks for `regions_config` are not supported at the same time in a `replication_specs`. If you need this use case, please send us [feedback](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues).
 This is an example of how to use dynamic blocks in `regions_config`:
 ```hcl
   replication_specs {
