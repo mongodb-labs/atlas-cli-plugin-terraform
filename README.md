@@ -98,6 +98,10 @@ Dynamic block and individual blocks for `regions_config` are not supported at th
 - [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`. This limitation doesn't apply if you're using `dynamic` blocks in `regions_config` or `replication_specs`.
 - `dynamic` blocks are currently supported only for `tags`, `labels` and `regions_config`. **Coming soon**: support for `replication_specs`.
 
+## Feedback
+
+If you find any issues or have any suggestions, please open an [issue](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues) in this repository.
+
 ## Contributing
 
 See our [CONTRIBUTING.md](CONTRIBUTING.md) guide.
