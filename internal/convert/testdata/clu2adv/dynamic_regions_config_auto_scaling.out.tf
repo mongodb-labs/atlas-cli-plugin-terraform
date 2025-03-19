@@ -39,7 +39,7 @@ resource "mongodbatlas_advanced_cluster" "cluster" {
             auto_scaling = {
               disk_gb_enabled = var.auto_scaling_disk_gb_enabled
             }
-          } if region.priority == priority
+          } if priority == region.priority
         ]
       ])
     }

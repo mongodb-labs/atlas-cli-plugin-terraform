@@ -6,13 +6,13 @@ resource "mongodbatlas_cluster" "dynamic_regions_config" {
   provider_instance_size_name = "M10"
   replication_specs {
     num_shards = var.replication_specs.num_shards
-    zone_name  = "Zone 1"
+    zone_name  = var.zone_name
     dynamic "regions_config" {
       for_each = var.replication_specs.regions_config
       content {
         region_name     = regions_config.value.region_name
         electable_nodes = regions_config.value.electable_nodes
-        priority        = regions_config.value.priority
+        priority        = regions_config.value.prio
         read_only_nodes = regions_config.value.read_only_nodes
       }
     }
@@ -26,7 +26,7 @@ variable "replication_specs" {
     regions_config = set(object({
       region_name     = string
       electable_nodes = number
-      priority        = number
+      prio            = number
       read_only_nodes = number
     }))
   })
@@ -36,13 +36,13 @@ variable "replication_specs" {
       {
         region_name     = "US_EAST_1"
         electable_nodes = 3
-        priority        = 7
+        prio            = 7
         read_only_nodes = 0
       },
       {
         region_name     = "US_WEST_2"
         electable_nodes = 2
-        priority        = 6
+        prio            = 6
         read_only_nodes = 1
       }
     ]

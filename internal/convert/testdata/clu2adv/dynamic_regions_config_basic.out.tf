@@ -4,13 +4,13 @@ resource "mongodbatlas_advanced_cluster" "dynamic_regions_config" {
   cluster_type = "SHARDED"
   replication_specs = [
     for i in range(var.replication_specs.num_shards) : {
-      zone_name = "Zone 1"
+      zone_name = var.zone_name
       region_configs = flatten([
         for priority in range(7, 0, -1) : [
           for region in var.replication_specs.regions_config : {
             provider_name = "AWS"
             region_name   = region.region_name
-            priority      = region.priority
+            priority      = region.prio
             electable_specs = region.electable_nodes > 0 ? {
               node_count    = region.electable_nodes
               instance_size = "M10"
@@ -19,7 +19,7 @@ resource "mongodbatlas_advanced_cluster" "dynamic_regions_config" {
               node_count    = region.read_only_nodes
               instance_size = "M10"
             } : null
-          } if region.priority == priority
+          } if priority == region.prio
         ]
       ])
     }
@@ -36,7 +36,7 @@ variable "replication_specs" {
     regions_config = set(object({
       region_name     = string
       electable_nodes = number
-      priority        = number
+      prio            = number
       read_only_nodes = number
     }))
   })
@@ -46,13 +46,13 @@ variable "replication_specs" {
       {
         region_name     = "US_EAST_1"
         electable_nodes = 3
-        priority        = 7
+        prio            = 7
         read_only_nodes = 0
       },
       {
         region_name     = "US_WEST_2"
         electable_nodes = 2
-        priority        = 6
+        prio            = 6
         read_only_nodes = 1
       }
     ]

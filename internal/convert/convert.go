@@ -264,8 +264,8 @@ func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwr
 	if key == nil || value == nil {
 		return nil, fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
 	}
-	keyExpr := replaceDynamicBlockExpr(key, nKey, name, "")
-	valueExpr := replaceDynamicBlockExpr(value, nValue, name, "")
+	keyExpr := replaceDynamicBlockExpr(key, name, nKey)
+	valueExpr := replaceDynamicBlockExpr(value, name, nValue)
 	collectionExpr := hcl.GetAttrExpr(d.forEach)
 	forExpr := fmt.Sprintf("for key, value in %s : %s => %s", collectionExpr, keyExpr, valueExpr)
 	tokens := hcl.TokensObjectFromExpr(forExpr)
@@ -321,15 +321,23 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
 	}
 	zoneName := hcl.GetAttrExpr(specbSrc.GetAttribute(nZoneName))
-	const nRegion = "region"
 	configSrc := d.content
 	configSrcb := configSrc.Body()
+	var priorityStr string
 
-	oldPrefix := fmt.Sprintf("%s.%s", nConfigSrc, nValue)
 	// Change value references in all attributes, e.g. regions_config.value.electable_nodes to region.electable_nodes
 	for name, attr := range configSrcb.Attributes() {
-		expr := replaceDynamicBlockExpr(attr, name, oldPrefix, nRegion)
+		expr := hcl.GetAttrExpr(attr)
+		expr = strings.ReplaceAll(expr,
+			fmt.Sprintf("%s.%s.", nConfigSrc, nValue),
+			fmt.Sprintf("%s.", nRegion))
+		if name == nPriority {
+			priorityStr = expr
+		}
 		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
+	}
+	if priorityStr == "" {
+		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
 	}
 	region, err := getRegionConfig(configSrc, root, true)
 	if err != nil {
@@ -343,7 +351,7 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 	}
 	config := region.BuildTokens(nil)
 	config = hcl.EncloseBraces(config, true)
-	config = append(config, hcl.TokensFromExpr("if region.priority == priority")...)
+	config = append(config, hcl.TokensFromExpr(fmt.Sprintf("if priority == %s", priorityStr))...)
 	forRegion := hcl.TokensFromExpr(fmt.Sprintf("for region in %s :", hcl.GetAttrExpr(d.forEach)))
 	forRegion = append(forRegion, config...)
 
@@ -546,13 +554,9 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 	return dynamicBlock{}, nil
 }
 
-func replaceDynamicBlockExpr(attr *hclwrite.Attribute, attrName, oldPrefix, newPrefix string) string {
+func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
 	expr := hcl.GetAttrExpr(attr)
-	newStr := attrName
-	if newPrefix != "" {
-		newStr = fmt.Sprintf("%s.%s", newPrefix, attrName)
-	}
-	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", oldPrefix, attrName), newStr)
+	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
 }
 
 func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
