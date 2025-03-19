@@ -321,46 +321,20 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
 	}
 	zoneName := hcl.GetAttrExpr(specbSrc.GetAttribute(nZoneName))
-	configSrc := d.content
-	configSrcb := configSrc.Body()
-	var priorityStr string
-
-	// Change value references in all attributes, e.g. regions_config.value.electable_nodes to region.electable_nodes
-	for name, attr := range configSrcb.Attributes() {
-		expr := hcl.GetAttrExpr(attr)
-		expr = strings.ReplaceAll(expr,
-			fmt.Sprintf("%s.%s.", nConfigSrc, nValue),
-			fmt.Sprintf("%s.", nRegion))
-		if name == nPriority {
-			priorityStr = expr
-		}
-		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
-	}
-	if priorityStr == "" {
-		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
-	}
-	region, err := getRegionConfig(configSrc, root, true)
-	if err != nil {
-		return dynamicBlock{}, err
-	}
-	forOuter := fmt.Sprintf("for i in range(%s) :", hcl.GetAttrExpr(shards))
 	repSpec := hclwrite.NewEmptyFile()
 	repSpecb := repSpec.Body()
 	if zoneName != "" {
 		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneName))
 	}
-	config := region.BuildTokens(nil)
-	config = hcl.EncloseBraces(config, true)
-	config = append(config, hcl.TokensFromExpr(fmt.Sprintf("if priority == %s", priorityStr))...)
-	forRegion := hcl.TokensFromExpr(fmt.Sprintf("for region in %s :", hcl.GetAttrExpr(d.forEach)))
-	forRegion = append(forRegion, config...)
-
-	priorityContent := hcl.EncloseBrackets(hcl.EncloseNewLines(forRegion))
+	regionArray, err := getDynamicBlockRegionConfigsRegionArray(d, root)
+	if err != nil {
+		return dynamicBlock{}, err
+	}
 	priorityBlock := hcl.TokensFromExpr("for priority in range(7, 0, -1) : ")
-	priorityBlock = append(priorityBlock, priorityContent...)
+	priorityBlock = append(priorityBlock, regionArray...)
 	repSpecb.SetAttributeRaw(nConfig, hcl.TokensFuncFlatten(priorityBlock))
 
-	tokens := hcl.TokensFromExpr(forOuter)
+	tokens := hcl.TokensFromExpr(fmt.Sprintf("for i in range(%s) :", hcl.GetAttrExpr(shards)))
 	tokens = append(tokens, hcl.EncloseBraces(repSpec.BuildTokens(nil), true)...)
 	tokens = hcl.EncloseBrackets(hcl.EncloseNewLines(tokens))
 	d.tokens = tokens
@@ -549,6 +523,35 @@ func encloseDynamicBlockRegionSpec(specTokens hclwrite.Tokens, countName string)
 	tokens := hcl.TokensFromExpr(fmt.Sprintf("%s.%s > 0 ?", nRegion, countName))
 	tokens = append(tokens, specTokens...)
 	return append(tokens, hcl.TokensFromExpr(": null")...)
+}
+
+// getDynamicBlockRegionConfigsRegionArray returns the region array for a dynamic block in replication_specs.
+// e.g. [ for region in var.replication_specs.regions_config : { ... } if priority == region.priority ]
+func getDynamicBlockRegionConfigsRegionArray(d dynamicBlock, root attrVals) (hclwrite.Tokens, error) {
+	transformDynamicBlockReferences(d.content.Body())
+	priorityStr := hcl.GetAttrExpr(d.content.Body().GetAttribute(nPriority))
+	if priorityStr == "" {
+		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
+	}
+	region, err := getRegionConfig(d.content, root, true)
+	if err != nil {
+		return nil, err
+	}
+	tokens := hcl.TokensFromExpr(fmt.Sprintf("for %s in %s :", nRegion, hcl.GetAttrExpr(d.forEach)))
+	tokens = append(tokens, hcl.EncloseBraces(region.BuildTokens(nil), true)...)
+	tokens = append(tokens, hcl.TokensFromExpr(fmt.Sprintf("if %s == %s", nPriority, priorityStr))...)
+	return hcl.EncloseBrackets(hcl.EncloseNewLines(tokens)), nil
+}
+
+// transformDynamicBlockReferences changes value references in all attributes, e.g. regions_config.value.electable_nodes to region.electable_nodes
+func transformDynamicBlockReferences(configSrcb *hclwrite.Body) {
+	for name, attr := range configSrcb.Attributes() {
+		expr := hcl.GetAttrExpr(attr)
+		expr = strings.ReplaceAll(expr,
+			fmt.Sprintf("%s.%s.", nConfigSrc, nValue),
+			fmt.Sprintf("%s.", nRegion))
+		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
+	}
 }
 
 func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
