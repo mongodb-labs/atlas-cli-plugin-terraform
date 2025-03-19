@@ -399,31 +399,13 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nPriority, nPriority, errRepSpecs); err != nil {
 		return nil, err
 	}
-	if electable, _ := getSpecs(configSrc, nElectableNodes, root); electable != nil {
-		if isDynamicBlock {
-			tokens := hcl.TokensFromExpr(fmt.Sprintf("region.%s > 0 ?", nElectableNodes))
-			tokens = append(tokens, electable...)
-			tokens = append(tokens, hcl.TokensFromExpr(": null")...)
-			electable = tokens
-		}
+	if electable, _ := getSpecs(configSrc, nElectableNodes, root, isDynamicBlock); electable != nil {
 		fileb.SetAttributeRaw(nElectableSpecs, electable)
 	}
-	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root); readOnly != nil {
-		if isDynamicBlock {
-			tokens := hcl.TokensFromExpr(fmt.Sprintf("region.%s > 0 ?", nReadOnlyNodes))
-			tokens = append(tokens, readOnly...)
-			tokens = append(tokens, hcl.TokensFromExpr(": null")...)
-			readOnly = tokens
-		}
+	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root, isDynamicBlock); readOnly != nil {
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
-	if analytics, _ := getSpecs(configSrc, nAnalyticsNodes, root); analytics != nil {
-		if isDynamicBlock {
-			tokens := hcl.TokensFromExpr(fmt.Sprintf("region.%s > 0 ?", nAnalyticsNodes))
-			tokens = append(tokens, analytics...)
-			tokens = append(tokens, hcl.TokensFromExpr(": null")...)
-			analytics = tokens
-		}
+	if analytics, _ := getSpecs(configSrc, nAnalyticsNodes, root, isDynamicBlock); analytics != nil {
 		fileb.SetAttributeRaw(nAnalyticsSpecs, analytics)
 	}
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
@@ -432,7 +414,7 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	return file, nil
 }
 
-func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals) (hclwrite.Tokens, error) {
+func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals, isDynamicBlock bool) (hclwrite.Tokens, error) {
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
@@ -455,7 +437,11 @@ func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals) (hclwr
 	if root.opt[nDiskIOPSSrc] != nil {
 		fileb.SetAttributeRaw(nDiskIOPS, root.opt[nDiskIOPSSrc])
 	}
-	return hcl.TokensObject(fileb), nil
+	tokens := hcl.TokensObject(fileb)
+	if isDynamicBlock {
+		tokens = encloseDynamicBlockRegionSpec(tokens, countName)
+	}
+	return tokens, nil
 }
 
 func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
@@ -513,17 +499,6 @@ func getResourceLabel(resource *hclwrite.Block) string {
 	return labels[1]
 }
 
-func checkDynamicBlock(body *hclwrite.Body) error {
-	for _, block := range body.Blocks() {
-		name := getResourceName(block)
-		if block.Type() != nDynamic || slices.Contains(dynamicBlockAllowList, name) {
-			continue
-		}
-		return fmt.Errorf("dynamic blocks are not supported for %s", name)
-	}
-	return nil
-}
-
 type dynamicBlock struct {
 	block   *hclwrite.Block
 	forEach *hclwrite.Attribute
@@ -533,6 +508,17 @@ type dynamicBlock struct {
 
 func (d dynamicBlock) IsPresent() bool {
 	return d.block != nil
+}
+
+func checkDynamicBlock(body *hclwrite.Body) error {
+	for _, block := range body.Blocks() {
+		name := getResourceName(block)
+		if block.Type() != nDynamic || slices.Contains(dynamicBlockAllowList, name) {
+			continue
+		}
+		return fmt.Errorf("dynamic blocks are not supported for %s", name)
+	}
+	return nil
 }
 
 func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
@@ -557,6 +543,12 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
 	expr := hcl.GetAttrExpr(attr)
 	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
+}
+
+func encloseDynamicBlockRegionSpec(specTokens hclwrite.Tokens, countName string) hclwrite.Tokens {
+	tokens := hcl.TokensFromExpr(fmt.Sprintf("%s.%s > 0 ?", nRegion, countName))
+	tokens = append(tokens, specTokens...)
+	return append(tokens, hcl.TokensFromExpr(": null")...)
 }
 
 func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
