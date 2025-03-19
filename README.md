@@ -76,7 +76,22 @@ dynamic "tags" {
 #### Dynamic blocks in regions_config
 
 You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` or `set` of objects.
-Dynamic block and individual blocks for `regions_config` are not supported at the same time in a `replication_specs`.
+Dynamic block and individual blocks for `regions_config` are not supported at the same time in a `replication_specs`. This is an example of how to use dynamic blocks in `regions_config`:
+```hcl
+  replication_specs {
+    num_shards = var.replication_specs.num_shards
+    zone_name  = var.replication_specs.zone_name # only needed if you're using zones
+    dynamic "regions_config" {
+      for_each = var.replication_specs.regions_config
+      content {
+        priority        = regions_config.value.priority
+        region_name     = regions_config.value.region_name
+        electable_nodes = regions_config.value.electable_nodes
+        read_only_nodes = regions_config.value.read_only_nodes
+      }
+    }
+  }
+```
 
 ### Limitations
 
