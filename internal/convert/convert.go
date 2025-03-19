@@ -317,10 +317,6 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
 	}
-	shards := specbSrc.GetAttribute(nNumShards)
-	if shards == nil {
-		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
-	}
 	repSpec := hclwrite.NewEmptyFile()
 	repSpecb := repSpec.Body()
 	if zoneName := hcl.GetAttrExpr(specbSrc.GetAttribute(nZoneName)); zoneName != "" {
@@ -334,6 +330,10 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 	priorityFor = append(priorityFor, regionFor...)
 	repSpecb.SetAttributeRaw(nConfig, hcl.TokensFuncFlatten(priorityFor))
 
+	shards := specbSrc.GetAttribute(nNumShards)
+	if shards == nil {
+		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
+	}
 	tokens := hcl.TokensFromExpr(fmt.Sprintf("for i in range(%s) :", hcl.GetAttrExpr(shards)))
 	tokens = append(tokens, hcl.EncloseBraces(repSpec.BuildTokens(nil), true)...)
 	d.tokens = hcl.EncloseBracketsNewLines(tokens)
