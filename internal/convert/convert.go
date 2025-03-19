@@ -331,7 +331,7 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 		expr := replaceDynamicBlockExpr(attr, name, oldPrefix, nRegion)
 		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
-	region, err := getRegionConfig(configSrc, root)
+	region, err := getRegionConfig(configSrc, root, true)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
@@ -342,7 +342,6 @@ func fillRegionConfigsDynamicBlock(specbSrc *hclwrite.Body, root attrVals) (dyna
 		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneName))
 	}
 	config := region.BuildTokens(nil)
-	config = append(config, hcl.TokenNewLine())
 	config = hcl.EncloseBraces(config, true)
 	config = append(config, hcl.TokensFromExpr("if region.priority == priority")...)
 	forRegion := hcl.TokensFromExpr(fmt.Sprintf("for region in %s :", hcl.GetAttrExpr(d.forEach)))
@@ -367,7 +366,7 @@ func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 		if configSrc == nil {
 			break
 		}
-		config, err := getRegionConfig(configSrc, root)
+		config, err := getRegionConfig(configSrc, root, false)
 		if err != nil {
 			return err
 		}
@@ -382,7 +381,7 @@ func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 	return nil
 }
 
-func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, error) {
+func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bool) (*hclwrite.File, error) {
 	file := hclwrite.NewEmptyFile()
 	fileb := file.Body()
 	fileb.SetAttributeRaw(nProviderName, root.req[nProviderName])
@@ -393,12 +392,30 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals) (*hclwrite.File, 
 		return nil, err
 	}
 	if electable, _ := getSpecs(configSrc, nElectableNodes, root); electable != nil {
+		if isDynamicBlock {
+			tokens := hcl.TokensFromExpr(fmt.Sprintf("region.%s > 0 ?", nElectableNodes))
+			tokens = append(tokens, electable...)
+			tokens = append(tokens, hcl.TokensFromExpr(": null")...)
+			electable = tokens
+		}
 		fileb.SetAttributeRaw(nElectableSpecs, electable)
 	}
 	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root); readOnly != nil {
+		if isDynamicBlock {
+			tokens := hcl.TokensFromExpr(fmt.Sprintf("region.%s > 0 ?", nReadOnlyNodes))
+			tokens = append(tokens, readOnly...)
+			tokens = append(tokens, hcl.TokensFromExpr(": null")...)
+			readOnly = tokens
+		}
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
 	if analytics, _ := getSpecs(configSrc, nAnalyticsNodes, root); analytics != nil {
+		if isDynamicBlock {
+			tokens := hcl.TokensFromExpr(fmt.Sprintf("region.%s > 0 ?", nAnalyticsNodes))
+			tokens = append(tokens, analytics...)
+			tokens = append(tokens, hcl.TokensFromExpr(": null")...)
+			analytics = tokens
+		}
 		fileb.SetAttributeRaw(nAnalyticsSpecs, analytics)
 	}
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
