@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	dynamicBlockAllowList = []string{nTags, nLabels, nConfigSrc}
+	dynamicBlockAllowList = []string{nTags, nLabels, nConfigSrc, nRepSpecs}
 )
 
 type attrVals struct {
@@ -91,15 +91,20 @@ func convertResource(block *hclwrite.Block) (bool, error) {
 	}
 
 	var err error
-	if blockb.FirstMatchingBlock(nRepSpecs, nil) != nil {
-		err = fillCluster(blockb)
-	} else {
+	if isFreeTierCluster(blockb) {
 		err = fillFreeTierCluster(blockb)
+	} else {
+		err = fillCluster(blockb)
 	}
 	if err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func isFreeTierCluster(resourceb *hclwrite.Body) bool {
+	d, _ := getDynamicBlock(resourceb, nRepSpecs)
+	return resourceb.FirstMatchingBlock(nRepSpecs, nil) == nil && !d.IsPresent()
 }
 
 func convertDataSource(block *hclwrite.Block) bool {
@@ -190,6 +195,15 @@ func fillCluster(resourceb *hclwrite.Body) error {
 }
 
 func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
+	d, err := fillReplicationSpecsWithDynamicBlock(resourceb, root)
+	if err != nil {
+		return err
+	}
+	if d.IsPresent() {
+		resourceb.RemoveBlock(d.block)
+		resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
+		return nil
+	}
 	// at least one replication_specs exists here, if not it would be a free tier cluster
 	var specbs []*hclwrite.Body
 	for {
@@ -202,7 +216,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 			break
 		}
 		specbSrc := specSrc.Body()
-		d, err := fillReplicationSpecsWithDynamicRegionConfigs(specbSrc, root)
+		d, err := fillReplicationSpecsWithDynamicRegionConfigs(specbSrc, root, false)
 		if err != nil {
 			return err
 		}
@@ -312,8 +326,26 @@ func fillBlockOpt(resourceb *hclwrite.Body, name string) {
 	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
 }
 
+// fillReplicationSpecsWithDynamicBlock used for dynamic blocks in replication_specs
+func fillReplicationSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dynamicBlock, error) {
+	dSpec, err := getDynamicBlock(resourceb, nRepSpecs)
+	if err != nil || !dSpec.IsPresent() {
+		return dynamicBlock{}, err
+	}
+	transformDynamicBlockReferences(dSpec.content.Body(), nRepSpecs, nSpec)
+	dConfig, err := fillReplicationSpecsWithDynamicRegionConfigs(dSpec.content.Body(), root, true)
+	if err != nil {
+		return dynamicBlock{}, err
+	}
+	forSpec := hcl.TokensFromExpr(fmt.Sprintf("for %s in %s : ", nSpec, hcl.GetAttrExpr(dSpec.forEach)))
+	forSpec = append(forSpec, dConfig.tokens...)
+	tokens := hcl.TokensFuncFlatten(forSpec)
+	dSpec.tokens = tokens
+	return dSpec, nil
+}
+
 // fillReplicationSpecsWithDynamicRegionConfigs is used for dynamic blocks in region_configs
-func fillReplicationSpecsWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals) (dynamicBlock, error) {
+func fillReplicationSpecsWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals, transformRegionReferences bool) (dynamicBlock, error) {
 	d, err := getDynamicBlock(specbSrc, nConfigSrc)
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
@@ -323,7 +355,11 @@ func fillReplicationSpecsWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root 
 	if zoneName := hcl.GetAttrExpr(specbSrc.GetAttribute(nZoneName)); zoneName != "" {
 		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneName))
 	}
-	regionFor, err := getDynamicBlockRegionConfigsRegionArray(d, root)
+	forEach := hcl.GetAttrExpr(d.forEach)
+	if transformRegionReferences {
+		forEach = replaceDynamicBlockReferences(forEach, nRepSpecs, nSpec)
+	}
+	regionFor, err := getDynamicBlockRegionConfigsRegionArray(forEach, d.content, root)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
@@ -414,7 +450,7 @@ func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals, isDyna
 	}
 	tokens := hcl.TokensObject(fileb)
 	if isDynamicBlock {
-		tokens = encloseDynamicBlockRegionSpec(tokens, countName)
+		tokens = append(hcl.TokensFromExpr(fmt.Sprintf("%s == 0 ? null :", hcl.GetAttrExpr(count))), tokens...)
 	}
 	return tokens, nil
 }
@@ -520,39 +556,36 @@ func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName strin
 	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
 }
 
-func encloseDynamicBlockRegionSpec(specTokens hclwrite.Tokens, countName string) hclwrite.Tokens {
-	tokens := hcl.TokensFromExpr(fmt.Sprintf("%s.%s > 0 ?", nRegion, countName))
-	tokens = append(tokens, specTokens...)
-	return append(tokens, hcl.TokensFromExpr(": null")...)
-}
-
 // getDynamicBlockRegionConfigsRegionArray returns the region array for a dynamic block in replication_specs.
 // e.g. [ for region in var.replication_specs.regions_config : { ... } if priority == region.priority ]
-func getDynamicBlockRegionConfigsRegionArray(d dynamicBlock, root attrVals) (hclwrite.Tokens, error) {
-	transformDynamicBlockReferences(d.content.Body())
-	priorityStr := hcl.GetAttrExpr(d.content.Body().GetAttribute(nPriority))
+func getDynamicBlockRegionConfigsRegionArray(forEach string, configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+	transformDynamicBlockReferences(configSrc.Body(), nConfigSrc, nRegion)
+	priorityStr := hcl.GetAttrExpr(configSrc.Body().GetAttribute(nPriority))
 	if priorityStr == "" {
 		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
 	}
-	region, err := getRegionConfig(d.content, root, true)
+	region, err := getRegionConfig(configSrc, root, true)
 	if err != nil {
 		return nil, err
 	}
-	tokens := hcl.TokensFromExpr(fmt.Sprintf("for %s in %s :", nRegion, hcl.GetAttrExpr(d.forEach)))
+	tokens := hcl.TokensFromExpr(fmt.Sprintf("for %s in %s :", nRegion, forEach))
 	tokens = append(tokens, hcl.EncloseBraces(region.BuildTokens(nil), true)...)
 	tokens = append(tokens, hcl.TokensFromExpr(fmt.Sprintf("if %s == %s", nPriority, priorityStr))...)
 	return hcl.EncloseBracketsNewLines(tokens), nil
 }
 
-// transformDynamicBlockReferences changes value references in all attributes, e.g. regions_config.value.electable_nodes to region.electable_nodes
-func transformDynamicBlockReferences(configSrcb *hclwrite.Body) {
+func transformDynamicBlockReferences(configSrcb *hclwrite.Body, blockName, varName string) {
 	for name, attr := range configSrcb.Attributes() {
-		expr := hcl.GetAttrExpr(attr)
-		expr = strings.ReplaceAll(expr,
-			fmt.Sprintf("%s.%s.", nConfigSrc, nValue),
-			fmt.Sprintf("%s.", nRegion))
+		expr := replaceDynamicBlockReferences(hcl.GetAttrExpr(attr), blockName, varName)
 		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
+}
+
+// replaceDynamicBlockReferences changes value references, e.g. regions_config.value.electable_nodes to region.electable_nodes
+func replaceDynamicBlockReferences(expr, blockName, varName string) string {
+	return strings.ReplaceAll(expr,
+		fmt.Sprintf("%s.%s.", blockName, nValue),
+		fmt.Sprintf("%s.", varName))
 }
 
 func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {

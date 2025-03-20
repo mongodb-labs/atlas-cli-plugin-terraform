@@ -2,7 +2,7 @@
 
 ENHANCEMENTS:
 
-* Supports `dynamic` block for `tags`, `labels` and `regions_config`
+* Supports `dynamic` blocks for `tags`, `labels`, `regions_config` and `replication_specs`
 
 ## 1.0.0 (Mar 6, 2025)
 

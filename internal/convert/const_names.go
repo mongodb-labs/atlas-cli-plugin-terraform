@@ -55,4 +55,5 @@ const (
 	nForEach                    = "for_each"
 	nContent                    = "content"
 	nRegion                     = "region"
+	nSpec                       = "spec"
 )
