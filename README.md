@@ -117,6 +117,7 @@ dynamic "replication_specs" {
     }
   }
 }
+```
 Dynamic block and individual blocks for `replication_specs` are not supported at the same time. If you need this use case, please send us [feedback](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues). You can handle this following the same approaches as for [`regions_config`](#dynamic-blocks-in-regions_config).
 
 ### Limitations
