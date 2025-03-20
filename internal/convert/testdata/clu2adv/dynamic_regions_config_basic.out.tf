@@ -12,14 +12,14 @@ resource "mongodbatlas_advanced_cluster" "dynamic_regions_config" {
             provider_name = "AWS"
             region_name   = region.region_name
             priority      = region.prio
-            electable_specs = region.electable_nodes > 0 ? {
+            electable_specs = region.electable_nodes == 0 ? null : {
               node_count    = region.electable_nodes
               instance_size = "M10"
-            } : null
-            read_only_specs = region.read_only_nodes > 0 ? {
+            }
+            read_only_specs = region.read_only_nodes == 0 ? null : {
               node_count    = region.read_only_nodes
               instance_size = "M10"
-            } : null
+            }
           } if priority == region.prio
         ]
       ])

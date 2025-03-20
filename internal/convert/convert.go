@@ -414,7 +414,7 @@ func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals, isDyna
 	}
 	tokens := hcl.TokensObject(fileb)
 	if isDynamicBlock {
-		tokens = encloseDynamicBlockRegionSpec(tokens, countName)
+		tokens = append(hcl.TokensFromExpr(fmt.Sprintf("%s.%s == 0 ? null :", nRegion, countName)), tokens...)
 	}
 	return tokens, nil
 }
@@ -518,12 +518,6 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
 	expr := hcl.GetAttrExpr(attr)
 	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
-}
-
-func encloseDynamicBlockRegionSpec(specTokens hclwrite.Tokens, countName string) hclwrite.Tokens {
-	tokens := hcl.TokensFromExpr(fmt.Sprintf("%s.%s > 0 ?", nRegion, countName))
-	tokens = append(tokens, specTokens...)
-	return append(tokens, hcl.TokensFromExpr(": null")...)
 }
 
 // getDynamicBlockRegionConfigsRegionArray returns the region array for a dynamic block in replication_specs.

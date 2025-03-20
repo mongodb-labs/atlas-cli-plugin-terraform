@@ -23,27 +23,27 @@ resource "mongodbatlas_advanced_cluster" "cluster" {
             provider_name = var.provider_name
             region_name   = region.region_name
             priority      = region.priority
-            electable_specs = region.electable_nodes > 0 ? {
+            electable_specs = region.electable_nodes == 0 ? null : {
               node_count      = region.electable_nodes
               instance_size   = var.provider_instance_size_name
               disk_size_gb    = var.disk_size_gb
               ebs_volume_type = var.provider_volume_type
               disk_iops       = var.provider_disk_iops
-            } : null
-            read_only_specs = region.read_only_nodes > 0 ? {
+            }
+            read_only_specs = region.read_only_nodes == 0 ? null : {
               node_count      = region.read_only_nodes
               instance_size   = var.provider_instance_size_name
               disk_size_gb    = var.disk_size_gb
               ebs_volume_type = var.provider_volume_type
               disk_iops       = var.provider_disk_iops
-            } : null
-            analytics_specs = region.analytics_nodes > 0 ? {
+            }
+            analytics_specs = region.analytics_nodes == 0 ? null : {
               node_count      = region.analytics_nodes
               instance_size   = var.provider_instance_size_name
               disk_size_gb    = var.disk_size_gb
               ebs_volume_type = var.provider_volume_type
               disk_iops       = var.provider_disk_iops
-            } : null
+            }
             auto_scaling = {
               disk_gb_enabled = var.auto_scaling_disk_gb_enabled
             }
