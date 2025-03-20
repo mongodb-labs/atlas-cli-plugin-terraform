@@ -195,6 +195,15 @@ func fillCluster(resourceb *hclwrite.Body) error {
 }
 
 func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
+	d, err := fillReplicationSpecsWithDynamicBlock(resourceb, root)
+	if err != nil {
+		return err
+	}
+	if d.IsPresent() {
+		resourceb.RemoveBlock(d.block)
+		resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
+		return nil
+	}
 	// at least one replication_specs exists here, if not it would be a free tier cluster
 	var specbs []*hclwrite.Body
 	for {
@@ -315,6 +324,15 @@ func fillBlockOpt(resourceb *hclwrite.Body, name string) {
 	}
 	resourceb.RemoveBlock(block)
 	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
+}
+
+// fillReplicationSpecsWithDynamicBlock used for dynamic blocks in replication_specs
+func fillReplicationSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dynamicBlock, error) {
+	d, err := getDynamicBlock(resourceb, nRepSpecs)
+	if err != nil || !d.IsPresent() {
+		return dynamicBlock{}, err
+	}
+	return d, nil
 }
 
 // fillReplicationSpecsWithDynamicRegionConfigs is used for dynamic blocks in region_configs
