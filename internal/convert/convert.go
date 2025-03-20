@@ -450,7 +450,7 @@ func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals, isDyna
 	}
 	tokens := hcl.TokensObject(fileb)
 	if isDynamicBlock {
-		tokens = append(hcl.TokensFromExpr(fmt.Sprintf("%s.%s == 0 ? null :", nRegion, countName)), tokens...)
+		tokens = append(hcl.TokensFromExpr(fmt.Sprintf("%s == 0 ? null :", hcl.GetAttrExpr(count))), tokens...)
 	}
 	return tokens, nil
 }
