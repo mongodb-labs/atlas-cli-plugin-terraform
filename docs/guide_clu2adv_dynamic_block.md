@@ -95,4 +95,4 @@ resource "mongodbatlas_cluster" "this" {
   }
 }
 ```
-This modified configuration file will have the same behavior as the original one, but it doesn't have individual blocks anymore, only the `dynamic` block, so it is supported by the plugin.
+This modified configuration file has the same behavior as the original one, but it doesn't have individual blocks anymore, only the `dynamic` block, so it is supported by the plugin.
