@@ -77,7 +77,7 @@ dynamic "tags" {
 
 #### Dynamic blocks in regions_config
 
-You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` or `set` of objects.
+You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` or `set` of objects. See this [guide](./docs/guide_clu2adv_dynamic_block.md) to learn more about some limitations.
 This is an example of how to use dynamic blocks in `regions_config`:
 ```hcl
 replication_specs {
@@ -94,13 +94,10 @@ replication_specs {
   }
 }
 ```
-Dynamic block and individual blocks for `regions_config` are not supported at the same time. If you need this use case, please send us [feedback](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues). There are currently two main approaches to handle this:
-- (Recommended) Remove the individual `regions_config` blocks and add their information to the variable you're using in the `for_each` expression, e.g. using [concat](https://developer.hashicorp.com/terraform/language/functions/concat) if you're using a list or [setunion](https://developer.hashicorp.com/terraform/language/functions/setunion) for sets. In this way, you don't need to change the generated `mongodb_advanced_cluster` configuration.
-- Change the generated `mongodb_advanced_cluster` configuration to join the individual blocks to the code generated for the `dynamic` block.
 
 #### Dynamic blocks in replication_specs
 
-You can use `dynamic` blocks for `replication_specs`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
+You can use `dynamic` blocks for `replication_specs`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects. See this [guide](./docs/guide_clu2adv_dynamic_block.md) to learn more about some limitations.
 This is an example of how to use dynamic blocks in `replication_specs`:
 ```hcl
 dynamic "replication_specs" {
@@ -120,12 +117,11 @@ dynamic "replication_specs" {
   }
 }
 ```
-Dynamic block and individual blocks for `replication_specs` are not supported at the same time. If you need this use case, please send us [feedback](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues). You can handle this following the same approaches as for [`regions_config`](#dynamic-blocks-in-regions_config).
 
 ### Limitations
 
 - [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`. This limitation doesn't apply if you're using `dynamic` blocks in `regions_config` or `replication_specs`.
-- `dynamic` blocks are supported with some limitations for [`regions_config`](#dynamic-blocks-in-regions_config) and [`replication_specs`](#dynamic-blocks-in-replication_specs).
+- `dynamic` blocks are supported with some [limitations](./docs/guide_clu2adv_dynamic_block.md).
 
 ## Feedback
 
