@@ -96,7 +96,7 @@ replication_specs {
 ```
 Dynamic block and individual blocks for `regions_config` are not supported at the same time. If you need this use case, please send us [feedback](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues). There are currently two main approaches to handle this:
 - (Recommended) Remove the individual `regions_config` blocks and add their information to the variable you're using in the `for_each` expression, e.g. using [concat](https://developer.hashicorp.com/terraform/language/functions/concat) if you're using a list or [setunion](https://developer.hashicorp.com/terraform/language/functions/setunion) for sets. In this way, you don't need to change the generated `mongodb_advanced_cluster` configuration.
-- Change the generated `mongodb_advanced_cluster` configuration to join the individual blocks to the code generated for the `dynamic` block. This approach is more error-prone.
+- Change the generated `mongodb_advanced_cluster` configuration to join the individual blocks to the code generated for the `dynamic` block.
 
 #### Dynamic blocks in replication_specs
 
