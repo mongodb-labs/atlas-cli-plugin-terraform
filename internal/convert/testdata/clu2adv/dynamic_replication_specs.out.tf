@@ -12,14 +12,15 @@ resource "mongodbatlas_advanced_cluster" "this" {
   cluster_type           = var.cluster_type
   mongo_db_major_version = var.mongo_db_major_version
 
+
   replication_specs = flatten([
     for spec in var.replication_specs : [
-      for i in range(var.replication_specs.num_shards) : {
-        zone_name = var.zone_name
+      for i in range(spec.num_shards) : {
+        zone_name = spec.zone_name
         region_configs = flatten([
           # Regions must be sorted by priority in descending order.
           for priority in range(7, 0, -1) : [
-            for region in var.replication_specs.regions_config : {
+            for region in spec.regions_config : {
               provider_name = var.provider_name
               region_name   = region.region_name
               priority      = region.priority
@@ -32,6 +33,9 @@ resource "mongodbatlas_advanced_cluster" "this" {
                 node_count    = region.read_only_nodes
                 instance_size = var.instance_size
                 disk_size_gb  = var.disk_size
+              }
+              auto_scaling = {
+                disk_gb_enabled = var.auto_scaling_disk_gb_enabled
               }
             } if priority == region.priority
           ]
