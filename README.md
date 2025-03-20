@@ -125,7 +125,7 @@ Dynamic block and individual blocks for `replication_specs` are not supported at
 ### Limitations
 
 - [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`. This limitation doesn't apply if you're using `dynamic` blocks in `regions_config` or `replication_specs`.
-- `dynamic` blocks are supported for `tags`, `labels`, `regions_config` and `replication_specs`. See limitations for [`regions_config`](#dynamic-blocks-in-regions_config) and [`replication_specs`](#dynamic-blocks-in-replication_specs) in their sections above.
+- `dynamic` blocks are supported with some limitations for [`regions_config`](#dynamic-blocks-in-regions_config) and [`replication_specs`](#dynamic-blocks-in-replication_specs).
 
 ## Feedback
 
