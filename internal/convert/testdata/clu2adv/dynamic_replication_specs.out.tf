@@ -1,5 +1,5 @@
 # Based on https://github.com/mongodb/terraform-provider-mongodbatlas/blob/master/examples/migrate_cluster_to_advanced_cluster/module_maintainer/v1/main.tf
-resource "mongodbatlas_advanced_cluster" "dynamic_regions_config" {
+resource "mongodbatlas_advanced_cluster" "this" {
   lifecycle {
     precondition {
       condition     = !(var.auto_scaling_disk_gb_enabled && var.disk_size > 0)
@@ -7,11 +7,10 @@ resource "mongodbatlas_advanced_cluster" "dynamic_regions_config" {
     }
   }
 
-  project_id                   = var.project_id
-  name                         = var.cluster_name
-  auto_scaling_disk_gb_enabled = var.auto_scaling_disk_gb_enabled
-  cluster_type                 = var.cluster_type
-  mongo_db_major_version       = var.mongo_db_major_version
+  project_id             = var.project_id
+  name                   = var.cluster_name
+  cluster_type           = var.cluster_type
+  mongo_db_major_version = var.mongo_db_major_version
 
   replication_specs = flatten([
     for spec in var.replication_specs : [

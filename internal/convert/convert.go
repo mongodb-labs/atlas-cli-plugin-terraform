@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	dynamicBlockAllowList = []string{nTags, nLabels, nConfigSrc}
+	dynamicBlockAllowList = []string{nTags, nLabels, nConfigSrc, nRepSpecs}
 )
 
 type attrVals struct {
@@ -91,15 +91,20 @@ func convertResource(block *hclwrite.Block) (bool, error) {
 	}
 
 	var err error
-	if blockb.FirstMatchingBlock(nRepSpecs, nil) != nil {
-		err = fillCluster(blockb)
-	} else {
+	if isFreeTierCluster(blockb) {
 		err = fillFreeTierCluster(blockb)
+	} else {
+		err = fillCluster(blockb)
 	}
 	if err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func isFreeTierCluster(resourceb *hclwrite.Body) bool {
+	d, _ := getDynamicBlock(resourceb, nRepSpecs)
+	return resourceb.FirstMatchingBlock(nRepSpecs, nil) == nil && !d.IsPresent()
 }
 
 func convertDataSource(block *hclwrite.Block) bool {
