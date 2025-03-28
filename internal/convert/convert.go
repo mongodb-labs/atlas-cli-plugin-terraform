@@ -412,13 +412,13 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nPriority, nPriority, errRepSpecs); err != nil {
 		return nil, err
 	}
-	if electable, _ := getSpecs(configSrc, nElectableNodes, root, isDynamicBlock); electable != nil {
+	if electable, _ := getSpec(configSrc, nElectableNodes, root, isDynamicBlock); electable != nil {
 		fileb.SetAttributeRaw(nElectableSpecs, electable)
 	}
-	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root, isDynamicBlock); readOnly != nil {
+	if readOnly, _ := getSpec(configSrc, nReadOnlyNodes, root, isDynamicBlock); readOnly != nil {
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
-	if analytics, _ := getSpecs(configSrc, nAnalyticsNodes, root, isDynamicBlock); analytics != nil {
+	if analytics, _ := getSpec(configSrc, nAnalyticsNodes, root, isDynamicBlock); analytics != nil {
 		fileb.SetAttributeRaw(nAnalyticsSpecs, analytics)
 	}
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
@@ -427,7 +427,7 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	return file, nil
 }
 
-func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals, dynamicBlock bool) (hclwrite.Tokens, error) {
+func getSpec(configSrc *hclwrite.Block, countName string, root attrVals, isDynamicBlock bool) (hclwrite.Tokens, error) {
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
@@ -451,7 +451,7 @@ func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals, dynami
 		fileb.SetAttributeRaw(nDiskIOPS, root.opt[nDiskIOPSSrc])
 	}
 	tokens := hcl.TokensObject(fileb)
-	if dynamicBlock {
+	if isDynamicBlock {
 		tokens = append(hcl.TokensFromExpr(fmt.Sprintf("%s == 0 ? null :", hcl.GetAttrExpr(count))), tokens...)
 	}
 	return tokens, nil
