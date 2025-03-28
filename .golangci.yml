@@ -47,8 +47,6 @@ linters:
         - style
     govet:
       enable-all: true
-    lll:
-      line-length: 500
     misspell:
       locale: US
       ignore-rules:
