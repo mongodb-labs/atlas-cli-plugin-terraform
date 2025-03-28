@@ -48,7 +48,8 @@ type attrVals struct {
 // ClusterToAdvancedCluster transforms all mongodbatlas_cluster definitions in a
 // Terraform configuration file into mongodbatlas_advanced_cluster schema 2.0.0.
 // All other resources and data sources are left untouched.
-// Note: hclwrite.Tokens are used instead of cty.Value so expressions with interpolations like var.region can be preserved.
+// Note: hclwrite.Tokens are used instead of cty.Value so expressions with
+// interpolations like var.region can be preserved.
 // cty.Value only supports literal expressions.
 func ClusterToAdvancedCluster(config []byte, includeMoved bool) ([]byte, error) {
 	var moveLabels []string
@@ -216,7 +217,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 			break
 		}
 		specbSrc := specSrc.Body()
-		d, err := fillReplicationSpecsWithDynamicRegionConfigs(specbSrc, root, false)
+		d, err := fillWithDynamicRegionConfigs(specbSrc, root, false)
 		if err != nil {
 			return err
 		}
@@ -333,7 +334,7 @@ func fillReplicationSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVal
 		return dynamicBlock{}, err
 	}
 	transformDynamicBlockReferences(dSpec.content.Body(), nRepSpecs, nSpec)
-	dConfig, err := fillReplicationSpecsWithDynamicRegionConfigs(dSpec.content.Body(), root, true)
+	dConfig, err := fillWithDynamicRegionConfigs(dSpec.content.Body(), root, true)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
@@ -344,8 +345,8 @@ func fillReplicationSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVal
 	return dSpec, nil
 }
 
-// fillReplicationSpecsWithDynamicRegionConfigs is used for dynamic blocks in region_configs
-func fillReplicationSpecsWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals, transformRegionReferences bool) (dynamicBlock, error) {
+// fillWithDynamicRegionConfigs is used for dynamic blocks in region_configs
+func fillWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals, changeReferences bool) (dynamicBlock, error) {
 	d, err := getDynamicBlock(specbSrc, nConfigSrc)
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
@@ -356,15 +357,16 @@ func fillReplicationSpecsWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root 
 		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneName))
 	}
 	forEach := hcl.GetAttrExpr(d.forEach)
-	if transformRegionReferences {
+	if changeReferences {
 		forEach = replaceDynamicBlockReferences(forEach, nRepSpecs, nSpec)
 	}
-	regionFor, err := getDynamicBlockRegionConfigsRegionArray(forEach, d.content, root)
+	regionFor, err := getDynamicBlockRegionArray(forEach, d.content, root)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
+	priorityForStr := fmt.Sprintf("for %s in range(%d, %d, -1) : ", nPriority, valMaxPriority, valMinPriority)
 	priorityFor := hcl.TokensComment(commentPriorityFor)
-	priorityFor = append(priorityFor, hcl.TokensFromExpr(fmt.Sprintf("for %s in range(%d, %d, -1) : ", nPriority, valMaxPriority, valMinPriority))...)
+	priorityFor = append(priorityFor, hcl.TokensFromExpr(priorityForStr)...)
 	priorityFor = append(priorityFor, regionFor...)
 	repSpecb.SetAttributeRaw(nConfig, hcl.TokensFuncFlatten(priorityFor))
 
@@ -410,13 +412,13 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nPriority, nPriority, errRepSpecs); err != nil {
 		return nil, err
 	}
-	if electable, _ := getSpecs(configSrc, nElectableNodes, root, isDynamicBlock); electable != nil {
+	if electable, _ := getSpec(configSrc, nElectableNodes, root, isDynamicBlock); electable != nil {
 		fileb.SetAttributeRaw(nElectableSpecs, electable)
 	}
-	if readOnly, _ := getSpecs(configSrc, nReadOnlyNodes, root, isDynamicBlock); readOnly != nil {
+	if readOnly, _ := getSpec(configSrc, nReadOnlyNodes, root, isDynamicBlock); readOnly != nil {
 		fileb.SetAttributeRaw(nReadOnlySpecs, readOnly)
 	}
-	if analytics, _ := getSpecs(configSrc, nAnalyticsNodes, root, isDynamicBlock); analytics != nil {
+	if analytics, _ := getSpec(configSrc, nAnalyticsNodes, root, isDynamicBlock); analytics != nil {
 		fileb.SetAttributeRaw(nAnalyticsSpecs, analytics)
 	}
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
@@ -425,7 +427,7 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	return file, nil
 }
 
-func getSpecs(configSrc *hclwrite.Block, countName string, root attrVals, isDynamicBlock bool) (hclwrite.Tokens, error) {
+func getSpec(configSrc *hclwrite.Block, countName string, root attrVals, isDynamicBlock bool) (hclwrite.Tokens, error) {
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
@@ -556,9 +558,9 @@ func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName strin
 	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
 }
 
-// getDynamicBlockRegionConfigsRegionArray returns the region array for a dynamic block in replication_specs.
+// getDynamicBlockRegionArray returns the region array for a dynamic block in replication_specs.
 // e.g. [ for region in var.replication_specs.regions_config : { ... } if priority == region.priority ]
-func getDynamicBlockRegionConfigsRegionArray(forEach string, configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
+func getDynamicBlockRegionArray(forEach string, configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
 	transformDynamicBlockReferences(configSrc.Body(), nConfigSrc, nRegion)
 	priorityStr := hcl.GetAttrExpr(configSrc.Body().GetAttribute(nPriority))
 	if priorityStr == "" {
@@ -581,7 +583,8 @@ func transformDynamicBlockReferences(configSrcb *hclwrite.Body, blockName, varNa
 	}
 }
 
-// replaceDynamicBlockReferences changes value references, e.g. regions_config.value.electable_nodes to region.electable_nodes
+// replaceDynamicBlockReferences changes value references,
+// e.g. regions_config.value.electable_nodes to region.electable_nodes
 func replaceDynamicBlockReferences(expr, blockName, varName string) string {
 	return strings.ReplaceAll(expr,
 		fmt.Sprintf("%s.%s.", blockName, nValue),
@@ -606,7 +609,8 @@ func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
 	keyStr, err := hcl.GetAttrString(key, "")
 	if err == nil {
 		if !hclsyntax.ValidIdentifier(keyStr) {
-			keyStr = strconv.Quote(keyStr) // wrap in quotes so invalid identifiers (e.g. with blanks) can be used as attribute names
+			// wrap in quotes so invalid identifiers (e.g. with blanks) can be used as attribute names
+			keyStr = strconv.Quote(keyStr)
 		}
 	} else {
 		keyStr = strings.TrimSpace(string(key.Expr().BuildTokens(nil).Bytes()))
