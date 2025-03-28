@@ -1,7 +1,5 @@
 version: "2"
 run:
-  build-tags:
-    - integration
   modules-download-mode: readonly
   tests: true
 linters:
@@ -49,8 +47,6 @@ linters:
       enable-all: true
     misspell:
       locale: US
-      ignore-rules:
-        - cancelled
     mnd:
       checks:
         - case
@@ -94,17 +90,7 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
 formatters:
   enable:
     - gofmt
     - goimports
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
