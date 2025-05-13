@@ -4,7 +4,7 @@ CLI_DESTINATION=./bin/$(CLI_BINARY_NAME)
 MANIFEST_FILE?=./bin/manifest.yml
 WIN_MANIFEST_FILE?=./bin/manifest.windows.yml
 
-GOLANGCI_VERSION=v2.0.2 # Also update golangci-lint GH action in code-health.yml when updating this version
+GOLANGCI_VERSION=v2.1.6 # Also update golangci-lint GH action in code-health.yml when updating this version
 
 .PHONY: build 
 build: ## Generate the binary in ./bin
