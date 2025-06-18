@@ -7,10 +7,6 @@ on:
         description: "Release version (e.g. 3.12.1)"
         required: true
         type: string
-      resource:
-        description: "Resource name (e.g. organization, project, etc.)"
-        required: true
-        type: string
 
 permissions:
   id-token: write
