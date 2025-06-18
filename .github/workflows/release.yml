@@ -67,3 +67,48 @@ jobs:
           ARTIFACTORY_REGISTRY: ${{ secrets.ARTIFACTORY_REGISTRY }}
           ARTIFACTORY_SIGN_USER: ${{ secrets.ARTIFACTORY_SIGN_USER }}
           ARTIFACTORY_SIGN_PASSWORD: ${{ secrets.ARTIFACTORY_SIGN_PASSWORD }}
+  compliance:
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      SILKBOMB_IMG: ${{ vars.SILKBOMB_IMG }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+            ref: ${{ inputs.version_number }}
+      - name: Generate PURLs and SBOM
+        run: make gen-purls gen-sbom
+      - name: Upload SBOM to Kondukto
+        run: make upload-sbom
+        env:
+          KONDUKTO_TOKEN: ${{ secrets.KONDUKTO_TOKEN }}
+          KONDUKTO_REPO: ${{ vars.KONDUKTO_REPO }}
+          KONDUKTO_BRANCH_PREFIX: ${{ vars.KONDUKTO_BRANCH_PREFIX }}
+      - name: Upload SBOM as release artifact
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
+        with:
+          files: compliance/sbom.json
+          tag_name: ${{ inputs.version_number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  generate-ssdlc-report:
+    needs: compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/templates/run-script-and-commit
+        with:
+          script_call: |
+            TAG="${{ inputs.version_number }}"
+            VERSION="${TAG#v}"
+            AUTHOR="${{ github.actor }}"
+            export AUTHOR VERSION
+            ./scripts/compliance/gen-ssdlc-report.sh
+          file_to_commit: 'compliance/v*/ssdlc-compliance-*.md'
+          commit_message: "chore: Update SSDLC report for ${{ inputs.version_number }}"
+          apix_bot_pat: ${{ secrets.APIX_BOT_PAT }}
+          remote: https://svc-apix-bot:${{ secrets.APIX_BOT_PAT }}@github.com/${{ github.repository }}
+          gpg_private_key: ${{ secrets.APIX_BOT_GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.APIX_BOT_PASSPHRASE }}
