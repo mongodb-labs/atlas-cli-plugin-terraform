@@ -64,4 +64,20 @@ generate-manifest-windows: ## Generate the manifest file for windows OSes
 .DEFAULT_GOAL := help
 help:
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' | sort
+
+.PHONY: gen-purls
+gen-purls:
+	./scripts/compliance/gen-purls.sh
+
+.PHONY: gen-sbom
+gen-sbom:
+	./scripts/compliance/gen-sbom.sh
+
+.PHONY: gen-ssdlc-report
+gen-ssdlc-report:
+	./scripts/compliance/gen-ssdlc-report.sh
+
+.PHONY: upload-sbom
+upload-sbom:
+	./scripts/compliance/upload-sbom.sh
 	
