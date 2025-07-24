@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/hashicorp/hcl/v2 v2.24.0
-	github.com/sebdah/goldie/v2 v2.5.5
+	github.com/sebdah/goldie/v2 v2.7.1
 	github.com/spf13/afero v1.14.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
