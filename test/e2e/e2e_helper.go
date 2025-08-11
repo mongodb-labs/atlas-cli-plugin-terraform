@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"os/exec"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 
 func RunTF(args ...string) (string, error) {
 	args = append([]string{"tf"}, args...)
-	cmd := exec.Command("atlas", args...)
+	cmd := exec.CommandContext(context.Background(), "atlas", args...)
 	resp, err := cmd.CombinedOutput()
 	return string(resp), err
 }
