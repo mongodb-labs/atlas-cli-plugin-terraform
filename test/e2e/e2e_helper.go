@@ -22,6 +22,11 @@ func RunClu2Adv(args ...string) (string, error) {
 	return RunTF(args...)
 }
 
+func RunAdv2New(args ...string) (string, error) {
+	args = append([]string{"adv2new"}, args...)
+	return RunTF(args...)
+}
+
 func CompareFiles(t *testing.T, fs afero.Fs, file1, file2 string) {
 	t.Helper()
 	data1, err1 := afero.ReadFile(fs, file1)
