@@ -1,3 +1,14 @@
 bin
 bin-plugin
 .vscode
+.DS_Store
+.idea
+.windsurf
+CLAUDE.md
+.claude
+*.env
+*.bak
+*.log
+*.mdc
+__debug_*
+*~
