@@ -9,22 +9,12 @@ import (
 	"github.com/spf13/afero"
 )
 
-// Converter defines the interface for different conversion functions.
-type Converter interface {
-	Convert(config []byte) ([]byte, error)
-}
-
-// ConvertFunc is a function type that implements the Converter interface.
-type ConvertFunc func(config []byte) ([]byte, error)
-
-func (f ConvertFunc) Convert(config []byte) ([]byte, error) {
-	return f(config)
-}
+type ConvertFn func(config []byte) ([]byte, error)
 
 // BaseOpts contains common functionality for CLI commands that convert files.
 type BaseOpts struct {
 	Fs            afero.Fs
-	Converter     Converter
+	Convert       ConvertFn
 	File          string
 	Output        string
 	ReplaceOutput bool
@@ -60,7 +50,7 @@ func (o *BaseOpts) generateFile(allowParseErrors bool) error {
 		return fmt.Errorf("failed to read file %s: %w", o.File, err)
 	}
 
-	outConfig, err := o.Converter.Convert(inConfig)
+	outConfig, err := o.Convert(inConfig)
 	if err != nil {
 		if allowParseErrors {
 			outConfig = []byte("# CONVERT ERROR: " + err.Error() + "\n\n")

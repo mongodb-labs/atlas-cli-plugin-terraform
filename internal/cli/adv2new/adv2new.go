@@ -10,8 +10,8 @@ import (
 
 func Builder() *cobra.Command {
 	o := &cli.BaseOpts{
-		Fs:        afero.NewOsFs(),
-		Converter: cli.ConvertFunc(convert.AdvancedClusterToNew),
+		Fs:      afero.NewOsFs(),
+		Convert: convert.AdvancedClusterToNew,
 	}
 	cmd := &cobra.Command{
 		Use:   "advancedClusterToNew",

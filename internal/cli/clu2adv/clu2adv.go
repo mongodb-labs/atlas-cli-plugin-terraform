@@ -17,9 +17,9 @@ func Builder() *cobra.Command {
 			Fs: afero.NewOsFs(),
 		},
 	}
-	o.Converter = cli.ConvertFunc(func(config []byte) ([]byte, error) {
+	o.Convert = func(config []byte) ([]byte, error) {
 		return convert.ClusterToAdvancedCluster(config, o.includeMoved)
-	})
+	}
 	cmd := &cobra.Command{
 		Use:   "clusterToAdvancedCluster",
 		Short: "Convert cluster to advanced_cluster preview provider 2.0.0",
