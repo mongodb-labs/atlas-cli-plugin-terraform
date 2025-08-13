@@ -6,6 +6,6 @@ import (
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/test/e2e"
 )
 
-func TestAdv2New(t *testing.T) {
-	e2e.RunTests(t, "adv2new", nil)
+func TestAdvancedClusterToV2(t *testing.T) {
+	e2e.RunTests(t, "adv2v2", nil)
 }

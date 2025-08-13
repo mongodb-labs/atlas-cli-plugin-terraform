@@ -6,7 +6,7 @@ import (
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/test/e2e"
 )
 
-func TestClu2Adv(t *testing.T) {
+func TestClusterToAdvancedCluster(t *testing.T) {
 	files := e2e.GetTestFiles(t, "clu2adv")
 	fileExpectedMoved := files.GetCustomFilePath("expected_moved.tf")
 	extraTests := map[string]e2e.TestCase{
