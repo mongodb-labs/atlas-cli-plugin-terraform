@@ -33,14 +33,7 @@ func Builder() *cobra.Command {
 			return o.Run()
 		},
 	}
-	cmd.Flags().StringVarP(&o.File, flag.File, flag.FileShort, "", "input file")
-	_ = cmd.MarkFlagRequired(flag.File)
-	cmd.Flags().StringVarP(&o.Output, flag.Output, flag.OutputShort, "", "output file")
-	_ = cmd.MarkFlagRequired(flag.Output)
-	cmd.Flags().BoolVarP(&o.ReplaceOutput, flag.ReplaceOutput, flag.ReplaceOutputShort, false,
-		"replace output file if exists")
-	cmd.Flags().BoolVarP(&o.Watch, flag.Watch, flag.WatchShort, false,
-		"keeps the plugin running and watches the input file for changes")
+	cli.SetupCommonFlags(cmd, o.BaseOpts)
 	cmd.Flags().BoolVarP(&o.includeMoved, flag.IncludeMoved, flag.IncludeMovedShort, false,
 		"include moved blocks in the output file")
 	return cmd
