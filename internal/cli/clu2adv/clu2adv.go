@@ -12,8 +12,11 @@ func Builder() *cobra.Command {
 	o := &struct {
 		*cli.BaseOpts
 		includeMoved bool
-	}{}
-	o.Fs = afero.NewOsFs()
+	}{
+		BaseOpts: &cli.BaseOpts{
+			Fs: afero.NewOsFs(),
+		},
+	}
 	o.Converter = cli.ConvertFunc(func(config []byte) ([]byte, error) {
 		return convert.ClusterToAdvancedCluster(config, o.includeMoved)
 	})
