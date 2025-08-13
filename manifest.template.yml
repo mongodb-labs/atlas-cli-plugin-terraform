@@ -8,5 +8,5 @@ binary: $BINARY
 commands:
     terraform:
         description: Utilities for Terraform's MongoDB Atlas Provider
-    tf:
-        description: Alias for the terraform command
+        aliases:
+            - tf
