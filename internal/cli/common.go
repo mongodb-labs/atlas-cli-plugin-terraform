@@ -23,8 +23,16 @@ type BaseOpts struct {
 	Watch         bool
 }
 
-// PreRun validates the input and output files before running the command.
-func (o *BaseOpts) PreRun() error {
+// RunE is the entry point for the command.
+func (o *BaseOpts) RunE(cmd *cobra.Command, args []string) error {
+	if err := o.preRun(); err != nil {
+		return err
+	}
+	return o.run()
+}
+
+// preRun validates the input and output files before running the command.
+func (o *BaseOpts) preRun() error {
 	if err := file.MustExist(o.Fs, o.File); err != nil {
 		return err
 	}
@@ -34,8 +42,8 @@ func (o *BaseOpts) PreRun() error {
 	return nil
 }
 
-// Run executes the conversion and optionally watches for file changes.
-func (o *BaseOpts) Run() error {
+// run executes the conversion and optionally watches for file changes.
+func (o *BaseOpts) run() error {
 	if err := o.generateFile(false); err != nil {
 		return err
 	}

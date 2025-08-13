@@ -18,12 +18,7 @@ func Builder() *cobra.Command {
 		Long: "Convert a Terraform configuration from mongodbatlas_advanced_cluster in provider version 1.X.X (SDKv2)" +
 			" to version 2.X.X (TPF - Terraform Plugin Framework)",
 		Aliases: []string{"adv2new"},
-		RunE: func(_ *cobra.Command, _ []string) error {
-			if err := o.PreRun(); err != nil {
-				return err
-			}
-			return o.Run()
-		},
+		RunE:    o.RunE,
 	}
 	cli.SetupCommonFlags(cmd, o)
 	return cmd

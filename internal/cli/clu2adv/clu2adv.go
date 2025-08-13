@@ -26,12 +26,7 @@ func Builder() *cobra.Command {
 		Long: "Convert a Terraform configuration from mongodbatlas_cluster to " +
 			"mongodbatlas_advanced_cluster preview provider 2.0.0",
 		Aliases: []string{"clu2adv"},
-		RunE: func(_ *cobra.Command, _ []string) error {
-			if err := o.PreRun(); err != nil {
-				return err
-			}
-			return o.Run()
-		},
+		RunE:    o.RunE,
 	}
 	cli.SetupCommonFlags(cmd, o.BaseOpts)
 	cmd.Flags().BoolVarP(&o.includeMoved, flag.IncludeMoved, flag.IncludeMovedShort, false,
