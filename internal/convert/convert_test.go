@@ -6,20 +6,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/convert"
 	"github.com/sebdah/goldie/v2"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestClusterToAdvancedCluster(t *testing.T) {
+// runConvertTests runs common conversion tests with the given test directory and convert function
+func runConvertTests(t *testing.T, cmdName string, convert func(testName string, inConfig []byte) ([]byte, error)) {
+	t.Helper()
 	const (
-		root        = "testdata/clu2adv"
 		inSuffix    = ".in.tf"
 		outSuffix   = ".out.tf"
 		errFilename = "errors.json"
 	)
+	root := filepath.Join("testdata", cmdName)
 	fs := afero.NewOsFs()
 	errMap := make(map[string]string)
 	errContent, err := afero.ReadFile(fs, filepath.Join(root, errFilename))
@@ -38,8 +39,7 @@ func TestClusterToAdvancedCluster(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			inConfig, err := afero.ReadFile(fs, inputFile)
 			require.NoError(t, err)
-			includeMoved := strings.Contains(testName, "includeMoved")
-			outConfig, err := convert.ClusterToAdvancedCluster(inConfig, includeMoved)
+			outConfig, err := convert(testName, inConfig)
 			if err == nil {
 				g.Assert(t, testName, outConfig)
 			} else {
