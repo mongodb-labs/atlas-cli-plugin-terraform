@@ -13,14 +13,14 @@ import (
 )
 
 // runConvertTests runs common conversion tests with the given test directory and convert function
-func runConvertTests(t *testing.T, testDir string, convert func(testName string, inConfig []byte) ([]byte, error)) {
+func runConvertTests(t *testing.T, cmdName string, convert func(testName string, inConfig []byte) ([]byte, error)) {
 	t.Helper()
 	const (
 		inSuffix    = ".in.tf"
 		outSuffix   = ".out.tf"
 		errFilename = "errors.json"
 	)
-	root := filepath.Join("testdata", testDir)
+	root := filepath.Join("testdata", cmdName)
 	fs := afero.NewOsFs()
 	errMap := make(map[string]string)
 	errContent, err := afero.ReadFile(fs, filepath.Join(root, errFilename))
