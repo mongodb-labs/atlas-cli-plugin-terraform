@@ -10,10 +10,10 @@ import (
 
 func Builder() *cobra.Command {
 	o := &struct {
-		*cli.BaseOpts
+		cli.BaseOpts
 		includeMoved bool
 	}{
-		BaseOpts: &cli.BaseOpts{
+		BaseOpts: cli.BaseOpts{
 			Fs: afero.NewOsFs(),
 		},
 	}
@@ -28,7 +28,7 @@ func Builder() *cobra.Command {
 		Aliases: []string{"clu2adv"},
 		RunE:    o.RunE,
 	}
-	cli.SetupCommonFlags(cmd, o.BaseOpts)
+	cli.SetupCommonFlags(cmd, &o.BaseOpts)
 	cmd.Flags().BoolVarP(&o.includeMoved, flag.IncludeMoved, flag.IncludeMovedShort, false,
 		"include moved blocks in the output file")
 	return cmd
