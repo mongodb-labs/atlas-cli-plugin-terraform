@@ -19,7 +19,7 @@ func AdvancedClusterToV2(config []byte) ([]byte, error) {
 		updated, err := updateResource(block)
 		if err != nil {
 			return nil,
-				err
+			return nil, err
 		}
 		if updated {
 			blockb := block.Body()
