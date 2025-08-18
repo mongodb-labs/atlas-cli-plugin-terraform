@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"slices"
+
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 )
@@ -34,6 +36,9 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 		return false, nil
 	}
 	resourceb := resource.Body()
+	if hasExpectedBlocksAsAttributes(resourceb) {
+		return false, nil
+	}
 	if err := convertRepSpecs(resourceb); err != nil {
 		return false, err
 	}
@@ -77,4 +82,25 @@ func convertConfig(repSpecs *hclwrite.Body) error {
 	fillBlockOpt(blockb, nAnalyticsAutoScaling)
 	repSpecs.SetAttributeRaw(nConfig, hcl.TokensArraySingle(blockb))
 	return nil
+}
+
+// hasExpectedBlocksAsAttributes checks if any of the expected block names
+// exist as attributes in the resource body. In that case conversion is not done
+// as advanced cluster is not in a valid SDKv2 configuration.
+func hasExpectedBlocksAsAttributes(resourceb *hclwrite.Body) bool {
+	expectedBlocks := []string{
+		nRepSpecs,
+		nTags,
+		nLabels,
+		nAdvConf,
+		nBiConnector,
+		nPinnedFCV,
+		nTimeouts,
+	}
+	for name := range resourceb.Attributes() {
+		if slices.Contains(expectedBlocks, name) {
+			return true
+		}
+	}
+	return false
 }
