@@ -18,7 +18,6 @@ func AdvancedClusterToV2(config []byte) ([]byte, error) {
 	for _, block := range parserb.Blocks() {
 		updated, err := updateResource(block)
 		if err != nil {
-			return nil,
 			return nil, err
 		}
 		if updated {
