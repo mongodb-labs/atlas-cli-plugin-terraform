@@ -13,4 +13,29 @@ resource "mongodbatlas_advanced_cluster" "clu" {
       }
     }
   }
+
+  timeouts {
+    create = "60m"
+  }
+
+  tags {
+    key   = "environment"
+    value = "dev"
+  }
+  tags {
+    key   = var.tag_key # non-literal values are supported and enclosed in parentheses
+    value = var.tag_value
+  }
+  tags {
+    key   = "Tag 2"
+    value = "Value 2"
+  }
+  labels {
+    key   = "label1"
+    value = "Val label 1"
+  }
+  labels {
+    key   = "Label 2"
+    value = "label val 2"
+  }
 }
