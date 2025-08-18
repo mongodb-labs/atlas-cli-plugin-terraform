@@ -22,7 +22,7 @@ func AdvancedClusterToV2(config []byte) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if updated {
+		if updated { // If the resource was converted, add a comment at then end so user knows the resource was updated
 			blockb := block.Body()
 			blockb.AppendNewline()
 			hcl.AppendComment(blockb, commentUpdatedBy)
