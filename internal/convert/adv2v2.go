@@ -70,7 +70,12 @@ func convertConfig(repSpecs *hclwrite.Body) error {
 		return nil
 	}
 	repSpecs.RemoveBlock(block)
-	fillBlockOpt(block.Body(), nElectableSpecs)
-	repSpecs.SetAttributeRaw(nConfig, hcl.TokensArraySingle(block.Body()))
+	blockb := block.Body()
+	fillBlockOpt(blockb, nElectableSpecs)
+	fillBlockOpt(blockb, nReadOnlySpecs)
+	fillBlockOpt(blockb, nAnalyticsSpecs)
+	fillBlockOpt(blockb, nAutoScaling)
+	fillBlockOpt(blockb, nAnalyticsAutoScaling)
+	repSpecs.SetAttributeRaw(nConfig, hcl.TokensArraySingle(blockb))
 	return nil
 }

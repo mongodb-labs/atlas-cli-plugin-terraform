@@ -33,6 +33,7 @@ const (
 	nBiConnector                = "bi_connector_config"
 	nElectableSpecs             = "electable_specs"
 	nAutoScaling                = "auto_scaling"
+	nAnalyticsAutoScaling       = "analytics_auto_scaling"
 	nReadOnlySpecs              = "read_only_specs"
 	nAnalyticsSpecs             = "analytics_specs"
 	nRegionNameSrc              = "provider_region_name"
