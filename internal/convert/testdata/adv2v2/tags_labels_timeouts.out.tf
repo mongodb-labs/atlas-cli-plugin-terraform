@@ -2,6 +2,8 @@ resource "mongodbatlas_advanced_cluster" "clu" {
   project_id   = var.project_id
   name         = "clu"
   cluster_type = "REPLICASET"
+
+
   replication_specs = [
     {
       region_configs = [
@@ -17,7 +19,6 @@ resource "mongodbatlas_advanced_cluster" "clu" {
       ]
     }
   ]
-
   tags = {
     environment   = "dev"
     (var.tag_key) = var.tag_value
