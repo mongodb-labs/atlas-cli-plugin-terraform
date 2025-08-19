@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -56,31 +57,45 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 }
 
 func convertRepSpecs(resourceb *hclwrite.Body) error {
-	block := resourceb.FirstMatchingBlock(nRepSpecs, nil)
-	if block == nil {
-		return nil
+	var repSpecs []*hclwrite.Body
+	for {
+		block := resourceb.FirstMatchingBlock(nRepSpecs, nil)
+		if block == nil {
+			break
+		}
+		resourceb.RemoveBlock(block)
+		if err := convertConfig(block.Body()); err != nil {
+			return err
+		}
+		repSpecs = append(repSpecs, block.Body())
 	}
-	resourceb.RemoveBlock(block)
-	if err := convertConfig(block.Body()); err != nil {
-		return err
+	if len(repSpecs) == 0 {
+		return fmt.Errorf("must have at least one replication_specs")
 	}
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(block.Body()))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(repSpecs))
 	return nil
 }
 
 func convertConfig(repSpecs *hclwrite.Body) error {
-	block := repSpecs.FirstMatchingBlock(nConfig, nil)
-	if block == nil {
-		return nil
+	var configs []*hclwrite.Body
+	for {
+		block := repSpecs.FirstMatchingBlock(nConfig, nil)
+		if block == nil {
+			break
+		}
+		repSpecs.RemoveBlock(block)
+		blockb := block.Body()
+		fillBlockOpt(blockb, nElectableSpecs)
+		fillBlockOpt(blockb, nReadOnlySpecs)
+		fillBlockOpt(blockb, nAnalyticsSpecs)
+		fillBlockOpt(blockb, nAutoScaling)
+		fillBlockOpt(blockb, nAnalyticsAutoScaling)
+		configs = append(configs, blockb)
 	}
-	repSpecs.RemoveBlock(block)
-	blockb := block.Body()
-	fillBlockOpt(blockb, nElectableSpecs)
-	fillBlockOpt(blockb, nReadOnlySpecs)
-	fillBlockOpt(blockb, nAnalyticsSpecs)
-	fillBlockOpt(blockb, nAutoScaling)
-	fillBlockOpt(blockb, nAnalyticsAutoScaling)
-	repSpecs.SetAttributeRaw(nConfig, hcl.TokensArraySingle(blockb))
+	if len(configs) == 0 {
+		return fmt.Errorf("replication_specs must have at least one region_configs")
+	}
+	repSpecs.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
 	return nil
 }
 
