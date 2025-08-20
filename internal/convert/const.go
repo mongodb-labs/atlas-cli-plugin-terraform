@@ -70,7 +70,6 @@ const (
 	nZoneName                   = "zone_name"
 	nKey                        = "key"
 	nValue                      = "value"
-	nUseRepSpecsPerShard        = "use_replication_spec_per_shard"
 	nMoved                      = "moved"
 	nFrom                       = "from"
 	nTo                         = "to"

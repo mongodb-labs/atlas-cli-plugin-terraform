@@ -95,7 +95,6 @@ func convertDataSource(block *hclwrite.Block) bool {
 	}
 	if newName, found := convertMap[getResourceName(block)]; found {
 		setResourceName(block, newName)
-		block.Body().SetAttributeValue(nUseRepSpecsPerShard, cty.True)
 		return true
 	}
 	return false
