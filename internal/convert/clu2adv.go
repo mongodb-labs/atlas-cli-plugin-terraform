@@ -164,7 +164,7 @@ func fillCluster(resourceb *hclwrite.Body) error {
 	if err := fillTagsLabelsOpt(resourceb, nLabels); err != nil {
 		return err
 	}
-	fillBlockOpt(resourceb, nAdvConf)
+	fillAdvConfigOpt(resourceb, nAdvConf)
 	fillBlockOpt(resourceb, nBiConnector)
 	fillBlockOpt(resourceb, nPinnedFCV)
 	fillBlockOpt(resourceb, nTimeouts)
@@ -301,6 +301,20 @@ func fillBlockOpt(resourceb *hclwrite.Body, name string) {
 	}
 	resourceb.RemoveBlock(block)
 	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
+}
+
+func fillAdvConfigOpt(resourceb *hclwrite.Body, name string) {
+	block := resourceb.FirstMatchingBlock(name, nil)
+	if block == nil {
+		return
+	}
+	blockBody := block.Body()
+
+	// Remove deprecated attributes from advanced_configuration
+	blockBody.RemoveAttribute(nFailIndexKeyTooLong)
+	blockBody.RemoveAttribute(nDefaultReadConcern)
+
+	fillBlockOpt(resourceb, name)
 }
 
 // fillReplicationSpecsWithDynamicBlock used for dynamic blocks in replication_specs

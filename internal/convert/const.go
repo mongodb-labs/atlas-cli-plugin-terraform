@@ -78,4 +78,6 @@ const (
 	nContent                    = "content"
 	nRegion                     = "region"
 	nSpec                       = "spec"
+	nFailIndexKeyTooLong        = "fail_index_key_too_long"
+	nDefaultReadConcern         = "default_read_concern"
 )
