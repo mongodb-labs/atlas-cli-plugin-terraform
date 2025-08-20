@@ -65,10 +65,21 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 			break
 		}
 		resourceb.RemoveBlock(block)
-		if err := convertConfig(block.Body(), diskSizeGB); err != nil {
+		blockb := block.Body()
+		numShardsVal := 1 // default to 1 if num_shards not present
+		if numShardsAttr := blockb.GetAttribute(nNumShards); numShardsAttr != nil {
+			var err error
+			if numShardsVal, err = hcl.GetAttrInt(numShardsAttr, errNumShards); err != nil {
+				return err
+			}
+			blockb.RemoveAttribute(nNumShards)
+		}
+		if err := convertConfig(blockb, diskSizeGB); err != nil {
 			return err
 		}
-		repSpecs = append(repSpecs, block.Body())
+		for i := 0; i < numShardsVal; i++ {
+			repSpecs = append(repSpecs, blockb)
+		}
 	}
 	if len(repSpecs) == 0 {
 		return fmt.Errorf("must have at least one replication_specs")
