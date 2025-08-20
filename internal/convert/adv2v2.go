@@ -40,7 +40,8 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 	if hasExpectedBlocksAsAttributes(resourceb) {
 		return false, nil
 	}
-	if err := convertRepSpecs(resourceb); err != nil {
+	diskSizeGB, _ := hcl.PopAttr(resourceb, nDiskSizeGB, errRoot)
+	if err := convertRepSpecs(resourceb, diskSizeGB); err != nil {
 		return false, err
 	}
 	if err := fillTagsLabelsOpt(resourceb, nTags); err != nil {
@@ -56,7 +57,7 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 	return true, nil
 }
 
-func convertRepSpecs(resourceb *hclwrite.Body) error {
+func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error {
 	var repSpecs []*hclwrite.Body
 	for {
 		block := resourceb.FirstMatchingBlock(nRepSpecs, nil)
@@ -64,7 +65,7 @@ func convertRepSpecs(resourceb *hclwrite.Body) error {
 			break
 		}
 		resourceb.RemoveBlock(block)
-		if err := convertConfig(block.Body()); err != nil {
+		if err := convertConfig(block.Body(), diskSizeGB); err != nil {
 			return err
 		}
 		repSpecs = append(repSpecs, block.Body())
@@ -76,7 +77,7 @@ func convertRepSpecs(resourceb *hclwrite.Body) error {
 	return nil
 }
 
-func convertConfig(repSpecs *hclwrite.Body) error {
+func convertConfig(repSpecs *hclwrite.Body, diskSizeGB hclwrite.Tokens) error {
 	var configs []*hclwrite.Body
 	for {
 		block := repSpecs.FirstMatchingBlock(nConfig, nil)
@@ -85,11 +86,11 @@ func convertConfig(repSpecs *hclwrite.Body) error {
 		}
 		repSpecs.RemoveBlock(block)
 		blockb := block.Body()
-		fillBlockOpt(blockb, nElectableSpecs)
-		fillBlockOpt(blockb, nReadOnlySpecs)
-		fillBlockOpt(blockb, nAnalyticsSpecs)
-		fillBlockOpt(blockb, nAutoScaling)
-		fillBlockOpt(blockb, nAnalyticsAutoScaling)
+		fillSpecOpt(blockb, nElectableSpecs, diskSizeGB)
+		fillSpecOpt(blockb, nReadOnlySpecs, diskSizeGB)
+		fillSpecOpt(blockb, nAnalyticsSpecs, diskSizeGB)
+		fillSpecOpt(blockb, nAutoScaling, nil)          // auto_scaling doesn't need disk_size_gb
+		fillSpecOpt(blockb, nAnalyticsAutoScaling, nil) // analytics_auto_scaling doesn't need disk_size_gb
 		configs = append(configs, blockb)
 	}
 	if len(configs) == 0 {
@@ -97,6 +98,19 @@ func convertConfig(repSpecs *hclwrite.Body) error {
 	}
 	repSpecs.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
 	return nil
+}
+
+func fillSpecOpt(resourceb *hclwrite.Body, name string, diskSizeGBTokens hclwrite.Tokens) {
+	block := resourceb.FirstMatchingBlock(name, nil)
+	if block == nil {
+		return
+	}
+	if diskSizeGBTokens != nil {
+		blockb := block.Body()
+		blockb.RemoveAttribute(nDiskSizeGB)
+		blockb.SetAttributeRaw(nDiskSizeGB, diskSizeGBTokens)
+	}
+	fillBlockOpt(resourceb, name)
 }
 
 // hasExpectedBlocksAsAttributes checks if any of the expected block names
