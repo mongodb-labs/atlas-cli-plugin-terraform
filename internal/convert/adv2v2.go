@@ -50,7 +50,7 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 	if err := fillTagsLabelsOpt(resourceb, nLabels); err != nil {
 		return false, err
 	}
-	fillAdvConfigOpt(resourceb, nAdvConf)
+	fillAdvConfigOpt(resourceb)
 	fillBlockOpt(resourceb, nBiConnector)
 	fillBlockOpt(resourceb, nPinnedFCV)
 	fillBlockOpt(resourceb, nTimeouts)
