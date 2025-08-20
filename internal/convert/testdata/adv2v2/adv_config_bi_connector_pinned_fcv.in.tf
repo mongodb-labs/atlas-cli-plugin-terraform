@@ -16,7 +16,9 @@ resource "mongodbatlas_advanced_cluster" "this" {
 
   advanced_configuration {
     # comments in advanced_configuration are kept
-    javascript_enabled = true
+    javascript_enabled      = true
+    fail_index_key_too_long = false       # deprecated so removed in output
+    default_read_concern    = "available" # deprecated so removed in output
   }
 
   bi_connector_config {
