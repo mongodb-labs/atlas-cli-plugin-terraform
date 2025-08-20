@@ -132,7 +132,7 @@ func hasExpectedBlocksAsAttributes(resourceb *hclwrite.Body) bool {
 		nRepSpecs,
 		nTags,
 		nLabels,
-		nAdvConf,
+		nAdvConfig,
 		nBiConnector,
 		nPinnedFCV,
 		nTimeouts,

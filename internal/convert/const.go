@@ -29,7 +29,7 @@ const (
 	nTags                       = "tags"
 	nLabels                     = "labels"
 	nTimeouts                   = "timeouts"
-	nAdvConf                    = "advanced_configuration"
+	nAdvConfig                  = "advanced_configuration"
 	nPinnedFCV                  = "pinned_fcv"
 	nBiConnector                = "bi_connector_config"
 	nElectableSpecs             = "electable_specs"

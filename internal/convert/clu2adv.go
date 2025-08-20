@@ -304,7 +304,7 @@ func fillBlockOpt(resourceb *hclwrite.Body, name string) {
 }
 
 func fillAdvConfigOpt(resourceb *hclwrite.Body) {
-	block := resourceb.FirstMatchingBlock(nAdvConf, nil)
+	block := resourceb.FirstMatchingBlock(nAdvConfig, nil)
 	if block == nil {
 		return
 	}
@@ -314,7 +314,7 @@ func fillAdvConfigOpt(resourceb *hclwrite.Body) {
 	blockBody.RemoveAttribute(nFailIndexKeyTooLong)
 	blockBody.RemoveAttribute(nDefaultReadConcern)
 
-	fillBlockOpt(resourceb, nAdvConf)
+	fillBlockOpt(resourceb, nAdvConfig)
 }
 
 // fillReplicationSpecsWithDynamicBlock used for dynamic blocks in replication_specs
