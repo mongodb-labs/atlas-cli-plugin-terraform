@@ -40,7 +40,7 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 	if hasExpectedBlocksAsAttributes(resourceb) {
 		return false, nil
 	}
-	diskSizeGB, _ := hcl.PopAttr(resourceb, nDiskSizeGB, errRoot)
+	diskSizeGB, _ := hcl.PopAttr(resourceb, nDiskSizeGB, errRoot) // ok to fail as it's optional
 	if err := convertRepSpecs(resourceb, diskSizeGB); err != nil {
 		return false, err
 	}
