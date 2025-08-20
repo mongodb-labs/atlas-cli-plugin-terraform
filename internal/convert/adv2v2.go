@@ -77,7 +77,7 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 		if err := convertConfig(blockb, diskSizeGB); err != nil {
 			return err
 		}
-		for i := 0; i < numShardsVal; i++ {
+		for range numShardsVal {
 			repSpecs = append(repSpecs, blockb)
 		}
 	}
