@@ -1,4 +1,4 @@
-resource "mongodbatlas_advanced_cluster" "geo" {
+resource "mongodbatlas_advanced_cluster" "numerical_num_shards" {
   project_id   = var.project_id
   name         = "geo"
   cluster_type = "GEOSHARDED"
@@ -39,7 +39,7 @@ resource "mongodbatlas_advanced_cluster" "geo" {
   }
 }
 
-resource "mongodbatlas_advanced_cluster" "geo" {
+resource "mongodbatlas_advanced_cluster" "numerical_num_shards_and_disk_size_gb" {
   project_id   = var.project_id
   name         = "geo"
   cluster_type = "GEOSHARDED"
@@ -47,6 +47,25 @@ resource "mongodbatlas_advanced_cluster" "geo" {
   replication_specs {
     zone_name  = "Zone 1"
     num_shards = 2
+    region_configs {
+      provider_name = "AWS"
+      region_name   = "US_EAST_1"
+      priority      = 7
+      electable_specs {
+        node_count    = 3
+        instance_size = "M10"
+      }
+    }
+  }
+}
+
+resource "mongodbatlas_advanced_cluster" "variable_num_shards" {
+  project_id   = var.project_id
+  name         = "geo"
+  cluster_type = "GEOSHARDED"
+  replication_specs {
+    zone_name  = "Zone 1"
+    num_shards = var.num_shards # unresolved num_shards
     region_configs {
       provider_name = "AWS"
       region_name   = "US_EAST_1"
