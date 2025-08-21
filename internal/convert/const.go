@@ -29,7 +29,7 @@ const (
 	nTags                       = "tags"
 	nLabels                     = "labels"
 	nTimeouts                   = "timeouts"
-	nAdvConf                    = "advanced_configuration"
+	nAdvConfig                  = "advanced_configuration"
 	nPinnedFCV                  = "pinned_fcv"
 	nBiConnector                = "bi_connector_config"
 	nElectableSpecs             = "electable_specs"
@@ -70,7 +70,6 @@ const (
 	nZoneName                   = "zone_name"
 	nKey                        = "key"
 	nValue                      = "value"
-	nUseRepSpecsPerShard        = "use_replication_spec_per_shard"
 	nMoved                      = "moved"
 	nFrom                       = "from"
 	nTo                         = "to"
@@ -79,4 +78,6 @@ const (
 	nContent                    = "content"
 	nRegion                     = "region"
 	nSpec                       = "spec"
+	nFailIndexKeyTooLong        = "fail_index_key_too_long"
+	nDefaultReadConcern         = "default_read_concern"
 )

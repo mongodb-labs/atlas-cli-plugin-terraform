@@ -50,7 +50,7 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 	if err := fillTagsLabelsOpt(resourceb, nLabels); err != nil {
 		return false, err
 	}
-	fillBlockOpt(resourceb, nAdvConf)
+	fillAdvConfigOpt(resourceb)
 	fillBlockOpt(resourceb, nBiConnector)
 	fillBlockOpt(resourceb, nPinnedFCV)
 	fillBlockOpt(resourceb, nTimeouts)
@@ -132,7 +132,7 @@ func hasExpectedBlocksAsAttributes(resourceb *hclwrite.Body) bool {
 		nRepSpecs,
 		nTags,
 		nLabels,
-		nAdvConf,
+		nAdvConfig,
 		nBiConnector,
 		nPinnedFCV,
 		nTimeouts,

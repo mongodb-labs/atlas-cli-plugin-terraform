@@ -33,6 +33,8 @@ resource "mongodbatlas_cluster" "cluster" {
   }
 
   advanced_configuration {
+    fail_index_key_too_long            = false       # deprecated so removed in output
+    default_read_concern               = "available" # deprecated so removed in output
     oplog_size_mb                      = var.oplog_size_mb
     transaction_lifetime_limit_seconds = var.transaction_lifetime_limit_seconds
     minimum_enabled_tls_protocol       = "TLS1_2"
