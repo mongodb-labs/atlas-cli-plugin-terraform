@@ -1,7 +1,7 @@
 resource "mongodbatlas_advanced_cluster" "dynamic_replication_specs" {
-  project_id   = var.project_id
-  name         = var.cluster_name
-  cluster_type = "GEOSHARDED"
+  project_id        = var.project_id
+  name              = var.cluster_name
+  cluster_type      = "GEOSHARDED"
   replication_specs = flatten([
     for spec in var.replication_specs : [
       for i in range(spec.num_shards) : {
@@ -9,15 +9,15 @@ resource "mongodbatlas_advanced_cluster" "dynamic_replication_specs" {
         region_configs = [
           for region in spec.region_configs : {
             provider_name = region.provider_name
-            region_name   = region.region_name
-            priority      = region.priority
+            region_name = region.region_name
+            priority = region.priority
             electable_specs = {
-              node_count    = region.electable_node_count
               instance_size = region.instance_size
+              node_count = region.electable_node_count
             }
             read_only_specs = {
-              node_count    = region.read_only_node_count
               instance_size = region.instance_size
+              node_count = region.read_only_node_count
             }
           }
         ]
@@ -27,7 +27,6 @@ resource "mongodbatlas_advanced_cluster" "dynamic_replication_specs" {
 
   # Updated by atlas-cli-plugin-terraform, please review the changes.
 }
-
 
 # example of variable for demostration purposes, not used in the conversion
 variable "replication_specs" {
