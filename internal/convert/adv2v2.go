@@ -3,7 +3,6 @@ package convert
 import (
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
@@ -275,21 +274,10 @@ func convertDynamicRepSpecsWithDynamicConfig(resourceb *hclwrite.Body, dSpec, dC
 
 		// Build the expression using HCL functions
 		configForEach := replaceDynamicBlockReferences(hcl.GetAttrExpr(dConfig.forEach), nRepSpecs, nSpec)
-		zoneNameExpr := ""
-		if zoneNameAttr := dSpec.content.Body().GetAttribute(nZoneName); zoneNameAttr != nil {
-			zoneNameExpr = replaceDynamicBlockReferences(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
-		}
 
-		// Build the nested expression string
-		var exprStr strings.Builder
-		exprStr.WriteString("flatten([\n")
-		exprStr.WriteString(fmt.Sprintf("    for %s in %s : [\n", nSpec, hcl.GetAttrExpr(dSpec.forEach)))
-		exprStr.WriteString(fmt.Sprintf("      for i in range(%s) : {\n", numShardsExpr))
-		if zoneNameExpr != "" {
-			exprStr.WriteString(fmt.Sprintf("        zone_name = %s\n", zoneNameExpr))
-		}
-		exprStr.WriteString("        region_configs = [\n")
-		exprStr.WriteString(fmt.Sprintf("          for %s in %s : {\n", nRegion, configForEach))
+		// Create the inner region_configs body
+		regionConfigFile := hclwrite.NewEmptyFile()
+		regionConfigBody := regionConfigFile.Body()
 
 		// Add all attributes generically in alphabetical order
 		attrs := dConfig.content.Body().Attributes()
@@ -301,13 +289,16 @@ func convertDynamicRepSpecsWithDynamicConfig(resourceb *hclwrite.Body, dSpec, dC
 
 		for _, name := range attrNames {
 			attr := attrs[name]
-			exprStr.WriteString(fmt.Sprintf("            %s = %s\n", name, hcl.GetAttrExpr(attr)))
+			regionConfigBody.SetAttributeRaw(name, hcl.TokensFromExpr(hcl.GetAttrExpr(attr)))
 		}
 
 		// Add all blocks generically as objects
 		for _, block := range dConfig.content.Body().Blocks() {
 			blockType := block.Type()
-			exprStr.WriteString(fmt.Sprintf("            %s = {\n", blockType))
+
+			// Create a new body for the block
+			blockFile := hclwrite.NewEmptyFile()
+			blockBody := blockFile.Body()
 
 			// Add block attributes in alphabetical order
 			blockAttrs := block.Body().Attributes()
@@ -319,18 +310,40 @@ func convertDynamicRepSpecsWithDynamicConfig(resourceb *hclwrite.Body, dSpec, dC
 
 			for _, attrName := range blockAttrNames {
 				attr := blockAttrs[attrName]
-				exprStr.WriteString(fmt.Sprintf("              %s = %s\n", attrName, hcl.GetAttrExpr(attr)))
+				blockBody.SetAttributeRaw(attrName, hcl.TokensFromExpr(hcl.GetAttrExpr(attr)))
 			}
-			exprStr.WriteString("            }\n")
+
+			regionConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
 		}
 
-		exprStr.WriteString("          }\n")
-		exprStr.WriteString("        ]\n")
-		exprStr.WriteString("      }\n")
-		exprStr.WriteString("    ]\n")
-		exprStr.WriteString("  ])")
+		// Build the region_configs for expression
+		regionForExpr := fmt.Sprintf("for %s in %s :", nRegion, configForEach)
+		regionTokens := hcl.TokensFromExpr(regionForExpr)
+		regionTokens = append(regionTokens, hcl.TokensObject(regionConfigBody)...)
 
-		tokens := hcl.TokensFromExpr(exprStr.String())
+		// Create the replication spec body
+		repSpecFile := hclwrite.NewEmptyFile()
+		repSpecBody := repSpecFile.Body()
+
+		if zoneNameAttr := dSpec.content.Body().GetAttribute(nZoneName); zoneNameAttr != nil {
+			zoneNameExpr := replaceDynamicBlockReferences(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
+			repSpecBody.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
+		}
+
+		repSpecBody.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(regionTokens))
+
+		// Build the inner for expression with range
+		innerForExpr := fmt.Sprintf("for i in range(%s) :", numShardsExpr)
+		innerTokens := hcl.TokensFromExpr(innerForExpr)
+		innerTokens = append(innerTokens, hcl.TokensObject(repSpecBody)...)
+
+		// Build the outer for expression
+		outerForExpr := fmt.Sprintf("for %s in %s : ", nSpec, hcl.GetAttrExpr(dSpec.forEach))
+		outerTokens := hcl.TokensFromExpr(outerForExpr)
+		outerTokens = append(outerTokens, hcl.EncloseBracketsNewLines(innerTokens)...)
+
+		// Apply flatten to the entire expression
+		tokens := hcl.TokensFuncFlatten(outerTokens)
 
 		resourceb.RemoveBlock(dSpec.block)
 		resourceb.SetAttributeRaw(nRepSpecs, tokens)

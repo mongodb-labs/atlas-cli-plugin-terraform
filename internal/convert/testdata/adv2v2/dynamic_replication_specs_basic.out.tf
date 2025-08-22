@@ -1,23 +1,23 @@
 resource "mongodbatlas_advanced_cluster" "dynamic_replication_specs" {
-  project_id        = var.project_id
-  name              = var.cluster_name
-  cluster_type      = "GEOSHARDED"
+  project_id   = var.project_id
+  name         = var.cluster_name
+  cluster_type = "GEOSHARDED"
   replication_specs = flatten([
     for spec in var.replication_specs : [
       for i in range(spec.num_shards) : {
         zone_name = spec.zone_name
         region_configs = [
           for region in spec.region_configs : {
-            priority = region.priority
+            priority      = region.priority
             provider_name = region.provider_name
-            region_name = region.region_name
+            region_name   = region.region_name
             electable_specs = {
               instance_size = region.instance_size
-              node_count = region.electable_node_count
+              node_count    = region.electable_node_count
             }
             read_only_specs = {
               instance_size = region.instance_size
-              node_count = region.read_only_node_count
+              node_count    = region.read_only_node_count
             }
           }
         ]
