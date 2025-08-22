@@ -120,7 +120,6 @@ dynamic "replication_specs" {
 
 ### Limitations
 
-- [`num_shards`](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/resources/cluster#num_shards-2) in `replication_specs` must be a numeric [literal expression](https://developer.hashicorp.com/nomad/docs/job-specification/hcl2/expressions#literal-expressions), e.g. `var.num_shards` is not supported. This is to allow creating a `replication_specs` element per shard in `mongodbatlas_advanced_cluster`. This limitation doesn't apply if you're using `dynamic` blocks in `regions_config` or `replication_specs`.
 - `dynamic` blocks are supported with some [limitations](./docs/guide_clu2adv_dynamic_block.md).
 
 ## Feedback
