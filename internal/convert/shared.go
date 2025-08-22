@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -128,4 +129,69 @@ func fillAdvConfigOpt(resourceb *hclwrite.Body) {
 	blockBody.RemoveAttribute(nDefaultReadConcern)
 
 	fillBlockOpt(resourceb, nAdvConfig)
+}
+
+// copyAttributesSorted copies attributes from source to target in sorted order for deterministic output
+func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hclwrite.Attribute) {
+	var names []string
+	for name := range sourceAttrs {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		attr := sourceAttrs[name]
+		targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(hcl.GetAttrExpr(attr)))
+	}
+}
+
+// transformAttributesSorted transforms and copies attributes in sorted order
+func transformAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hclwrite.Attribute,
+	transforms ...func(string) string) {
+	var names []string
+	for name := range sourceAttrs {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		attr := sourceAttrs[name]
+		expr := hcl.GetAttrExpr(attr)
+		// Apply all transformations
+		for _, transform := range transforms {
+			expr = transform(expr)
+		}
+		targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
+	}
+}
+
+// processAllSpecs processes all spec blocks (electable, read_only, analytics) and auto_scaling blocks
+func processAllSpecs(body *hclwrite.Body, diskSizeGB hclwrite.Tokens) {
+	fillSpecOpt(body, nElectableSpecs, diskSizeGB)
+	fillSpecOpt(body, nReadOnlySpecs, diskSizeGB)
+	fillSpecOpt(body, nAnalyticsSpecs, diskSizeGB)
+	fillSpecOpt(body, nAutoScaling, nil)
+	fillSpecOpt(body, nAnalyticsAutoScaling, nil)
+}
+
+// fillSpecOpt converts a spec block to an attribute with object value and optionally adds disk_size_gb
+func fillSpecOpt(resourceb *hclwrite.Body, name string, diskSizeGBTokens hclwrite.Tokens) {
+	block := resourceb.FirstMatchingBlock(name, nil)
+	if block == nil {
+		return
+	}
+	if diskSizeGBTokens != nil {
+		blockb := block.Body()
+		blockb.RemoveAttribute(nDiskSizeGB)
+		blockb.SetAttributeRaw(nDiskSizeGB, diskSizeGBTokens)
+	}
+	fillBlockOpt(resourceb, name)
+}
+
+// buildForExpression builds a for expression with the given variable and collection
+func buildForExpression(varName, collection string) string {
+	return fmt.Sprintf("for %s in %s : ", varName, collection)
+}
+
+// buildForExpressionWithIndex builds a for expression with an index variable
+func buildForExpressionWithIndex(indexVar, collection string) string {
+	return fmt.Sprintf("for %s in %s : ", indexVar, collection)
 }
