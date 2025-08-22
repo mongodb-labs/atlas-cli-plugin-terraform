@@ -394,10 +394,9 @@ func convertDynamicRepSpecsWithoutNumShards(resourceb *hclwrite.Body, dSpec, dCo
 
 	// Build the for expression as an array wrapped in flatten
 	// Format: flatten([for spec in ... : [ { ... } ] ])
-	forExpr := fmt.Sprintf("for %s in %s : [\n      ", nSpec, hcl.GetAttrExpr(dSpec.forEach))
+	forExpr := fmt.Sprintf("for %s in %s : ", nSpec, hcl.GetAttrExpr(dSpec.forEach))
 	innerTokens := hcl.TokensFromExpr(forExpr)
-	innerTokens = append(innerTokens, hcl.TokensObject(repSpecb)...)
-	innerTokens = append(innerTokens, hcl.TokensFromExpr("\n    ]")...)
+	innerTokens = append(innerTokens, hcl.TokensArraySingle(repSpecb)...)
 
 	// Apply flatten to the entire expression
 	tokens := hcl.TokensFuncFlatten(innerTokens)

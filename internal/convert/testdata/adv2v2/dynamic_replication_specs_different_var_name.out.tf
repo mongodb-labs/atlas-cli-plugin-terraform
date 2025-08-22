@@ -30,19 +30,19 @@ resource "mongodbatlas_advanced_cluster" "different_var_names_no_zone_name_no_nu
   cluster_type = var.cluster_type
   replication_specs = flatten([
     for spec in var.my_rep_specs : [
-       {
-      region_configs = [
-        for region in spec.region_configs : {
-          priority      = region.prio
-          provider_name = region.provider_name
-          region_name   = region.my_region_name
-          electable_specs = {
-            instance_size = region.instance_size
-            node_count    = region.my_electable_node_count
+      {
+        region_configs = [
+          for region in spec.region_configs : {
+            priority      = region.prio
+            provider_name = region.provider_name
+            region_name   = region.my_region_name
+            electable_specs = {
+              instance_size = region.instance_size
+              node_count    = region.my_electable_node_count
+            }
           }
-        }
-      ]
-    } 
+        ]
+      }
     ]
   ])
 
