@@ -1,7 +1,27 @@
 resource "mongodbatlas_advanced_cluster" "dynamic_replication_specs" {
+  lifecycle {
+    precondition {
+      condition     = !(var.auto_scaling_disk_gb_enabled && var.disk_size > 0)
+      error_message = "Must use either auto_scaling_disk_gb_enabled or disk_size, not both."
+    }
+  }
+
   project_id   = var.project_id
   name         = var.cluster_name
   cluster_type = "GEOSHARDED"
+
+  dynamic "tags" {
+    for_each = var.tags
+    content {
+      key   = tags.key
+      value = tags.value
+    }
+  }
+  tags {
+    key   = "Tag 2"
+    value = "Value 2"
+  }
+
   dynamic "replication_specs" {
     for_each = var.replication_specs
     content {

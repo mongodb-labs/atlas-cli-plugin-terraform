@@ -1,7 +1,16 @@
 resource "mongodbatlas_advanced_cluster" "dynamic_replication_specs" {
+  lifecycle {
+    precondition {
+      condition     = !(var.auto_scaling_disk_gb_enabled && var.disk_size > 0)
+      error_message = "Must use either auto_scaling_disk_gb_enabled or disk_size, not both."
+    }
+  }
+
   project_id   = var.project_id
   name         = var.cluster_name
   cluster_type = "GEOSHARDED"
+
+
   replication_specs = flatten([
     for spec in var.replication_specs : [
       for i in range(spec.num_shards) : {
@@ -24,6 +33,12 @@ resource "mongodbatlas_advanced_cluster" "dynamic_replication_specs" {
       }
     ]
   ])
+  tags = merge(
+    var.tags,
+    {
+      "Tag 2" = "Value 2"
+    }
+  )
 
   # Updated by atlas-cli-plugin-terraform, please review the changes.
 }
