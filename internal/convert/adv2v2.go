@@ -200,37 +200,6 @@ func convertDynamicRepSpecs(resourceb *hclwrite.Body, dSpec dynamicBlock, diskSi
 	return nil
 }
 
-// Helper function to add attributes in order
-func addAttributesInOrder(targetBody *hclwrite.Body, sourceAttrs map[string]*hclwrite.Attribute,
-	orderedNames []string) {
-	// Add ordered attributes first
-	for _, name := range orderedNames {
-		if attr, exists := sourceAttrs[name]; exists {
-			targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(hcl.GetAttrExpr(attr)))
-		}
-	}
-
-	// Add any remaining attributes alphabetically
-	var remainingAttrs []string
-	for name := range sourceAttrs {
-		found := false
-		for _, orderedName := range orderedNames {
-			if name == orderedName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remainingAttrs = append(remainingAttrs, name)
-		}
-	}
-	slices.Sort(remainingAttrs)
-	for _, name := range remainingAttrs {
-		attr := sourceAttrs[name]
-		targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(hcl.GetAttrExpr(attr)))
-	}
-}
-
 // Helper function to process blocks for region configs
 func processRegionConfigBlocks(targetBody *hclwrite.Body, blocks []*hclwrite.Block) {
 	for _, block := range blocks {
@@ -238,13 +207,18 @@ func processRegionConfigBlocks(targetBody *hclwrite.Body, blocks []*hclwrite.Blo
 		blockFile := hclwrite.NewEmptyFile()
 		blockBody := blockFile.Body()
 
-		// For electable_specs, use specific order: instance_size, node_count
-		var attrOrder []string
-		if blockType == "electable_specs" {
-			attrOrder = []string{"instance_size", "node_count"}
+		// Copy all attributes in deterministic order
+		attrs := block.Body().Attributes()
+		var names []string
+		for name := range attrs {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+		for _, name := range names {
+			attr := attrs[name]
+			blockBody.SetAttributeRaw(name, hcl.TokensFromExpr(hcl.GetAttrExpr(attr)))
 		}
 
-		addAttributesInOrder(blockBody, block.Body().Attributes(), attrOrder)
 		targetBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
 	}
 }
@@ -261,14 +235,28 @@ func convertDynamicRepSpecsWithDynamicConfig(resourceb *hclwrite.Body, dSpec, dC
 
 		// Transform references in place for the dynamic config content
 		transformDynamicBlockReferencesRecursive(dConfig.content.Body(), configBlockName, nRegion)
-		// Also transform outer references
-		for name, attr := range dConfig.content.Body().Attributes() {
+		// Also transform outer references (with deterministic ordering)
+		attrs := dConfig.content.Body().Attributes()
+		var attrNames []string
+		for name := range attrs {
+			attrNames = append(attrNames, name)
+		}
+		slices.Sort(attrNames)
+		for _, name := range attrNames {
+			attr := attrs[name]
 			expr := hcl.GetAttrExpr(attr)
 			expr = replaceDynamicBlockReferences(expr, nRepSpecs, nSpec)
 			dConfig.content.Body().SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 		}
 		for _, block := range dConfig.content.Body().Blocks() {
-			for name, attr := range block.Body().Attributes() {
+			blockAttrs := block.Body().Attributes()
+			var blockAttrNames []string
+			for name := range blockAttrs {
+				blockAttrNames = append(blockAttrNames, name)
+			}
+			slices.Sort(blockAttrNames)
+			for _, name := range blockAttrNames {
+				attr := blockAttrs[name]
 				expr := hcl.GetAttrExpr(attr)
 				expr = replaceDynamicBlockReferences(expr, nRepSpecs, nSpec)
 				block.Body().SetAttributeRaw(name, hcl.TokensFromExpr(expr))
@@ -283,9 +271,17 @@ func convertDynamicRepSpecsWithDynamicConfig(resourceb *hclwrite.Body, dSpec, dC
 		regionConfigFile := hclwrite.NewEmptyFile()
 		regionConfigBody := regionConfigFile.Body()
 
-		// Add attributes in a specific order for consistency
-		orderedAttrs := []string{"priority", "provider_name", "region_name"}
-		addAttributesInOrder(regionConfigBody, dConfig.content.Body().Attributes(), orderedAttrs)
+		// Copy all attributes in deterministic order
+		configAttrs := dConfig.content.Body().Attributes()
+		var configAttrNames []string
+		for name := range configAttrs {
+			configAttrNames = append(configAttrNames, name)
+		}
+		slices.Sort(configAttrNames)
+		for _, name := range configAttrNames {
+			attr := configAttrs[name]
+			regionConfigBody.SetAttributeRaw(name, hcl.TokensFromExpr(hcl.GetAttrExpr(attr)))
+		}
 
 		// Add all blocks generically as objects
 		processRegionConfigBlocks(regionConfigBody, dConfig.content.Body().Blocks())
@@ -329,36 +325,21 @@ func convertDynamicRepSpecsWithDynamicConfig(resourceb *hclwrite.Body, dSpec, dC
 
 // Helper function to add attributes with transformation
 func addAttributesWithTransform(targetBody *hclwrite.Body, sourceAttrs map[string]*hclwrite.Attribute,
-	orderedNames []string, configBlockName string, transformFunc func(string) string) {
-	// Add ordered attributes first
-	for _, name := range orderedNames {
-		if attr, exists := sourceAttrs[name]; exists {
-			expr := hcl.GetAttrExpr(attr)
-			// First replace nested dynamic block references
-			expr = replaceDynamicBlockReferences(expr, configBlockName, nRegion)
-			// Then replace outer dynamic block references
-			expr = replaceDynamicBlockReferences(expr, nRepSpecs, nSpec)
-			targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
-		}
+	configBlockName string) {
+	// Sort attribute names for deterministic output
+	var names []string
+	for name := range sourceAttrs {
+		names = append(names, name)
 	}
-
-	// Add any remaining attributes
-	for name, attr := range sourceAttrs {
-		found := false
-		for _, orderedName := range orderedNames {
-			if name == orderedName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			expr := hcl.GetAttrExpr(attr)
-			// First replace nested dynamic block references
-			expr = replaceDynamicBlockReferences(expr, configBlockName, nRegion)
-			// Then replace outer dynamic block references
-			expr = replaceDynamicBlockReferences(expr, nRepSpecs, nSpec)
-			targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
-		}
+	slices.Sort(names)
+	for _, name := range names {
+		attr := sourceAttrs[name]
+		expr := hcl.GetAttrExpr(attr)
+		// First replace nested dynamic block references
+		expr = replaceDynamicBlockReferences(expr, configBlockName, nRegion)
+		// Then replace outer dynamic block references
+		expr = replaceDynamicBlockReferences(expr, nRepSpecs, nSpec)
+		targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
 }
 
@@ -377,22 +358,14 @@ func convertDynamicRepSpecsWithoutNumShards(resourceb *hclwrite.Body, dSpec, dCo
 	configFile := hclwrite.NewEmptyFile()
 	configb := configFile.Body()
 
-	// Copy and transform attributes in a specific order for consistency
-	orderedAttrs := []string{"priority", "provider_name", "region_name"}
-	addAttributesWithTransform(configb, dConfig.content.Body().Attributes(), orderedAttrs, configBlockName, nil)
+	// Copy and transform attributes
+	addAttributesWithTransform(configb, dConfig.content.Body().Attributes(), configBlockName)
 
 	// Process blocks and transform their references
 	for _, block := range dConfig.content.Body().Blocks() {
 		newBlock := configb.AppendNewBlock(block.Type(), block.Labels())
 		newBlockb := newBlock.Body()
-
-		// Order attributes for consistency
-		var attrOrder []string
-		if block.Type() == "electable_specs" {
-			attrOrder = []string{"instance_size", "node_count"}
-		}
-
-		addAttributesWithTransform(newBlockb, block.Body().Attributes(), attrOrder, configBlockName, nil)
+		addAttributesWithTransform(newBlockb, block.Body().Attributes(), configBlockName)
 	}
 
 	// Process specs
@@ -494,8 +467,15 @@ func convertDynamicConfig(repSpecs *hclwrite.Body, dConfig dynamicBlock, diskSiz
 }
 
 func transformDynamicBlockReferencesRecursive(body *hclwrite.Body, blockName, varName string) {
-	// Transform attributes
-	for name, attr := range body.Attributes() {
+	// Transform attributes in deterministic order
+	attrs := body.Attributes()
+	var names []string
+	for name := range attrs {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		attr := attrs[name]
 		expr := replaceDynamicBlockReferences(hcl.GetAttrExpr(attr), blockName, varName)
 		body.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
