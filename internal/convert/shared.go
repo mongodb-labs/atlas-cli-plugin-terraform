@@ -1,0 +1,131 @@
+package convert
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
+)
+
+// HasVariableNumShards checks if any block has a variable (non-literal) num_shards attribute
+func HasVariableNumShards(blocks []*hclwrite.Block) bool {
+	for _, block := range blocks {
+		if shardsAttr := block.Body().GetAttribute(nNumShards); shardsAttr != nil {
+			if _, err := hcl.GetAttrInt(shardsAttr, errNumShards); err != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ProcessNumShards handles num_shards for a block, returning tokens for the expanded specs
+// processedBody is the body with num_shards removed and other processing done
+func ProcessNumShards(shardsAttr *hclwrite.Attribute, processedBody *hclwrite.Body) (hclwrite.Tokens, error) {
+	if shardsAttr == nil {
+		// No num_shards, default to 1
+		return hcl.TokensArraySingle(processedBody), nil
+	}
+
+	shardsVal, err := hcl.GetAttrInt(shardsAttr, errNumShards)
+	if err != nil {
+		// num_shards is a variable/expression
+		shardsExpr := hcl.GetAttrExpr(shardsAttr)
+		forExpr := fmt.Sprintf("for i in range(%s) :", shardsExpr)
+		tokens := hcl.TokensFromExpr(forExpr)
+		tokens = append(tokens, hcl.TokensObject(processedBody)...)
+		return hcl.EncloseBracketsNewLines(tokens), nil
+	}
+
+	// num_shards is a literal number - create explicit array
+	var bodies []*hclwrite.Body
+	for i := 0; i < shardsVal; i++ {
+		bodies = append(bodies, processedBody)
+	}
+	return hcl.TokensArray(bodies), nil
+}
+
+// dynamicBlock represents a Terraform dynamic block structure
+type dynamicBlock struct {
+	block   *hclwrite.Block
+	forEach *hclwrite.Attribute
+	content *hclwrite.Block
+	tokens  hclwrite.Tokens
+}
+
+// IsPresent returns true if the dynamic block exists
+func (d dynamicBlock) IsPresent() bool {
+	return d.block != nil
+}
+
+// getDynamicBlock finds and returns a dynamic block with the given name from the body
+func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
+	for _, block := range body.Blocks() {
+		if block.Type() != nDynamic || name != getResourceName(block) {
+			continue
+		}
+		blockb := block.Body()
+		forEach := blockb.GetAttribute(nForEach)
+		if forEach == nil {
+			return dynamicBlock{}, fmt.Errorf("dynamic block %s: attribute %s not found", name, nForEach)
+		}
+		content := blockb.FirstMatchingBlock(nContent, nil)
+		if content == nil {
+			return dynamicBlock{}, fmt.Errorf("dynamic block %s: block %s not found", name, nContent)
+		}
+		return dynamicBlock{forEach: forEach, block: block, content: content}, nil
+	}
+	return dynamicBlock{}, nil
+}
+
+// getResourceName returns the first label of a block, if it exists.
+// e.g. in resource "mongodbatlas_cluster" "mycluster", the first label is "mongodbatlas_cluster".
+func getResourceName(resource *hclwrite.Block) string {
+	labels := resource.Labels()
+	if len(labels) == 0 {
+		return ""
+	}
+	return labels[0]
+}
+
+// replaceDynamicBlockReferences changes value references,
+// e.g. regions_config.value.electable_nodes to region.electable_nodes
+func replaceDynamicBlockReferences(expr, blockName, varName string) string {
+	return strings.ReplaceAll(expr,
+		fmt.Sprintf("%s.%s.", blockName, nValue),
+		fmt.Sprintf("%s.", varName))
+}
+
+// transformDynamicBlockReferences transforms all attribute references in a body from dynamic block format
+func transformDynamicBlockReferences(configSrcb *hclwrite.Body, blockName, varName string) {
+	for name, attr := range configSrcb.Attributes() {
+		expr := replaceDynamicBlockReferences(hcl.GetAttrExpr(attr), blockName, varName)
+		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
+	}
+}
+
+// fillBlockOpt converts a block to an attribute with object value
+func fillBlockOpt(resourceb *hclwrite.Body, name string) {
+	block := resourceb.FirstMatchingBlock(name, nil)
+	if block == nil {
+		return
+	}
+	resourceb.RemoveBlock(block)
+	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
+}
+
+// fillAdvConfigOpt fills the advanced_configuration attribute, removing deprecated attributes
+func fillAdvConfigOpt(resourceb *hclwrite.Body) {
+	block := resourceb.FirstMatchingBlock(nAdvConfig, nil)
+	if block == nil {
+		return
+	}
+	blockBody := block.Body()
+
+	// Remove deprecated attributes from advanced_configuration
+	blockBody.RemoveAttribute(nFailIndexKeyTooLong)
+	blockBody.RemoveAttribute(nDefaultReadConcern)
+
+	fillBlockOpt(resourceb, nAdvConfig)
+}

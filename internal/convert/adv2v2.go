@@ -83,73 +83,31 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 	}
 
 	// Check if any replication_specs has a variable num_shards
-	hasVariableNumShards := false
-	for _, block := range repSpecBlocks {
-		numShardsAttr := block.Body().GetAttribute(nNumShards)
-		if numShardsAttr != nil {
-			_, err := hcl.GetAttrInt(numShardsAttr, errNumShards)
-			if err != nil {
-				hasVariableNumShards = true
-				break
-			}
-		}
-	}
+	hasVariableNumShards := HasVariableNumShards(repSpecBlocks)
 
-	// If we have any variable num_shards, we need to use concat
 	if hasVariableNumShards {
 		var concatParts []hclwrite.Tokens
-		hasMultipleParts := false
 
 		for _, block := range repSpecBlocks {
 			blockb := block.Body()
 			numShardsAttr := blockb.GetAttribute(nNumShards)
+			blockb.RemoveAttribute(nNumShards)
 
-			if numShardsAttr != nil {
-				numShardsVal, err := hcl.GetAttrInt(numShardsAttr, errNumShards)
-
-				if err != nil {
-					// num_shards is a variable/expression
-					numShardsExpr := hcl.GetAttrExpr(numShardsAttr)
-					blockb.RemoveAttribute(nNumShards)
-
-					if err := convertConfig(blockb, diskSizeGB); err != nil {
-						return err
-					}
-
-					forExpr := fmt.Sprintf("for i in range(%s) :", numShardsExpr)
-					tokens := hcl.TokensFromExpr(forExpr)
-					tokens = append(tokens, hcl.TokensObject(blockb)...)
-					concatParts = append(concatParts, hcl.EncloseBracketsNewLines(tokens))
-				} else {
-					// num_shards is a literal number - create explicit array
-					blockb.RemoveAttribute(nNumShards)
-
-					if err := convertConfig(blockb, diskSizeGB); err != nil {
-						return err
-					}
-
-					var repSpecs []*hclwrite.Body
-					for range numShardsVal {
-						repSpecs = append(repSpecs, blockb)
-					}
-					concatParts = append(concatParts, hcl.TokensArray(repSpecs))
-					hasMultipleParts = true
-				}
-			} else {
-				// No num_shards, default to 1
-				if err := convertConfig(blockb, diskSizeGB); err != nil {
-					return err
-				}
-				concatParts = append(concatParts, hcl.TokensArraySingle(blockb))
-				hasMultipleParts = true
+			if err := convertConfig(blockb, diskSizeGB); err != nil {
+				return err
 			}
+
+			tokens, err := ProcessNumShards(numShardsAttr, blockb)
+			if err != nil {
+				return err
+			}
+			concatParts = append(concatParts, tokens)
 		}
 
-		// Use concat only if we have multiple parts or mixing numerical and variable
-		if len(concatParts) > 1 || hasMultipleParts {
+		// Use concat to combine all parts
+		if len(concatParts) > 1 {
 			resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensFuncConcat(concatParts...))
 		} else {
-			// Only one variable num_shards, no need for concat
 			resourceb.SetAttributeRaw(nRepSpecs, concatParts[0])
 		}
 	} else {
@@ -158,21 +116,19 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 		for _, block := range repSpecBlocks {
 			blockb := block.Body()
 			numShardsAttr := blockb.GetAttribute(nNumShards)
+			blockb.RemoveAttribute(nNumShards)
+
+			if err := convertConfig(blockb, diskSizeGB); err != nil {
+				return err
+			}
 
 			if numShardsAttr != nil {
 				numShardsVal, _ := hcl.GetAttrInt(numShardsAttr, errNumShards)
-				blockb.RemoveAttribute(nNumShards)
-				if err := convertConfig(blockb, diskSizeGB); err != nil {
-					return err
-				}
 				for range numShardsVal {
 					repSpecs = append(repSpecs, blockb)
 				}
 			} else {
 				// No num_shards, default to 1
-				if err := convertConfig(blockb, diskSizeGB); err != nil {
-					return err
-				}
 				repSpecs = append(repSpecs, blockb)
 			}
 		}
