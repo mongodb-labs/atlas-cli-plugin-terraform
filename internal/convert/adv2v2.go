@@ -201,7 +201,7 @@ func convertDynamicRepSpecs(resourceb *hclwrite.Body, dSpec dynamicBlock, diskSi
 }
 
 // Helper function to process blocks for region configs
-func processRegionConfigBlocks(targetBody *hclwrite.Body, blocks []*hclwrite.Block) {
+func processRegionConfigBlocks(targetBody *hclwrite.Body, blocks []*hclwrite.Block, diskSizeGB hclwrite.Tokens) {
 	for _, block := range blocks {
 		blockType := block.Type()
 		blockFile := hclwrite.NewEmptyFile()
@@ -217,6 +217,12 @@ func processRegionConfigBlocks(targetBody *hclwrite.Body, blocks []*hclwrite.Blo
 		for _, name := range names {
 			attr := attrs[name]
 			blockBody.SetAttributeRaw(name, hcl.TokensFromExpr(hcl.GetAttrExpr(attr)))
+		}
+
+		// Add disk_size_gb to specs blocks if needed
+		if diskSizeGB != nil && (blockType == nElectableSpecs ||
+			blockType == nReadOnlySpecs || blockType == nAnalyticsSpecs) {
+			blockBody.SetAttributeRaw(nDiskSizeGB, diskSizeGB)
 		}
 
 		targetBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
@@ -284,7 +290,7 @@ func convertDynamicRepSpecsWithDynamicConfig(resourceb *hclwrite.Body, dSpec, dC
 		}
 
 		// Add all blocks generically as objects
-		processRegionConfigBlocks(regionConfigBody, dConfig.content.Body().Blocks())
+		processRegionConfigBlocks(regionConfigBody, dConfig.content.Body().Blocks(), diskSizeGB)
 
 		// Build the region_configs for expression
 		regionForExpr := fmt.Sprintf("for %s in %s :", nRegion, configForEach)
