@@ -8,9 +8,9 @@ resource "mongodbatlas_advanced_cluster" "dynamic_replication_specs" {
         zone_name = spec.zone_name
         region_configs = [
           for region in spec.region_configs : {
+            priority = region.priority
             provider_name = region.provider_name
             region_name = region.region_name
-            priority = region.priority
             electable_specs = {
               instance_size = region.instance_size
               node_count = region.electable_node_count

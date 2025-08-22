@@ -291,45 +291,37 @@ func convertDynamicRepSpecsWithDynamicConfig(resourceb *hclwrite.Body, dSpec, dC
 		exprStr.WriteString("        region_configs = [\n")
 		exprStr.WriteString(fmt.Sprintf("          for %s in %s : {\n", nRegion, configForEach))
 
-		// Add regular attributes first (provider_name, region_name, priority)
+		// Add all attributes generically in alphabetical order
 		attrs := dConfig.content.Body().Attributes()
-		if providerName := attrs["provider_name"]; providerName != nil {
-			exprStr.WriteString(fmt.Sprintf("            provider_name = %s\n", hcl.GetAttrExpr(providerName)))
+		attrNames := make([]string, 0, len(attrs))
+		for name := range attrs {
+			attrNames = append(attrNames, name)
 		}
-		if regionName := attrs["region_name"]; regionName != nil {
-			exprStr.WriteString(fmt.Sprintf("            region_name = %s\n", hcl.GetAttrExpr(regionName)))
-		}
-		if priority := attrs["priority"]; priority != nil {
-			exprStr.WriteString(fmt.Sprintf("            priority = %s\n", hcl.GetAttrExpr(priority)))
+		slices.Sort(attrNames)
+
+		for _, name := range attrNames {
+			attr := attrs[name]
+			exprStr.WriteString(fmt.Sprintf("            %s = %s\n", name, hcl.GetAttrExpr(attr)))
 		}
 
-		// Add spec blocks as objects with correct formatting and ordering
-		// Look for the original blocks before they were converted
+		// Add all blocks generically as objects
 		for _, block := range dConfig.content.Body().Blocks() {
-			if block.Type() == "electable_specs" {
-				exprStr.WriteString("            electable_specs = {\n")
-				blockAttrs := block.Body().Attributes()
-				// Write in specific order: instance_size first, then node_count
-				if instanceSize := blockAttrs["instance_size"]; instanceSize != nil {
-					exprStr.WriteString(fmt.Sprintf("              instance_size = %s\n", hcl.GetAttrExpr(instanceSize)))
-				}
-				if nodeCount := blockAttrs["node_count"]; nodeCount != nil {
-					exprStr.WriteString(fmt.Sprintf("              node_count = %s\n", hcl.GetAttrExpr(nodeCount)))
-				}
-				exprStr.WriteString("            }\n")
+			blockType := block.Type()
+			exprStr.WriteString(fmt.Sprintf("            %s = {\n", blockType))
+
+			// Add block attributes in alphabetical order
+			blockAttrs := block.Body().Attributes()
+			blockAttrNames := make([]string, 0, len(blockAttrs))
+			for name := range blockAttrs {
+				blockAttrNames = append(blockAttrNames, name)
 			}
-			if block.Type() == "read_only_specs" {
-				exprStr.WriteString("            read_only_specs = {\n")
-				blockAttrs := block.Body().Attributes()
-				// Write in specific order: instance_size first, then node_count
-				if instanceSize := blockAttrs["instance_size"]; instanceSize != nil {
-					exprStr.WriteString(fmt.Sprintf("              instance_size = %s\n", hcl.GetAttrExpr(instanceSize)))
-				}
-				if nodeCount := blockAttrs["node_count"]; nodeCount != nil {
-					exprStr.WriteString(fmt.Sprintf("              node_count = %s\n", hcl.GetAttrExpr(nodeCount)))
-				}
-				exprStr.WriteString("            }\n")
+			slices.Sort(blockAttrNames)
+
+			for _, attrName := range blockAttrNames {
+				attr := blockAttrs[attrName]
+				exprStr.WriteString(fmt.Sprintf("              %s = %s\n", attrName, hcl.GetAttrExpr(attr)))
 			}
+			exprStr.WriteString("            }\n")
 		}
 
 		exprStr.WriteString("          }\n")
