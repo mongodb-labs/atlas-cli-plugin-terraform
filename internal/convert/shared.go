@@ -186,12 +186,7 @@ func fillSpecOpt(resourceb *hclwrite.Body, name string, diskSizeGBTokens hclwrit
 	fillBlockOpt(resourceb, name)
 }
 
-// buildForExpression builds a for expression with the given variable and collection
-func buildForExpression(varName, collection string) string {
-	return fmt.Sprintf("for %s in %s : ", varName, collection)
-}
-
-// buildForExpressionWithIndex builds a for expression with an index variable
-func buildForExpressionWithIndex(indexVar, collection string) string {
-	return fmt.Sprintf("for %s in %s : ", indexVar, collection)
+// buildForExpr builds a for expression with the given variable and collection
+func buildForExpr(varName, collection string) string {
+	return fmt.Sprintf("for %s in %s :", varName, collection)
 }
