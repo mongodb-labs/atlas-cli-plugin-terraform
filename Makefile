@@ -27,6 +27,17 @@ clean: ## Clean binary folders
 test: ## Run unit tests
 	go test ./internal/... -timeout=30s -parallel=4 -race
 
+.PHONY: lint-fix
+lint-fix: ## Fix Go linter issues
+	@echo "==> Fixing linters errors..."
+	$(shell go env GOPATH)/bin/fieldalignment -json -fix ./...
+	golangci-lint run --fix
+
+.PHONY: lint
+lint: ## Check Go linter issues
+	@echo "==> Checking source code against linters..."
+	golangci-lint run
+
 .PHONY: test-update
 test-update: ## Run unit tests and update the golden files
 	go test ./internal/... -timeout=30s -parallel=4 -race -update

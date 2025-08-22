@@ -118,6 +118,13 @@ func TokensFuncMerge(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 	return append(ret, EncloseParens(params)...)
 }
 
+// TokensFuncConcat creates the tokens for the HCL concat function.
+func TokensFuncConcat(tokens ...hclwrite.Tokens) hclwrite.Tokens {
+	params := EncloseNewLines(joinTokens(tokens...))
+	ret := TokensFromExpr("concat")
+	return append(ret, EncloseParens(params)...)
+}
+
 // TokensFuncFlatten creates the tokens for the HCL flatten function.
 func TokensFuncFlatten(tokens hclwrite.Tokens) hclwrite.Tokens {
 	ret := TokensFromExpr("flatten")
