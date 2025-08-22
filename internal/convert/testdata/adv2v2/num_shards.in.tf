@@ -65,7 +65,7 @@ resource "mongodbatlas_advanced_cluster" "variable_num_shards" {
   cluster_type = "GEOSHARDED"
   replication_specs {
     zone_name  = "Zone 1"
-    num_shards = var.num_shards # unresolved num_shards
+    num_shards = var.num_shards
     region_configs {
       provider_name = "AWS"
       region_name   = "US_EAST_1"
