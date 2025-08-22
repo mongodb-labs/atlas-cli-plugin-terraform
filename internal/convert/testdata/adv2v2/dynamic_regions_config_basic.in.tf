@@ -20,6 +20,29 @@ resource "mongodbatlas_advanced_cluster" "dynamic_regions_config" {
   }
 }
 
+resource "mongodbatlas_advanced_cluster" "using_disk_size_gb" {
+  project_id   = var.project_id
+  name         = "cluster"
+  cluster_type = "SHARDED"
+  disk_size_gb = 123
+  replication_specs {
+    num_shards = var.replication_specs.num_shards
+    zone_name  = var.zone_name
+    dynamic "region_configs" {
+      for_each = var.replication_specs.region_configs
+      content {
+        priority      = region_configs.value.prio
+        provider_name = "AWS"
+        region_name   = region_configs.value.region_name
+        electable_specs {
+          instance_size = region_configs.value.instance_size
+          node_count    = region_configs.value.node_count
+        }
+      }
+    }
+  }
+}
+
 # example of variable for demostration purposes, not used in the conversion
 variable "replication_specs" {
   type = object({
