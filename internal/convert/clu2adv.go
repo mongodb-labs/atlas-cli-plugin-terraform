@@ -181,80 +181,24 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 		resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
 		return nil
 	}
+
 	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
 	if len(repSpecBlocks) == 0 {
 		return fmt.Errorf("%s: no replication_specs found", errRepSpecs)
 	}
+
 	if hasVariableNumShards(repSpecBlocks) {
-		var concatParts []hclwrite.Tokens
-		for _, block := range repSpecBlocks {
-			spec := hclwrite.NewEmptyFile()
-			specb := spec.Body()
-			specbSrc := block.Body()
-			d, err := fillWithDynamicRegionConfigs(specbSrc, root, false)
-			if err != nil {
-				return err
-			}
-			if d.IsPresent() {
-				concatParts = append(concatParts, d.tokens)
-				continue
-			}
-			_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
-			shardsAttr := specbSrc.GetAttribute(nNumShards)
-			if shardsAttr == nil {
-				return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
-			}
-			if errConfig := fillRegionConfigs(specb, specbSrc, root); errConfig != nil {
-				return errConfig
-			}
-			tokens, err := processNumShards(shardsAttr, specb)
-			if err != nil {
-				return err
-			}
-			concatParts = append(concatParts, tokens)
+		tokens, err := processVariableReplicationSpecs(repSpecBlocks, root)
+		if err != nil {
+			return err
 		}
-		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensFuncConcat(concatParts...))
+		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensFuncConcat(tokens...))
 	} else {
-		// All num_shards are numeric, use simple array
-		var specbs []*hclwrite.Body
-		for _, block := range repSpecBlocks {
-			spec := hclwrite.NewEmptyFile()
-			specb := spec.Body()
-			specbSrc := block.Body()
-
-			// Check for dynamic region configs
-			d, err := fillWithDynamicRegionConfigs(specbSrc, root, false)
-			if err != nil {
-				return err
-			}
-			if d.IsPresent() {
-				// For dynamic blocks that have numerical num_shards
-				// Extract the tokens and add to array
-				// This is complex, for now just return the dynamic block as is
-				resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
-				return nil
-			}
-
-			// Handle zone_name
-			_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
-
-			// Handle num_shards
-			shardsAttr := specbSrc.GetAttribute(nNumShards)
-			if shardsAttr == nil {
-				return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
-			}
-
-			shardsVal, _ := hcl.GetAttrInt(shardsAttr, errNumShards)
-
-			if errConfig := fillRegionConfigs(specb, specbSrc, root); errConfig != nil {
-				return errConfig
-			}
-
-			for range shardsVal {
-				specbs = append(specbs, specb)
-			}
+		tokens, err := processStaticReplicationSpecs(resourceb, repSpecBlocks, root)
+		if err != nil {
+			return err
 		}
-		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(specbs))
+		resourceb.SetAttributeRaw(nRepSpecs, tokens)
 	}
 
 	return nil
@@ -537,6 +481,82 @@ func getDynamicBlockRegionArray(forEach string, configSrc *hclwrite.Block, root 
 	tokens = append(tokens, hcl.EncloseBraces(region.BuildTokens(nil), true)...)
 	tokens = append(tokens, hcl.TokensFromExpr(fmt.Sprintf("if %s == %s", nPriority, priorityStr))...)
 	return hcl.EncloseBracketsNewLines(tokens), nil
+}
+
+func processVariableReplicationSpecs(repSpecBlocks []*hclwrite.Block, root attrVals) ([]hclwrite.Tokens, error) {
+	var concatParts []hclwrite.Tokens
+	for _, block := range repSpecBlocks {
+		tokens, err := processReplicationSpecBlock(block, root, true)
+		if err != nil {
+			return nil, err
+		}
+		concatParts = append(concatParts, tokens)
+	}
+	return concatParts, nil
+}
+
+func processStaticReplicationSpecs(resourceb *hclwrite.Body, repSpecBlocks []*hclwrite.Block,
+	root attrVals) (hclwrite.Tokens, error) {
+	var specbs []*hclwrite.Body
+	for _, block := range repSpecBlocks {
+		spec := hclwrite.NewEmptyFile()
+		specb := spec.Body()
+		specbSrc := block.Body()
+
+		d, err := fillWithDynamicRegionConfigs(specbSrc, root, false)
+		if err != nil {
+			return nil, err
+		}
+		if d.IsPresent() {
+			// For dynamic blocks that have numerical num_shards
+			// This is complex, return the dynamic block as is
+			return d.tokens, nil
+		}
+
+		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
+
+		shardsAttr := specbSrc.GetAttribute(nNumShards)
+		if shardsAttr == nil {
+			return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
+		}
+
+		shardsVal, _ := hcl.GetAttrInt(shardsAttr, errNumShards)
+
+		if errConfig := fillRegionConfigs(specb, specbSrc, root); errConfig != nil {
+			return nil, errConfig
+		}
+
+		for range shardsVal {
+			specbs = append(specbs, specb)
+		}
+	}
+	return hcl.TokensArray(specbs), nil
+}
+
+func processReplicationSpecBlock(block *hclwrite.Block, root attrVals, isVariable bool) (hclwrite.Tokens, error) {
+	spec := hclwrite.NewEmptyFile()
+	specb := spec.Body()
+	specbSrc := block.Body()
+
+	d, err := fillWithDynamicRegionConfigs(specbSrc, root, false)
+	if err != nil {
+		return nil, err
+	}
+	if d.IsPresent() {
+		return d.tokens, nil
+	}
+
+	_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
+	shardsAttr := specbSrc.GetAttribute(nNumShards)
+	if shardsAttr == nil {
+		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
+	}
+
+	if errConfig := fillRegionConfigs(specb, specbSrc, root); errConfig != nil {
+		return nil, errConfig
+	}
+
+	return processNumShards(shardsAttr, specb)
 }
 
 func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
