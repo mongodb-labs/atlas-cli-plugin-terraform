@@ -237,13 +237,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 			}
 			concatParts = append(concatParts, tokens)
 		}
-
-		// Use concat to combine all parts
-		if len(concatParts) > 1 {
-			resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensFuncConcat(concatParts...))
-		} else {
-			resourceb.SetAttributeRaw(nRepSpecs, concatParts[0])
-		}
+		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensFuncConcat(concatParts...))
 	} else {
 		// All num_shards are numeric, use simple array
 		var specbs []*hclwrite.Body

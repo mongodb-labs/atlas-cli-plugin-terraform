@@ -121,6 +121,9 @@ func TokensFuncMerge(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 // TokensFuncConcat creates the tokens for the HCL concat function.
 func TokensFuncConcat(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 	params := EncloseNewLines(joinTokens(tokens...))
+	if len(tokens) == 1 {
+		return tokens[0] // no need to concat if there's only one element
+	}
 	ret := TokensFromExpr("concat")
 	return append(ret, EncloseParens(params)...)
 }
