@@ -100,13 +100,10 @@ func transformDynamicBlockReferences(configSrcb *hclwrite.Body, blockName, varNa
 // transformDynamicBlockReferencesRecursive transforms attributes and nested blocks recursively
 // replacing references from dynamic block format, e.g. regions_config.value.* to region.*
 func transformDynamicBlockReferencesRecursive(body *hclwrite.Body, blockName, varName string) {
-	// Transform attributes in deterministic order
 	transform := func(expr string) string {
 		return replaceDynamicBlockReferences(expr, blockName, varName)
 	}
 	transformAttributesSorted(body, body.Attributes(), transform)
-
-	// Transform nested blocks
 	for _, block := range body.Blocks() {
 		transformDynamicBlockReferencesRecursive(block.Body(), blockName, varName)
 	}

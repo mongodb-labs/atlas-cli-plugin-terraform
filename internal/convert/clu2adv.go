@@ -67,7 +67,6 @@ func convertResource(block *hclwrite.Block) (bool, error) {
 	if errDyn := checkDynamicBlock(blockb); errDyn != nil {
 		return false, errDyn
 	}
-
 	var err error
 	if isFreeTierCluster(blockb) {
 		err = fillFreeTierCluster(blockb)
@@ -139,7 +138,6 @@ func fillFreeTierCluster(resourceb *hclwrite.Body) error {
 		return err
 	}
 	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpec.Body()))
-
 	repSpecs := hclwrite.NewEmptyFile()
 	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArraySingle(configb))
 	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs.Body()))
@@ -181,12 +179,10 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 		resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
 		return nil
 	}
-
 	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
 	if len(repSpecBlocks) == 0 {
 		return fmt.Errorf("%s: no replication_specs found", errRepSpecs)
 	}
-
 	if hasVariableNumShards(repSpecBlocks) {
 		tokens, err := processVariableReplicationSpecs(repSpecBlocks, root)
 		if err != nil {
