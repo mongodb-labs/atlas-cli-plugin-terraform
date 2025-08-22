@@ -106,6 +106,35 @@ func transformDynamicBlockReferences(configSrcb *hclwrite.Body, blockName, varNa
 	}
 }
 
+// transformDynamicBlockReferencesRecursive transforms attributes and nested blocks recursively
+// replacing references from dynamic block format, e.g. regions_config.value.* to region.*
+func transformDynamicBlockReferencesRecursive(body *hclwrite.Body, blockName, varName string) {
+	// Transform attributes in deterministic order
+	transform := func(expr string) string {
+		return replaceDynamicBlockReferences(expr, blockName, varName)
+	}
+	transformAttributesSorted(body, body.Attributes(), transform)
+
+	// Transform nested blocks
+	for _, block := range body.Blocks() {
+		transformDynamicBlockReferencesRecursive(block.Body(), blockName, varName)
+	}
+}
+
+// collectBlocks removes and returns all blocks of the given name from body in order of appearance.
+func collectBlocks(body *hclwrite.Body, name string) []*hclwrite.Block {
+	var blocks []*hclwrite.Block
+	for {
+		block := body.FirstMatchingBlock(name, nil)
+		if block == nil {
+			break
+		}
+		body.RemoveBlock(block)
+		blocks = append(blocks, block)
+	}
+	return blocks
+}
+
 // fillBlockOpt converts a block to an attribute with object value
 func fillBlockOpt(resourceb *hclwrite.Body, name string) {
 	block := resourceb.FirstMatchingBlock(name, nil)

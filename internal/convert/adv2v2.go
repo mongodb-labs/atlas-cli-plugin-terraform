@@ -68,15 +68,7 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 	}
 
 	// Collect all replication_specs blocks first
-	var repSpecBlocks []*hclwrite.Block
-	for {
-		block := resourceb.FirstMatchingBlock(nRepSpecs, nil)
-		if block == nil {
-			break
-		}
-		resourceb.RemoveBlock(block)
-		repSpecBlocks = append(repSpecBlocks, block)
-	}
+	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
 
 	if len(repSpecBlocks) == 0 {
 		return fmt.Errorf("must have at least one replication_specs")
@@ -372,12 +364,7 @@ func convertConfig(repSpecs *hclwrite.Body, diskSizeGB hclwrite.Tokens) error {
 	}
 
 	var configs []*hclwrite.Body
-	for {
-		block := repSpecs.FirstMatchingBlock(nConfig, nil)
-		if block == nil {
-			break
-		}
-		repSpecs.RemoveBlock(block)
+	for _, block := range collectBlocks(repSpecs, nConfig) {
 		blockb := block.Body()
 		processAllSpecs(blockb, diskSizeGB)
 		configs = append(configs, blockb)
@@ -408,19 +395,6 @@ func convertDynamicConfig(repSpecs *hclwrite.Body, dConfig dynamicBlock, diskSiz
 	repSpecs.RemoveBlock(dConfig.block)
 	repSpecs.SetAttributeRaw(nConfig, tokens)
 	return nil
-}
-
-func transformDynamicBlockReferencesRecursive(body *hclwrite.Body, blockName, varName string) {
-	// Transform attributes in deterministic order
-	transform := func(expr string) string {
-		return replaceDynamicBlockReferences(expr, blockName, varName)
-	}
-	transformAttributesSorted(body, body.Attributes(), transform)
-
-	// Transform nested blocks
-	for _, block := range body.Blocks() {
-		transformDynamicBlockReferencesRecursive(block.Body(), blockName, varName)
-	}
 }
 
 // hasExpectedBlocksAsAttributes checks if any of the expected block names

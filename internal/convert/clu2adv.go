@@ -183,15 +183,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 	}
 
 	// Collect all replication_specs blocks first
-	var repSpecBlocks []*hclwrite.Block
-	for {
-		block := resourceb.FirstMatchingBlock(nRepSpecs, nil)
-		if block == nil {
-			break
-		}
-		resourceb.RemoveBlock(block)
-		repSpecBlocks = append(repSpecBlocks, block)
-	}
+	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
 
 	if len(repSpecBlocks) == 0 {
 		return fmt.Errorf("%s: no replication_specs found", errRepSpecs)
