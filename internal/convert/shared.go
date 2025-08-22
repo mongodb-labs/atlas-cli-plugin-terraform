@@ -9,8 +9,8 @@ import (
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 )
 
-// HasVariableNumShards checks if any block has a variable (non-literal) num_shards attribute
-func HasVariableNumShards(blocks []*hclwrite.Block) bool {
+// hasVariableNumShards checks if any block has a variable (non-literal) num_shards attribute
+func hasVariableNumShards(blocks []*hclwrite.Block) bool {
 	for _, block := range blocks {
 		if shardsAttr := block.Body().GetAttribute(nNumShards); shardsAttr != nil {
 			if _, err := hcl.GetAttrInt(shardsAttr, errNumShards); err != nil {
@@ -21,33 +21,25 @@ func HasVariableNumShards(blocks []*hclwrite.Block) bool {
 	return false
 }
 
-// ProcessNumShards handles num_shards for a block, returning tokens for the expanded specs
-// processedBody is the body with num_shards removed and other processing done
-func ProcessNumShards(shardsAttr *hclwrite.Attribute, processedBody *hclwrite.Body) (hclwrite.Tokens, error) {
+// processNumShards handles num_shards for a block, returning tokens for the expanded specs.
+// processedBody is the body with num_shards removed and other processing done.
+func processNumShards(shardsAttr *hclwrite.Attribute, processedBody *hclwrite.Body) (hclwrite.Tokens, error) {
 	if shardsAttr == nil {
-		// No num_shards, default to 1
-		return hcl.TokensArraySingle(processedBody), nil
+		return hcl.TokensArraySingle(processedBody), nil // Default 1 if no num_shards specified
 	}
-
-	shardsVal, err := hcl.GetAttrInt(shardsAttr, errNumShards)
-	if err != nil {
-		// num_shards is a variable/expression
-		shardsExpr := hcl.GetAttrExpr(shardsAttr)
-		forExpr := fmt.Sprintf("for i in range(%s) :", shardsExpr)
-		tokens := hcl.TokensFromExpr(forExpr)
-		tokens = append(tokens, hcl.TokensObject(processedBody)...)
-		return hcl.EncloseBracketsNewLines(tokens), nil
+	if shardsVal, err := hcl.GetAttrInt(shardsAttr, errNumShards); err == nil {
+		var bodies []*hclwrite.Body
+		for range shardsVal {
+			bodies = append(bodies, processedBody)
+		}
+		return hcl.TokensArray(bodies), nil
 	}
-
-	// num_shards is a literal number - create explicit array
-	var bodies []*hclwrite.Body
-	for i := 0; i < shardsVal; i++ {
-		bodies = append(bodies, processedBody)
-	}
-	return hcl.TokensArray(bodies), nil
+	shardsExpr := hcl.GetAttrExpr(shardsAttr)
+	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", shardsExpr)))
+	tokens = append(tokens, hcl.TokensObject(processedBody)...)
+	return hcl.EncloseBracketsNewLines(tokens), nil
 }
 
-// dynamicBlock represents a Terraform dynamic block structure
 type dynamicBlock struct {
 	block   *hclwrite.Block
 	forEach *hclwrite.Attribute
@@ -55,7 +47,6 @@ type dynamicBlock struct {
 	tokens  hclwrite.Tokens
 }
 
-// IsPresent returns true if the dynamic block exists
 func (d dynamicBlock) IsPresent() bool {
 	return d.block != nil
 }
