@@ -23,21 +23,21 @@ func hasVariableNumShards(blocks []*hclwrite.Block) bool {
 
 // processNumShards handles num_shards for a block, returning tokens for the expanded specs.
 // processedBody is the body with num_shards removed and other processing done.
-func processNumShards(shardsAttr *hclwrite.Attribute, processedBody *hclwrite.Body) (hclwrite.Tokens, error) {
+func processNumShards(shardsAttr *hclwrite.Attribute, processedBody *hclwrite.Body) hclwrite.Tokens {
 	if shardsAttr == nil {
-		return hcl.TokensArraySingle(processedBody), nil // Default 1 if no num_shards specified
+		return hcl.TokensArraySingle(processedBody) // Default 1 if no num_shards specified
 	}
 	if shardsVal, err := hcl.GetAttrInt(shardsAttr, errNumShards); err == nil {
 		var bodies []*hclwrite.Body
 		for range shardsVal {
 			bodies = append(bodies, processedBody)
 		}
-		return hcl.TokensArray(bodies), nil
+		return hcl.TokensArray(bodies)
 	}
 	shardsExpr := hcl.GetAttrExpr(shardsAttr)
 	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", shardsExpr), false))
 	tokens = append(tokens, hcl.TokensObject(processedBody)...)
-	return hcl.EncloseBracketsNewLines(tokens), nil
+	return hcl.EncloseBracketsNewLines(tokens)
 }
 
 type dynamicBlock struct {

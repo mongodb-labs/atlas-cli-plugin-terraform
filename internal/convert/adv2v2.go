@@ -111,11 +111,7 @@ func processVariableNumShards(repSpecBlocks []*hclwrite.Block, diskSizeGB hclwri
 		if err := convertConfig(blockb, diskSizeGB); err != nil {
 			return nil, err
 		}
-		tokens, err := processNumShards(numShardsAttr, blockb)
-		if err != nil {
-			return nil, err
-		}
-		concatParts = append(concatParts, tokens)
+		concatParts = append(concatParts, processNumShards(numShardsAttr, blockb))
 	}
 	return hcl.TokensFuncConcat(concatParts...), nil
 }
