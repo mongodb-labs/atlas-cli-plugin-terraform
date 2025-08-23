@@ -36,6 +36,9 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 		return false, nil
 	}
 	resourceb := resource.Body()
+	if errDyn := checkDynamicBlock(resourceb); errDyn != nil {
+		return false, errDyn
+	}
 	if hasExpectedBlocksAsAttributes(resourceb) {
 		return false, nil
 	}
@@ -194,10 +197,24 @@ func buildDynamicRepSpecsWithNumShards(dSpec, dConfig dynamicBlock, diskSizeGB h
 		transformAttributesSorted(block.Body(), block.Body().Attributes(), transform)
 	}
 	regionConfigBody := buildRegionConfigBody(dConfig, diskSizeGB)
-	regionTokens := buildRegionForExpr(nSpec, regionConfigBody)
+
+	configForEach := fmt.Sprintf("%s.%s", nSpec, nConfig)
+	regionForExpr := buildForExpr(nRegion, configForEach, false)
+	regionTokens := hcl.TokensFromExpr(regionForExpr)
+	regionTokens = append(regionTokens, hcl.TokensObject(regionConfigBody)...)
+
 	repSpecBody := buildRepSpecBody(dSpec, regionTokens)
-	innerTokens := buildInnerForExpr(numShardsExpr, repSpecBody)
-	outerTokens := buildOuterForExpr(dSpec, innerTokens)
+
+	// Inline buildInnerForExpr
+	innerForExpr := buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false)
+	innerTokens := hcl.TokensFromExpr(innerForExpr)
+	innerTokens = append(innerTokens, hcl.TokensObject(repSpecBody)...)
+
+	// Inline buildOuterForExpr
+	outerForExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true)
+	outerTokens := hcl.TokensFromExpr(outerForExpr)
+	outerTokens = append(outerTokens, hcl.EncloseBracketsNewLines(innerTokens)...)
+
 	return hcl.TokensFuncFlatten(outerTokens), nil
 }
 
@@ -209,13 +226,6 @@ func buildRegionConfigBody(dConfig dynamicBlock, diskSizeGB hclwrite.Tokens) *hc
 	return regionConfigBody
 }
 
-func buildRegionForExpr(spec string, regionConfigBody *hclwrite.Body) hclwrite.Tokens {
-	configForEach := fmt.Sprintf("%s.%s", spec, nConfig)
-	regionForExpr := buildForExpr(nRegion, configForEach, false)
-	regionTokens := hcl.TokensFromExpr(regionForExpr)
-	return append(regionTokens, hcl.TokensObject(regionConfigBody)...)
-}
-
 func buildRepSpecBody(dSpec dynamicBlock, regionTokens hclwrite.Tokens) *hclwrite.Body {
 	repSpecFile := hclwrite.NewEmptyFile()
 	repSpecBody := repSpecFile.Body()
@@ -225,18 +235,6 @@ func buildRepSpecBody(dSpec dynamicBlock, regionTokens hclwrite.Tokens) *hclwrit
 	}
 	repSpecBody.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(regionTokens))
 	return repSpecBody
-}
-
-func buildInnerForExpr(numShardsExpr string, repSpecBody *hclwrite.Body) hclwrite.Tokens {
-	innerForExpr := buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false)
-	innerTokens := hcl.TokensFromExpr(innerForExpr)
-	return append(innerTokens, hcl.TokensObject(repSpecBody)...)
-}
-
-func buildOuterForExpr(dSpec dynamicBlock, innerTokens hclwrite.Tokens) hclwrite.Tokens {
-	outerForExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true)
-	outerTokens := hcl.TokensFromExpr(outerForExpr)
-	return append(outerTokens, hcl.EncloseBracketsNewLines(innerTokens)...)
 }
 
 func processRegionConfigBlocks(targetBody *hclwrite.Body, blocks []*hclwrite.Block, diskSizeGB hclwrite.Tokens) {

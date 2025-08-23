@@ -4,5 +4,6 @@
 	"free_cluster_missing_attribute": "free cluster (because no replication_specs): attribute backing_provider_name not found",
 	"regions_config_missing_priority": "setting replication_specs: attribute priority not found",
 	"replication_specs_missing_num_shards": "num_shards not found",
-	"replication_specs_missing_regions_config": "setting replication_specs: regions_config not found"
+	"replication_specs_missing_regions_config": "setting replication_specs: regions_config not found",
+	"dynamic_unsupported_tag": "dynamic blocks are not supported for advanced_configuration"
 }

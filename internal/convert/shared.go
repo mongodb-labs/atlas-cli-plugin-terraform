@@ -71,6 +71,18 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 	return dynamicBlock{}, nil
 }
 
+func checkDynamicBlock(body *hclwrite.Body) error {
+	dynamicBlockAllowList := []string{nTags, nLabels, nRepSpecs}
+	for _, block := range body.Blocks() {
+		name := getResourceName(block)
+		if block.Type() != nDynamic || slices.Contains(dynamicBlockAllowList, name) {
+			continue
+		}
+		return fmt.Errorf("dynamic blocks are not supported for %s", name)
+	}
+	return nil
+}
+
 // getResourceName returns the first label of a block, if it exists.
 // e.g. in resource "mongodbatlas_cluster" "mycluster", the first label is "mongodbatlas_cluster".
 func getResourceName(resource *hclwrite.Block) string {

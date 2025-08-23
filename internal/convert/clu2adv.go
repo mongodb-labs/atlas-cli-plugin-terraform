@@ -2,7 +2,6 @@ package convert
 
 import (
 	"fmt"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,10 +10,6 @@ import (
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 	"github.com/zclconf/go-cty/cty"
-)
-
-var (
-	dynamicBlockAllowList = []string{nTags, nLabels, nConfigSrc, nRepSpecs}
 )
 
 type attrVals struct {
@@ -236,7 +231,7 @@ func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwr
 	valueExpr := replaceDynamicBlockExpr(value, name, nValue)
 	collectionExpr := hcl.GetAttrExpr(d.forEach)
 	forExpr := fmt.Sprintf("for key, value in %s : %s => %s", collectionExpr, keyExpr, valueExpr)
-	tokens := hcl.TokensObjectFromExpr(forExpr)
+	tokens := hcl.EncloseBraces(hcl.EncloseNewLines(hcl.TokensFromExpr(forExpr)), false)
 	if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
 		tokens = hcl.TokensFromExpr(collectionExpr)
 	}
@@ -445,17 +440,6 @@ func getResourceLabel(resource *hclwrite.Block) string {
 	return labels[1]
 }
 
-func checkDynamicBlock(body *hclwrite.Body) error {
-	for _, block := range body.Blocks() {
-		name := getResourceName(block)
-		if block.Type() != nDynamic || slices.Contains(dynamicBlockAllowList, name) {
-			continue
-		}
-		return fmt.Errorf("dynamic blocks are not supported for %s", name)
-	}
-	return nil
-}
-
 func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
 	expr := hcl.GetAttrExpr(attr)
 	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
@@ -570,7 +554,7 @@ func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
 }
 
 func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
-	keyStr, err := hcl.GetAttrString(key, "")
+	keyStr, err := hcl.GetAttrString(key)
 	if err == nil {
 		if !hclsyntax.ValidIdentifier(keyStr) {
 			// wrap in quotes so invalid identifiers (e.g. with blanks) can be used as attribute names

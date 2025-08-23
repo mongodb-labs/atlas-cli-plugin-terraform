@@ -1,5 +1,6 @@
 {
 	"configuration_file_error": "failed to parse Terraform config file",
 	"replication_specs_missing_region_configs": "replication_specs must have at least one region_configs",
-	"missing_replication_specs": "must have at least one replication_specs"
+	"missing_replication_specs": "must have at least one replication_specs",
+	"dynamic_unsupported_tag": "dynamic blocks are not supported for advanced_configuration"
 }
