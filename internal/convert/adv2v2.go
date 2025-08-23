@@ -166,8 +166,8 @@ func processDynamicRepSpecsWithoutConfig(dSpec dynamicBlock, diskSizeGB hclwrite
 
 func buildDynamicRepSpecsWithShards(dSpec dynamicBlock, numShardsAttr *hclwrite.Attribute) (hclwrite.Tokens, error) {
 	numShardsExpr := replaceDynamicBlockReferences(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)
-	outerFor := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach))
-	innerFor := buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr))
+	outerFor := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), false)
+	innerFor := buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false)
 	forExpr := fmt.Sprintf("%s [\n    %s ", outerFor, innerFor)
 	tokens := hcl.TokensFromExpr(forExpr)
 	tokens = append(tokens, hcl.TokensObject(dSpec.content.Body())...)
@@ -176,7 +176,7 @@ func buildDynamicRepSpecsWithShards(dSpec dynamicBlock, numShardsAttr *hclwrite.
 }
 
 func buildSimpleDynamicRepSpecs(dSpec dynamicBlock) (hclwrite.Tokens, error) {
-	forExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach))
+	forExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), false)
 	tokens := hcl.TokensFromExpr(forExpr)
 	tokens = append(tokens, hcl.TokensObject(dSpec.content.Body())...)
 	return hcl.EncloseBracketsNewLines(tokens), nil
@@ -211,7 +211,7 @@ func buildRegionConfigBody(dConfig dynamicBlock, diskSizeGB hclwrite.Tokens) *hc
 
 func buildRegionForExpr(spec string, regionConfigBody *hclwrite.Body) hclwrite.Tokens {
 	configForEach := fmt.Sprintf("%s.%s", spec, nConfig)
-	regionForExpr := buildForExpr(nRegion, configForEach)
+	regionForExpr := buildForExpr(nRegion, configForEach, false)
 	regionTokens := hcl.TokensFromExpr(regionForExpr)
 	return append(regionTokens, hcl.TokensObject(regionConfigBody)...)
 }
@@ -228,14 +228,14 @@ func buildRepSpecBody(dSpec dynamicBlock, regionTokens hclwrite.Tokens) *hclwrit
 }
 
 func buildInnerForExpr(numShardsExpr string, repSpecBody *hclwrite.Body) hclwrite.Tokens {
-	innerForExpr := buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr))
+	innerForExpr := buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false)
 	innerTokens := hcl.TokensFromExpr(innerForExpr)
 	return append(innerTokens, hcl.TokensObject(repSpecBody)...)
 }
 
 func buildOuterForExpr(dSpec dynamicBlock, innerTokens hclwrite.Tokens) hclwrite.Tokens {
-	outerForExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach))
-	outerTokens := hcl.TokensFromExpr(fmt.Sprintf("%s ", outerForExpr))
+	outerForExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true)
+	outerTokens := hcl.TokensFromExpr(outerForExpr)
 	return append(outerTokens, hcl.EncloseBracketsNewLines(innerTokens)...)
 }
 
@@ -298,12 +298,12 @@ func convertDynamicRepSpecsWithoutNumShards(resourceb *hclwrite.Body, dSpec, dCo
 	}
 	processAllSpecs(configb, diskSizeGB)
 	configForEach := fmt.Sprintf("%s.%s", nSpec, nConfig)
-	regionForExpr := buildForExpr(nRegion, configForEach)
+	regionForExpr := buildForExpr(nRegion, configForEach, false)
 	regionTokens := hcl.TokensFromExpr(regionForExpr)
 	regionTokens = append(regionTokens, hcl.TokensObject(configb)...)
 	repSpecb.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(regionTokens))
-	forExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach))
-	innerTokens := hcl.TokensFromExpr(fmt.Sprintf("%s ", forExpr))
+	forExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true)
+	innerTokens := hcl.TokensFromExpr(forExpr)
 	innerTokens = append(innerTokens, hcl.TokensArraySingle(repSpecb)...)
 	tokens := hcl.TokensFuncFlatten(innerTokens)
 	resourceb.RemoveBlock(dSpec.block)
@@ -342,7 +342,7 @@ func convertDynamicConfig(repSpecs *hclwrite.Body, dConfig dynamicBlock, diskSiz
 	blockName := getResourceName(dConfig.block)
 	transformDynamicBlockReferencesRecursive(dConfig.content.Body(), blockName, nRegion)
 	processAllSpecs(dConfig.content.Body(), diskSizeGB)
-	forExpr := buildForExpr(nRegion, hcl.GetAttrExpr(dConfig.forEach))
+	forExpr := buildForExpr(nRegion, hcl.GetAttrExpr(dConfig.forEach), false)
 	tokens := hcl.TokensFromExpr(forExpr)
 	tokens = append(tokens, hcl.TokensObject(dConfig.content.Body())...)
 	tokens = hcl.EncloseBracketsNewLines(tokens)

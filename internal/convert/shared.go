@@ -35,7 +35,7 @@ func processNumShards(shardsAttr *hclwrite.Attribute, processedBody *hclwrite.Bo
 		return hcl.TokensArray(bodies), nil
 	}
 	shardsExpr := hcl.GetAttrExpr(shardsAttr)
-	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", shardsExpr)))
+	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", shardsExpr), false))
 	tokens = append(tokens, hcl.TokensObject(processedBody)...)
 	return hcl.EncloseBracketsNewLines(tokens), nil
 }
@@ -204,6 +204,10 @@ func fillSpecOpt(resourceb *hclwrite.Body, name string, diskSizeGBTokens hclwrit
 }
 
 // buildForExpr builds a for expression with the given variable and collection
-func buildForExpr(varName, collection string) string {
-	return fmt.Sprintf("for %s in %s :", varName, collection)
+func buildForExpr(varName, collection string, trailingSpace bool) string {
+	expr := fmt.Sprintf("for %s in %s :", varName, collection)
+	if trailingSpace {
+		expr += " "
+	}
+	return expr
 }

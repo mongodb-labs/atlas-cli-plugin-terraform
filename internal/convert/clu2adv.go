@@ -281,7 +281,7 @@ func fillReplicationSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVal
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-	forSpec := hcl.TokensFromExpr(fmt.Sprintf("%s ", buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach))))
+	forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
 	forSpec = append(forSpec, dConfig.tokens...)
 	tokens := hcl.TokensFuncFlatten(forSpec)
 	dSpec.tokens = tokens
@@ -307,9 +307,9 @@ func fillWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals, change
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-	priorityForStr := buildForExpr(nPriority, fmt.Sprintf("range(%d, %d, -1)", valMaxPriority, valMinPriority))
+	priorityForStr := buildForExpr(nPriority, fmt.Sprintf("range(%d, %d, -1)", valMaxPriority, valMinPriority), true)
 	priorityFor := hcl.TokensComment(commentPriorityFor)
-	priorityFor = append(priorityFor, hcl.TokensFromExpr(fmt.Sprintf("%s ", priorityForStr))...)
+	priorityFor = append(priorityFor, hcl.TokensFromExpr(priorityForStr)...)
 	priorityFor = append(priorityFor, regionFor...)
 	repSpecb.SetAttributeRaw(nConfig, hcl.TokensFuncFlatten(priorityFor))
 
@@ -317,7 +317,7 @@ func fillWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals, change
 	if shards == nil {
 		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
 	}
-	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", hcl.GetAttrExpr(shards))))
+	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", hcl.GetAttrExpr(shards)), false))
 	tokens = append(tokens, hcl.EncloseBraces(repSpec.BuildTokens(nil), true)...)
 	d.tokens = hcl.EncloseBracketsNewLines(tokens)
 	return d, nil
@@ -473,7 +473,7 @@ func getDynamicBlockRegionArray(forEach string, configSrc *hclwrite.Block, root 
 	if err != nil {
 		return nil, err
 	}
-	tokens := hcl.TokensFromExpr(buildForExpr(nRegion, forEach))
+	tokens := hcl.TokensFromExpr(buildForExpr(nRegion, forEach, false))
 	tokens = append(tokens, hcl.EncloseBraces(region.BuildTokens(nil), true)...)
 	tokens = append(tokens, hcl.TokensFromExpr(fmt.Sprintf("if %s == %s", nPriority, priorityStr))...)
 	return hcl.EncloseBracketsNewLines(tokens), nil
