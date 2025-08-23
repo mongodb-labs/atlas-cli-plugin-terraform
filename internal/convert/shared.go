@@ -223,3 +223,73 @@ func buildForExpr(varName, collection string, trailingSpace bool) string {
 	}
 	return expr
 }
+
+func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
+	tokensDynamic, err := extractTagsLabelsDynamicBlock(resourceb, name)
+	if err != nil {
+		return err
+	}
+	tokensIndividual, err := extractTagsLabelsIndividual(resourceb, name)
+	if err != nil {
+		return err
+	}
+	if tokensDynamic != nil && tokensIndividual != nil {
+		resourceb.SetAttributeRaw(name, hcl.TokensFuncMerge(tokensDynamic, tokensIndividual))
+		return nil
+	}
+	if tokensDynamic != nil {
+		resourceb.SetAttributeRaw(name, tokensDynamic)
+	}
+	if tokensIndividual != nil {
+		resourceb.SetAttributeRaw(name, tokensIndividual)
+	}
+	return nil
+}
+
+func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
+	d, err := getDynamicBlock(resourceb, name)
+	if err != nil || !d.IsPresent() {
+		return nil, err
+	}
+	key := d.content.Body().GetAttribute(nKey)
+	value := d.content.Body().GetAttribute(nValue)
+	if key == nil || value == nil {
+		return nil, fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
+	}
+	keyExpr := replaceDynamicBlockExpr(key, name, nKey)
+	valueExpr := replaceDynamicBlockExpr(value, name, nValue)
+	collectionExpr := hcl.GetAttrExpr(d.forEach)
+	forExpr := fmt.Sprintf("for key, value in %s : %s => %s", collectionExpr, keyExpr, valueExpr)
+	tokens := hcl.EncloseBraces(hcl.EncloseNewLines(hcl.TokensFromExpr(forExpr)), false)
+	if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
+		tokens = hcl.TokensFromExpr(collectionExpr)
+	}
+	resourceb.RemoveBlock(d.block)
+	return tokens, nil
+}
+
+func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
+	var (
+		file  = hclwrite.NewEmptyFile()
+		fileb = file.Body()
+		found = false
+	)
+	for {
+		block := resourceb.FirstMatchingBlock(name, nil)
+		if block == nil {
+			break
+		}
+		key := block.Body().GetAttribute(nKey)
+		value := block.Body().GetAttribute(nValue)
+		if key == nil || value == nil {
+			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
+		}
+		setKeyValue(fileb, key, value)
+		resourceb.RemoveBlock(block)
+		found = true
+	}
+	if !found {
+		return nil, nil
+	}
+	return hcl.TokensObject(fileb), nil
+}
