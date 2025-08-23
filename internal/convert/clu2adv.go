@@ -178,20 +178,50 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 	if len(repSpecBlocks) == 0 {
 		return fmt.Errorf("%s: no replication_specs found", errRepSpecs)
 	}
-	if hasVariableNumShards(repSpecBlocks) {
-		tokens, err := processVariableRepSpecs(repSpecBlocks, root)
-		if err != nil {
-			return err
-		}
-		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensFuncConcat(tokens...))
-	} else {
-		tokens, err := processStaticRepSpecs(repSpecBlocks, root)
-		if err != nil {
-			return err
-		}
-		resourceb.SetAttributeRaw(nRepSpecs, tokens)
+	dConfig, err := fillWithDynamicRegionConfigs(repSpecBlocks[0].Body(), root, false)
+	if err != nil {
+		return err
 	}
-
+	if dConfig.IsPresent() {
+		resourceb.SetAttributeRaw(nRepSpecs, dConfig.tokens)
+		return nil
+	}
+	hasVariableShards := hasVariableNumShards(repSpecBlocks)
+	var resultTokens []hclwrite.Tokens
+	var resultBodies []*hclwrite.Body
+	for _, block := range repSpecBlocks {
+		spec := hclwrite.NewEmptyFile()
+		specb := spec.Body()
+		specbSrc := block.Body()
+		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
+		shardsAttr := specbSrc.GetAttribute(nNumShards)
+		if shardsAttr == nil {
+			return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
+		}
+		if errConfig := fillRegionConfigs(specb, specbSrc, root); errConfig != nil {
+			return errConfig
+		}
+		if hasVariableShards {
+			tokens, err := processNumShards(shardsAttr, specb)
+			if err != nil {
+				return err
+			}
+			resultTokens = append(resultTokens, tokens)
+			continue
+		}
+		shardsVal, err := hcl.GetAttrInt(shardsAttr, errNumShards)
+		if err != nil {
+			return err
+		}
+		for range shardsVal {
+			resultBodies = append(resultBodies, specb)
+		}
+	}
+	if hasVariableShards {
+		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensFuncConcat(resultTokens...))
+	} else {
+		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(resultBodies))
+	}
 	return nil
 }
 
@@ -390,71 +420,6 @@ func getDynamicBlockRegionArray(forEach string, configSrc *hclwrite.Block, root 
 	tokens = append(tokens, hcl.EncloseBraces(region.BuildTokens(nil), true)...)
 	tokens = append(tokens, hcl.TokensFromExpr(fmt.Sprintf("if %s == %s", nPriority, priorityStr))...)
 	return hcl.EncloseBracketsNewLines(tokens), nil
-}
-
-func processVariableRepSpecs(repSpecBlocks []*hclwrite.Block, root attrVals) ([]hclwrite.Tokens, error) {
-	var concatParts []hclwrite.Tokens
-	for _, block := range repSpecBlocks {
-		tokens, err := processReplicationSpecBlock(block, root)
-		if err != nil {
-			return nil, err
-		}
-		concatParts = append(concatParts, tokens)
-	}
-	return concatParts, nil
-}
-
-func processStaticRepSpecs(repSpecBlocks []*hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
-	var specbs []*hclwrite.Body
-	for _, block := range repSpecBlocks {
-		spec := hclwrite.NewEmptyFile()
-		specb := spec.Body()
-		specbSrc := block.Body()
-		d, err := fillWithDynamicRegionConfigs(specbSrc, root, false)
-		if err != nil {
-			return nil, err
-		}
-		if d.IsPresent() {
-			// For dynamic blocks that have numerical num_shards
-			// This is complex, return the dynamic block as is
-			return d.tokens, nil
-		}
-		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
-		shardsAttr := specbSrc.GetAttribute(nNumShards)
-		if shardsAttr == nil {
-			return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
-		}
-		shardsVal, _ := hcl.GetAttrInt(shardsAttr, errNumShards)
-		if errConfig := fillRegionConfigs(specb, specbSrc, root); errConfig != nil {
-			return nil, errConfig
-		}
-		for range shardsVal {
-			specbs = append(specbs, specb)
-		}
-	}
-	return hcl.TokensArray(specbs), nil
-}
-
-func processReplicationSpecBlock(block *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
-	spec := hclwrite.NewEmptyFile()
-	specb := spec.Body()
-	specbSrc := block.Body()
-	d, err := fillWithDynamicRegionConfigs(specbSrc, root, false)
-	if err != nil {
-		return nil, err
-	}
-	if d.IsPresent() {
-		return d.tokens, nil
-	}
-	_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
-	shardsAttr := specbSrc.GetAttribute(nNumShards)
-	if shardsAttr == nil {
-		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
-	}
-	if errConfig := fillRegionConfigs(specb, specbSrc, root); errConfig != nil {
-		return nil, errConfig
-	}
-	return processNumShards(shardsAttr, specb)
 }
 
 func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
