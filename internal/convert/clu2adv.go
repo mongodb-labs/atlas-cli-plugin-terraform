@@ -176,7 +176,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 	}
 	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
 	if len(repSpecBlocks) == 0 {
-		return fmt.Errorf("%s: no replication_specs found", errRepSpecs)
+		return fmt.Errorf("must have at least one replication_specs")
 	}
 	dConfig, err := fillWithDynamicRegionConfigs(repSpecBlocks[0].Body(), root, false)
 	if err != nil {
