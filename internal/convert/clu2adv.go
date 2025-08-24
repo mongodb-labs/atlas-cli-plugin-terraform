@@ -148,7 +148,7 @@ func fillCluster(resourceb *hclwrite.Body) error {
 	resourceb.RemoveAttribute(nNumShards) // num_shards in root is not relevant, only in replication_specs
 	// ok to fail as cloud_backup is optional
 	_ = hcl.MoveAttr(resourceb, resourceb, nCloudBackup, nBackupEnabled, errRepSpecs)
-	if err := fillReplicationSpecs(resourceb, root); err != nil {
+	if err := fillRepSpecs(resourceb, root); err != nil {
 		return err
 	}
 	if err := fillTagsLabelsOpt(resourceb, nTags); err != nil {
@@ -164,8 +164,8 @@ func fillCluster(resourceb *hclwrite.Body) error {
 	return nil
 }
 
-func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
-	d, err := fillReplicationSpecsWithDynamicBlock(resourceb, root)
+func fillRepSpecs(resourceb *hclwrite.Body, root attrVals) error {
+	d, err := fillRepSpecsWithDynamicBlock(resourceb, root)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 	if len(repSpecBlocks) == 0 {
 		return fmt.Errorf("must have at least one replication_specs")
 	}
-	dConfig, err := fillWithDynamicRegionConfigs(repSpecBlocks[0].Body(), root, false)
+	dConfig, err := fillConfigsWithDynamicRegion(repSpecBlocks[0].Body(), root, false)
 	if err != nil {
 		return err
 	}
@@ -221,14 +221,14 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 	return nil
 }
 
-// fillReplicationSpecsWithDynamicBlock used for dynamic blocks in replication_specs
-func fillReplicationSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dynamicBlock, error) {
+// fillRepSpecsWithDynamicBlock used for dynamic blocks in replication_specs
+func fillRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dynamicBlock, error) {
 	dSpec, err := getDynamicBlock(resourceb, nRepSpecs)
 	if err != nil || !dSpec.IsPresent() {
 		return dynamicBlock{}, err
 	}
 	transformDynamicBlockReferences(dSpec.content.Body(), nRepSpecs, nSpec)
-	dConfig, err := fillWithDynamicRegionConfigs(dSpec.content.Body(), root, true)
+	dConfig, err := fillConfigsWithDynamicRegion(dSpec.content.Body(), root, true)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
@@ -239,8 +239,8 @@ func fillReplicationSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVal
 	return dSpec, nil
 }
 
-// fillWithDynamicRegionConfigs is used for dynamic blocks in region_configs
-func fillWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals, changeReferences bool) (dynamicBlock, error) {
+// fillConfigsWithDynamicRegion is used for dynamic blocks in region_configs
+func fillConfigsWithDynamicRegion(specbSrc *hclwrite.Body, root attrVals, changeReferences bool) (dynamicBlock, error) {
 	d, err := getDynamicBlock(specbSrc, nConfigSrc)
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
