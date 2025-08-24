@@ -65,6 +65,8 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 		return err
 	}
 	if d.IsPresent() {
+		resourceb.RemoveBlock(d.block)
+		resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
 		return nil
 	}
 	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
@@ -103,148 +105,117 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 
 func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) (dynamicBlock, error) {
 	dSpec, err := getDynamicBlock(resourceb, nRepSpecs)
+	if err != nil || !dSpec.IsPresent() {
+		return dynamicBlock{}, err
+	}
+	transformDynamicBlockReferences(dSpec.content.Body(), nRepSpecs, nSpec)
+	dConfig, err := convertConfigsWithDynamicBlock(dSpec.content.Body(), diskSizeGB)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-	if dSpec.IsPresent() {
-		transformDynamicBlockReferences(dSpec.content.Body(), nRepSpecs, nSpec)
-		dConfig, err := getDynamicBlock(dSpec.content.Body(), nConfig)
+	forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
+	forSpec = append(forSpec, dConfig.tokens...)
+	tokens := hcl.TokensFuncFlatten(forSpec)
+	dSpec.tokens = tokens
+	return dSpec, nil
+}
+
+func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite.Tokens) (dynamicBlock, error) {
+	d, err := getDynamicBlock(specbSrc, nConfig)
+	if err != nil {
+		return dynamicBlock{}, err
+	}
+	if !d.IsPresent() {
+		d, err = getDynamicBlock(specbSrc, nConfigSrc)
 		if err != nil {
 			return dynamicBlock{}, err
 		}
-		if !dConfig.IsPresent() {
-			dConfig, err = getDynamicBlock(dSpec.content.Body(), nConfigSrc)
-			if err != nil {
-				return dynamicBlock{}, err
-			}
-		}
-		if dConfig.IsPresent() {
-			// Will inline convertDynamicRepSpecsWithDynamicConfig
-			configBlockName := getResourceName(dConfig.block)
-			numShardsAttr := dSpec.content.Body().GetAttribute(nNumShards)
-			if numShardsAttr != nil {
-				numShardsExpr := replaceDynamicBlockReferences(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)
-				transform1 := func(expr string) string {
-					return replaceDynamicBlockReferences(expr, configBlockName, nRegion)
-				}
-				transformAttributesSorted(dConfig.content.Body(), dConfig.content.Body().Attributes(), transform1)
-				for _, block := range dConfig.content.Body().Blocks() {
-					// Recursive call inlined
-					transformAttributesSorted(block.Body(), block.Body().Attributes(), transform1)
-				}
-				transform2 := func(expr string) string {
-					return replaceDynamicBlockReferences(expr, nRepSpecs, nSpec)
-				}
-				transformAttributesSorted(dConfig.content.Body(), dConfig.content.Body().Attributes(), transform2)
-				for _, block := range dConfig.content.Body().Blocks() {
-					transformAttributesSorted(block.Body(), block.Body().Attributes(), transform2)
-				}
-				regionConfigFile := hclwrite.NewEmptyFile()
-				regionConfigBody := regionConfigFile.Body()
-				copyAttributesSorted(regionConfigBody, dConfig.content.Body().Attributes())
-				for _, block := range dConfig.content.Body().Blocks() {
-					blockType := block.Type()
-					blockFile := hclwrite.NewEmptyFile()
-					blockBody := blockFile.Body()
-					copyAttributesSorted(blockBody, block.Body().Attributes())
-					if diskSizeGB != nil && (blockType == nElectableSpecs ||
-						blockType == nReadOnlySpecs || blockType == nAnalyticsSpecs) {
-						blockBody.SetAttributeRaw(nDiskSizeGB, diskSizeGB)
-					}
-					regionConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
-				}
-
-				configForEach := fmt.Sprintf("%s.%s", nSpec, nConfig)
-				regionForExpr := buildForExpr(nRegion, configForEach, false)
-				regionTokens := hcl.TokensFromExpr(regionForExpr)
-				regionTokens = append(regionTokens, hcl.TokensObject(regionConfigBody)...)
-
-				repSpecFile := hclwrite.NewEmptyFile()
-				repSpecBody := repSpecFile.Body()
-				if zoneNameAttr := dSpec.content.Body().GetAttribute(nZoneName); zoneNameAttr != nil {
-					zoneNameExpr := replaceDynamicBlockReferences(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
-					repSpecBody.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
-				}
-				repSpecBody.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(regionTokens))
-
-				innerForExpr := buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false)
-				innerTokens := hcl.TokensFromExpr(innerForExpr)
-				innerTokens = append(innerTokens, hcl.TokensObject(repSpecBody)...)
-
-				outerForExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true)
-				outerTokens := hcl.TokensFromExpr(outerForExpr)
-				outerTokens = append(outerTokens, hcl.EncloseBracketsNewLines(innerTokens)...)
-
-				tokens := hcl.TokensFuncFlatten(outerTokens)
-				resourceb.RemoveBlock(dSpec.block)
-				resourceb.SetAttributeRaw(nRepSpecs, tokens)
-				return dSpec, nil
-			}
-			repSpecFile := hclwrite.NewEmptyFile()
-			repSpecb := repSpecFile.Body()
-			if zoneNameAttr := dSpec.content.Body().GetAttribute(nZoneName); zoneNameAttr != nil {
-				zoneNameExpr := replaceDynamicBlockReferences(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
-				repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
-			}
-			configFile := hclwrite.NewEmptyFile()
-			configb := configFile.Body()
-			addAttributesWithTransform(configb, dConfig.content.Body().Attributes(), configBlockName)
-			for _, block := range dConfig.content.Body().Blocks() {
-				newBlock := configb.AppendNewBlock(block.Type(), block.Labels())
-				newBlockb := newBlock.Body()
-				addAttributesWithTransform(newBlockb, block.Body().Attributes(), configBlockName)
-			}
-			processAllSpecs(configb, diskSizeGB)
-			configForEach := fmt.Sprintf("%s.%s", nSpec, nConfig)
-			regionForExpr := buildForExpr(nRegion, configForEach, false)
-			regionTokens := hcl.TokensFromExpr(regionForExpr)
-			regionTokens = append(regionTokens, hcl.TokensObject(configb)...)
-			repSpecb.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(regionTokens))
-			forExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true)
-			innerTokens := hcl.TokensFromExpr(forExpr)
-			innerTokens = append(innerTokens, hcl.TokensArraySingle(repSpecb)...)
-			tokens := hcl.TokensFuncFlatten(innerTokens)
-			resourceb.RemoveBlock(dSpec.block)
-			resourceb.SetAttributeRaw(nRepSpecs, tokens)
-			return dSpec, nil
-		}
-		numShardsAttr := dSpec.content.Body().GetAttribute(nNumShards)
-		dSpec.content.Body().RemoveAttribute(nNumShards)
-		if err := convertConfig(dSpec.content.Body(), diskSizeGB); err != nil {
-			return dynamicBlock{}, err
-		}
-		var tokens hclwrite.Tokens
-		if numShardsAttr != nil {
-			numShardsExpr := replaceDynamicBlockReferences(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)
-			outerFor := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), false)
-			innerFor := buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false)
-			forExpr := fmt.Sprintf("%s [\n    %s ", outerFor, innerFor)
-			tokens = hcl.TokensFromExpr(forExpr)
-			tokens = append(tokens, hcl.TokensObject(dSpec.content.Body())...)
-			tokens = append(tokens, hcl.TokensFromExpr("\n  ]\n]")...)
-			tokens = hcl.TokensFuncFlatten(tokens)
-		} else {
-			forExpr := buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), false)
-			tokens = hcl.TokensFromExpr(forExpr)
-			tokens = append(tokens, hcl.TokensObject(dSpec.content.Body())...)
-			tokens = hcl.EncloseBracketsNewLines(tokens)
-		}
-		resourceb.RemoveBlock(dSpec.block)
-		resourceb.SetAttributeRaw(nRepSpecs, tokens)
-		return dSpec, nil
 	}
-	return dynamicBlock{}, nil
+	if !d.IsPresent() {
+		// No dynamic config block, handle num_shards if present
+		numShardsAttr := specbSrc.GetAttribute(nNumShards)
+		if numShardsAttr == nil {
+			return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
+		}
+		specbSrc.RemoveAttribute(nNumShards)
+		if errConv := convertConfig(specbSrc, diskSizeGB); errConv != nil {
+			return dynamicBlock{}, errConv
+		}
+		numShardsExpr := hcl.GetAttrExpr(numShardsAttr)
+		numShardsExpr = replaceDynamicBlockReferences(numShardsExpr, nRepSpecs, nSpec)
+		tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false))
+		tokens = append(tokens, hcl.TokensObject(specbSrc)...)
+		tokens = hcl.EncloseBracketsNewLines(tokens)
+		return dynamicBlock{tokens: tokens}, nil
+	}
+
+	// Dynamic config block found
+	repSpec := hclwrite.NewEmptyFile()
+	repSpecb := repSpec.Body()
+	if zoneNameAttr := specbSrc.GetAttribute(nZoneName); zoneNameAttr != nil {
+		zoneNameExpr := hcl.GetAttrExpr(zoneNameAttr)
+		zoneNameExpr = replaceDynamicBlockReferences(zoneNameExpr, nRepSpecs, nSpec)
+		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
+	}
+
+	configForEach := fmt.Sprintf("%s.%s", nSpec, nConfig)
+
+	regionConfig, err := getDynamicRegionConfig(d, configForEach, diskSizeGB)
+	if err != nil {
+		return dynamicBlock{}, err
+	}
+	repSpecb.SetAttributeRaw(nConfig, regionConfig)
+
+	// Handle num_shards
+	numShardsAttr := specbSrc.GetAttribute(nNumShards)
+	if numShardsAttr != nil {
+		numShardsExpr := hcl.GetAttrExpr(numShardsAttr)
+		numShardsExpr = replaceDynamicBlockReferences(numShardsExpr, nRepSpecs, nSpec)
+		tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false))
+		tokens = append(tokens, hcl.TokensObject(repSpecb)...)
+		return dynamicBlock{tokens: hcl.EncloseBracketsNewLines(tokens)}, nil
+	}
+	return dynamicBlock{tokens: hcl.TokensArraySingle(repSpecb)}, nil
 }
 
-func addAttributesWithTransform(targetBody *hclwrite.Body, sourceAttrs map[string]*hclwrite.Attribute,
-	configBlockName string) {
-	transform1 := func(expr string) string {
-		return replaceDynamicBlockReferences(expr, configBlockName, nRegion)
+// getDynamicRegionConfig builds the region config array for a dynamic config block
+func getDynamicRegionConfig(d dynamicBlock, configForEach string, diskSizeGB hclwrite.Tokens) (hclwrite.Tokens, error) {
+	configBlockName := getResourceName(d.block)
+	transformDynamicBlockReferences(d.content.Body(), configBlockName, nRegion)
+	for _, block := range d.content.Body().Blocks() {
+		transformDynamicBlockReferences(block.Body(), configBlockName, nRegion)
 	}
-	transform2 := func(expr string) string {
-		return replaceDynamicBlockReferences(expr, nRepSpecs, nSpec)
+	// Additional transformation for nested spec references
+	for name, attr := range d.content.Body().Attributes() {
+		expr := replaceDynamicBlockReferences(hcl.GetAttrExpr(attr), nRepSpecs, nSpec)
+		d.content.Body().SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
-	transformAttributesSorted(targetBody, sourceAttrs, transform1, transform2)
+	for _, block := range d.content.Body().Blocks() {
+		for name, attr := range block.Body().Attributes() {
+			expr := replaceDynamicBlockReferences(hcl.GetAttrExpr(attr), nRepSpecs, nSpec)
+			block.Body().SetAttributeRaw(name, hcl.TokensFromExpr(expr))
+		}
+	}
+
+	regionConfigFile := hclwrite.NewEmptyFile()
+	regionConfigBody := regionConfigFile.Body()
+	copyAttributesSorted(regionConfigBody, d.content.Body().Attributes())
+	for _, block := range d.content.Body().Blocks() {
+		blockType := block.Type()
+		blockFile := hclwrite.NewEmptyFile()
+		blockBody := blockFile.Body()
+		copyAttributesSorted(blockBody, block.Body().Attributes())
+		if diskSizeGB != nil && (blockType == nElectableSpecs ||
+			blockType == nReadOnlySpecs || blockType == nAnalyticsSpecs) {
+			blockBody.SetAttributeRaw(nDiskSizeGB, diskSizeGB)
+		}
+		regionConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
+	}
+
+	regionForExpr := buildForExpr(nRegion, configForEach, false)
+	regionTokens := hcl.TokensFromExpr(regionForExpr)
+	regionTokens = append(regionTokens, hcl.TokensObject(regionConfigBody)...)
+	return hcl.EncloseBracketsNewLines(regionTokens), nil
 }
 
 func convertConfig(repSpecs *hclwrite.Body, diskSizeGB hclwrite.Tokens) error {
