@@ -93,19 +93,19 @@ func getResourceName(resource *hclwrite.Block) string {
 	return labels[0]
 }
 
-// replaceDynamicBlockReferences changes value references,
+// transformReference changes value references,
 // e.g. regions_config.value.electable_nodes to region.electable_nodes
-func replaceDynamicBlockReferences(expr, blockName, varName string) string {
+func transformReference(expr, blockName, varName string) string {
 	return strings.ReplaceAll(expr,
 		fmt.Sprintf("%s.%s.", blockName, nValue),
 		fmt.Sprintf("%s.", varName))
 }
 
-// transformDynamicBlockReferences transforms all attribute references in a body from dynamic block format
-func transformDynamicBlockReferences(configSrcb *hclwrite.Body, blockName, varName string) {
-	for name, attr := range configSrcb.Attributes() {
-		expr := replaceDynamicBlockReferences(hcl.GetAttrExpr(attr), blockName, varName)
-		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
+// transformReferences transforms all attribute references in a body from dynamic block format
+func transformReferences(body *hclwrite.Body, blockName, varName string) {
+	for name, attr := range body.Attributes() {
+		expr := transformReference(hcl.GetAttrExpr(attr), blockName, varName)
+		body.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
 }
 

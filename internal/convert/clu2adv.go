@@ -227,7 +227,7 @@ func fillRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dyna
 	if err != nil || !dSpec.IsPresent() {
 		return dynamicBlock{}, err
 	}
-	transformDynamicBlockReferences(dSpec.content.Body(), nRepSpecs, nSpec)
+	transformReferences(dSpec.content.Body(), nRepSpecs, nSpec)
 	dConfig, err := fillConfigsWithDynamicRegion(dSpec.content.Body(), root, true)
 	if err != nil {
 		return dynamicBlock{}, err
@@ -252,7 +252,7 @@ func fillConfigsWithDynamicRegion(specbSrc *hclwrite.Body, root attrVals, change
 	}
 	forEach := hcl.GetAttrExpr(d.forEach)
 	if changeReferences {
-		forEach = replaceDynamicBlockReferences(forEach, nRepSpecs, nSpec)
+		forEach = transformReference(forEach, nRepSpecs, nSpec)
 	}
 	regionFor, err := getDynamicBlockRegionArray(forEach, d.content, root)
 	if err != nil {
@@ -403,7 +403,7 @@ func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName strin
 // getDynamicBlockRegionArray returns the region array for a dynamic block in replication_specs.
 // e.g. [ for region in var.replication_specs.regions_config : { ... } if priority == region.priority ]
 func getDynamicBlockRegionArray(forEach string, configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
-	transformDynamicBlockReferences(configSrc.Body(), nConfigSrc, nRegion)
+	transformReferences(configSrc.Body(), nConfigSrc, nRegion)
 	priorityStr := hcl.GetAttrExpr(configSrc.Body().GetAttribute(nPriority))
 	if priorityStr == "" {
 		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
