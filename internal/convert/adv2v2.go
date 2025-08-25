@@ -188,8 +188,7 @@ func hasExpectedBlocksAsAttributes(resourceb *hclwrite.Body) bool {
 	return false
 }
 
-func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hclwrite.Attribute,
-	transforms ...func(string) string) {
+func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hclwrite.Attribute) {
 	var names []string
 	for name := range sourceAttrs {
 		names = append(names, name)
@@ -197,9 +196,6 @@ func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hcl
 	slices.Sort(names)
 	for _, name := range names {
 		expr := hcl.GetAttrExpr(sourceAttrs[name])
-		for _, transform := range transforms {
-			expr = transform(expr)
-		}
 		targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
 }
