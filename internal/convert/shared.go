@@ -206,8 +206,7 @@ func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwr
 
 func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
 	var (
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
+		fileb = hclwrite.NewEmptyFile().Body()
 	)
 	blocks := collectBlocks(resourceb, name)
 	if len(blocks) == 0 {

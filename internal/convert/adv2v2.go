@@ -149,8 +149,7 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 		return dynamicBlock{}, err
 	}
 	configBody := d.content.Body()
-	repSpec := hclwrite.NewEmptyFile()
-	repSpecb := repSpec.Body()
+	repSpecb := hclwrite.NewEmptyFile().Body()
 	if zoneNameAttr := specbSrc.GetAttribute(nZoneName); zoneNameAttr != nil {
 		expr := transformReference(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
 		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(expr))
@@ -158,13 +157,11 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 	configForEach := fmt.Sprintf("%s.%s", nSpec, nConfig)
 	configBlockName := getResourceName(d.block)
 	transformReferences(configBody, configBlockName, nRegion)
-	regionConfigFile := hclwrite.NewEmptyFile()
-	regionConfigBody := regionConfigFile.Body()
+	regionConfigBody := hclwrite.NewEmptyFile().Body()
 	copyAttributesSorted(regionConfigBody, configBody.Attributes())
 	for _, block := range configBody.Blocks() {
 		blockType := block.Type()
-		blockFile := hclwrite.NewEmptyFile()
-		blockBody := blockFile.Body()
+		blockBody := hclwrite.NewEmptyFile().Body()
 		copyAttributesSorted(blockBody, block.Body().Attributes())
 		if diskSizeGB != nil && (blockType == nElectableSpecs ||
 			blockType == nReadOnlySpecs || blockType == nAnalyticsSpecs) {
@@ -176,8 +173,7 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 	regionTokens = append(regionTokens, hcl.TokensObject(regionConfigBody)...)
 	regionConfig := hcl.EncloseBracketsNewLines(regionTokens)
 	repSpecb.SetAttributeRaw(nConfig, regionConfig)
-	numShardsAttr := specbSrc.GetAttribute(nNumShards)
-	if numShardsAttr != nil {
+	if numShardsAttr := specbSrc.GetAttribute(nNumShards); numShardsAttr != nil {
 		numShardsExpr := transformReference(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)
 		tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false))
 		tokens = append(tokens, hcl.TokensObject(repSpecb)...)

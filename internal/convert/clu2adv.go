@@ -116,8 +116,7 @@ func fillMovedBlocks(body *hclwrite.Body, moveLabels []string) {
 // fillFreeTierCluster is the entry point to convert clusters in free tier
 func fillFreeTierCluster(resourceb *hclwrite.Body) error {
 	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
-	config := hclwrite.NewEmptyFile()
-	configb := config.Body()
+	configb := hclwrite.NewEmptyFile().Body()
 	hcl.SetAttrInt(configb, nPriority, valMaxPriority)
 	if err := hcl.MoveAttr(resourceb, configb, nRegionNameSrc, nRegionName, errFreeCluster); err != nil {
 		return err
@@ -128,14 +127,14 @@ func fillFreeTierCluster(resourceb *hclwrite.Body) error {
 	if err := hcl.MoveAttr(resourceb, configb, nBackingProviderName, nBackingProviderName, errFreeCluster); err != nil {
 		return err
 	}
-	electableSpec := hclwrite.NewEmptyFile()
-	if err := hcl.MoveAttr(resourceb, electableSpec.Body(), nInstanceSizeSrc, nInstanceSize, errFreeCluster); err != nil {
+	electableSpecb := hclwrite.NewEmptyFile().Body()
+	if err := hcl.MoveAttr(resourceb, electableSpecb, nInstanceSizeSrc, nInstanceSize, errFreeCluster); err != nil {
 		return err
 	}
-	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpec.Body()))
-	repSpecs := hclwrite.NewEmptyFile()
-	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArraySingle(configb))
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs.Body()))
+	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpecb))
+	repSpecsb := hclwrite.NewEmptyFile().Body()
+	repSpecsb.SetAttributeRaw(nConfig, hcl.TokensArraySingle(configb))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecsb))
 	return nil
 }
 
@@ -190,8 +189,7 @@ func fillRepSpecs(resourceb *hclwrite.Body, root attrVals) error {
 	var resultTokens []hclwrite.Tokens
 	var resultBodies []*hclwrite.Body
 	for _, block := range repSpecBlocks {
-		spec := hclwrite.NewEmptyFile()
-		specb := spec.Body()
+		specb := hclwrite.NewEmptyFile().Body()
 		specbSrc := block.Body()
 		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
 		shardsAttr := specbSrc.GetAttribute(nNumShards)
@@ -245,8 +243,7 @@ func fillConfigsWithDynamicRegion(specbSrc *hclwrite.Body, root attrVals, change
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
 	}
-	repSpec := hclwrite.NewEmptyFile()
-	repSpecb := repSpec.Body()
+	repSpecb := hclwrite.NewEmptyFile().Body()
 	if zoneName := hcl.GetAttrExpr(specbSrc.GetAttribute(nZoneName)); zoneName != "" {
 		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneName))
 	}
@@ -268,7 +265,7 @@ func fillConfigsWithDynamicRegion(specbSrc *hclwrite.Body, root attrVals, change
 		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
 	}
 	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", hcl.GetAttrExpr(shards)), false))
-	tokens = append(tokens, hcl.EncloseBraces(repSpec.BuildTokens(nil), true)...)
+	tokens = append(tokens, hcl.EncloseBraces(repSpecb.BuildTokens(nil), true)...)
 	d.tokens = hcl.EncloseBracketsNewLines(tokens)
 	return d, nil
 }
@@ -284,7 +281,7 @@ func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 		if err != nil {
 			return err
 		}
-		configs = append(configs, config.Body())
+		configs = append(configs, config)
 		specbSrc.RemoveBlock(configSrc)
 	}
 	if len(configs) == 0 {
@@ -295,9 +292,8 @@ func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 	return nil
 }
 
-func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bool) (*hclwrite.File, error) {
-	file := hclwrite.NewEmptyFile()
-	fileb := file.Body()
+func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bool) (*hclwrite.Body, error) {
+	fileb := hclwrite.NewEmptyFile().Body()
 	fileb.SetAttributeRaw(nProviderName, root.req[nProviderName])
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nRegionName, nRegionName, errRepSpecs); err != nil {
 		return nil, err
@@ -317,13 +313,12 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
 		fileb.SetAttributeRaw(nAutoScaling, autoScaling)
 	}
-	return file, nil
+	return fileb, nil
 }
 
 func getSpec(configSrc *hclwrite.Block, countName string, root attrVals, isDynamicBlock bool) (hclwrite.Tokens, error) {
 	var (
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
+		fileb = hclwrite.NewEmptyFile().Body()
 		count = configSrc.Body().GetAttribute(countName)
 	)
 	if count == nil {
@@ -359,8 +354,7 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 			{nComputeMaxInstanceSizeSrc, nComputeMaxInstanceSize},
 			{nComputeScaleDownEnabledSrc, nComputeScaleDownEnabled},
 		}
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
+		fileb = hclwrite.NewEmptyFile().Body()
 		found = false
 	)
 	for _, tuple := range names {
