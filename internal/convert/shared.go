@@ -208,13 +208,12 @@ func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrit
 	var (
 		file  = hclwrite.NewEmptyFile()
 		fileb = file.Body()
-		found = false
 	)
-	for {
-		block := resourceb.FirstMatchingBlock(name, nil)
-		if block == nil {
-			break
-		}
+	blocks := collectBlocks(resourceb, name)
+	if len(blocks) == 0 {
+		return nil, nil
+	}
+	for _, block := range blocks {
 		key := block.Body().GetAttribute(nKey)
 		value := block.Body().GetAttribute(nValue)
 		if key == nil || value == nil {
@@ -222,10 +221,6 @@ func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrit
 		}
 		setKeyValue(fileb, key, value)
 		resourceb.RemoveBlock(block)
-		found = true
-	}
-	if !found {
-		return nil, nil
 	}
 	return hcl.TokensObject(fileb), nil
 }

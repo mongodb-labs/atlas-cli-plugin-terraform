@@ -80,8 +80,33 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 		blockb := block.Body()
 		shardsAttr := blockb.GetAttribute(nNumShards)
 		blockb.RemoveAttribute(nNumShards)
-		if err := convertConfig(blockb, diskSizeGB); err != nil {
+
+		// Process config - inlined from convertConfig
+		dConfig, err := getDynamicBlock(blockb, nConfig)
+		if err != nil {
 			return err
+		}
+
+		if dConfig.IsPresent() {
+			blockName := getResourceName(dConfig.block)
+			transformReferences(dConfig.content.Body(), blockName, nRegion)
+			copyAttributesSorted(dConfig.content.Body(), dConfig.content.Body().Attributes())
+			processAllSpecs(dConfig.content.Body(), diskSizeGB)
+			tokens := hcl.TokensFromExpr(buildForExpr(nRegion, hcl.GetAttrExpr(dConfig.forEach), false))
+			tokens = append(tokens, hcl.TokensObject(dConfig.content.Body())...)
+			blockb.RemoveBlock(dConfig.block)
+			blockb.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(tokens))
+		} else {
+			var configs []*hclwrite.Body
+			for _, configBlock := range collectBlocks(blockb, nConfig) {
+				configBlockb := configBlock.Body()
+				processAllSpecs(configBlockb, diskSizeGB)
+				configs = append(configs, configBlockb)
+			}
+			if len(configs) == 0 {
+				return fmt.Errorf("replication_specs must have at least one region_configs")
+			}
+			blockb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
 		}
 		if hasVariableShards {
 			resultTokens = append(resultTokens, processNumShards(shardsAttr, blockb))
@@ -161,35 +186,6 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 	return dynamicBlock{tokens: hcl.TokensArraySingle(repSpecb)}, nil
 }
 
-func convertConfig(repSpecs *hclwrite.Body, diskSizeGB hclwrite.Tokens) error {
-	dConfig, err := getDynamicBlock(repSpecs, nConfig)
-	if err != nil {
-		return err
-	}
-	if dConfig.IsPresent() {
-		blockName := getResourceName(dConfig.block)
-		transformReferences(dConfig.content.Body(), blockName, nRegion)
-		copyAttributesSorted(dConfig.content.Body(), dConfig.content.Body().Attributes())
-		processAllSpecs(dConfig.content.Body(), diskSizeGB)
-		tokens := hcl.TokensFromExpr(buildForExpr(nRegion, hcl.GetAttrExpr(dConfig.forEach), false))
-		tokens = append(tokens, hcl.TokensObject(dConfig.content.Body())...)
-		repSpecs.RemoveBlock(dConfig.block)
-		repSpecs.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(tokens))
-		return nil
-	}
-	var configs []*hclwrite.Body
-	for _, block := range collectBlocks(repSpecs, nConfig) {
-		blockb := block.Body()
-		processAllSpecs(blockb, diskSizeGB)
-		configs = append(configs, blockb)
-	}
-	if len(configs) == 0 {
-		return fmt.Errorf("replication_specs must have at least one region_configs")
-	}
-	repSpecs.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
-	return nil
-}
-
 // hasExpectedBlocksAsAttributes checks if any of the expected block names
 // exist as attributes in the resource body. In that case conversion is not done
 // as advanced cluster is not in a valid SDKv2 configuration.
@@ -216,9 +212,6 @@ func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hcl
 			expr = transform(expr)
 		}
 		targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
-	}
-	for _, block := range targetBody.Blocks() {
-		copyAttributesSorted(block.Body(), block.Body().Attributes(), transforms...)
 	}
 }
 
