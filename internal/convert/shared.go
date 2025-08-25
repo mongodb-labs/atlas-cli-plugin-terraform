@@ -107,6 +107,9 @@ func transformReferences(body *hclwrite.Body, blockName, varName string) {
 		expr := transformReference(hcl.GetAttrExpr(attr), blockName, varName)
 		body.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
 	}
+	for _, block := range body.Blocks() {
+		transformReferences(block.Body(), blockName, varName)
+	}
 }
 
 // collectBlocks removes and returns all blocks of the given name from body in order of appearance.

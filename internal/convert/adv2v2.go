@@ -133,19 +133,6 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 	configForEach := fmt.Sprintf("%s.%s", nSpec, nConfig)
 	configBlockName := getResourceName(d.block)
 	transformReferences(configBody, configBlockName, nRegion)
-	for _, block := range configBody.Blocks() {
-		transformReferences(block.Body(), configBlockName, nRegion)
-	}
-	for name, attr := range configBody.Attributes() {
-		expr := transformReference(hcl.GetAttrExpr(attr), nRepSpecs, nSpec)
-		configBody.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
-	}
-	for _, block := range configBody.Blocks() {
-		for name, attr := range block.Body().Attributes() {
-			expr := transformReference(hcl.GetAttrExpr(attr), nRepSpecs, nSpec)
-			block.Body().SetAttributeRaw(name, hcl.TokensFromExpr(expr))
-		}
-	}
 	regionConfigFile := hclwrite.NewEmptyFile()
 	regionConfigBody := regionConfigFile.Body()
 	copyAttributesSorted(regionConfigBody, configBody.Attributes())
@@ -181,13 +168,8 @@ func convertConfig(repSpecs *hclwrite.Body, diskSizeGB hclwrite.Tokens) error {
 	}
 	if dConfig.IsPresent() {
 		blockName := getResourceName(dConfig.block)
-		transform := func(expr string) string {
-			return transformReference(expr, blockName, nRegion)
-		}
-		copyAttributesSorted(dConfig.content.Body(), dConfig.content.Body().Attributes(), transform)
-		for _, block := range dConfig.content.Body().Blocks() {
-			copyAttributesSorted(block.Body(), block.Body().Attributes(), transform)
-		}
+		transformReferences(dConfig.content.Body(), blockName, nRegion)
+		copyAttributesSorted(dConfig.content.Body(), dConfig.content.Body().Attributes())
 		processAllSpecs(dConfig.content.Body(), diskSizeGB)
 		tokens := hcl.TokensFromExpr(buildForExpr(nRegion, hcl.GetAttrExpr(dConfig.forEach), false))
 		tokens = append(tokens, hcl.TokensObject(dConfig.content.Body())...)
@@ -234,6 +216,9 @@ func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hcl
 			expr = transform(expr)
 		}
 		targetBody.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
+	}
+	for _, block := range targetBody.Blocks() {
+		copyAttributesSorted(block.Body(), block.Body().Attributes(), transforms...)
 	}
 }
 
