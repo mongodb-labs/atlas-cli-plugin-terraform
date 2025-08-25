@@ -30,7 +30,7 @@ atlas terraform advancedClusterToV2 --file in.tf --output out.tf
 atlas tf adv2v2 -f in.tf -o out.tf
 ```
 
-[📖 Full Documentation](./docs/command_adv2v2.md) | [Dynamic Blocks Guide](./docs/guide_adv2v2_dynamic_block.md)
+[📖 Full Documentation](./docs/command_adv2v2.md)
 
 ## Installation
 
