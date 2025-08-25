@@ -21,9 +21,8 @@ func hasVariableNumShards(blocks []*hclwrite.Block) bool {
 	return false
 }
 
-// processNumShards handles num_shards for a block, returning tokens for the expanded specs.
-// processedBody is the body with num_shards removed and other processing done.
-func processNumShards(shardsAttr *hclwrite.Attribute, processedBody *hclwrite.Body) hclwrite.Tokens {
+// processNumShardsWhenSomeIsVariable handles num_shards when some replication_specs have variable num_shards
+func processNumShardsWhenSomeIsVariable(shardsAttr *hclwrite.Attribute, processedBody *hclwrite.Body) hclwrite.Tokens {
 	if shardsAttr == nil {
 		return hcl.TokensArraySingle(processedBody) // Default 1 if no num_shards specified
 	}
@@ -118,10 +117,8 @@ func collectBlocks(body *hclwrite.Body, name string) []*hclwrite.Block {
 	for _, block := range body.Blocks() {
 		if block.Type() == name {
 			blocks = append(blocks, block)
+			body.RemoveBlock(block)
 		}
-	}
-	for _, block := range blocks {
-		body.RemoveBlock(block)
 	}
 	return blocks
 }

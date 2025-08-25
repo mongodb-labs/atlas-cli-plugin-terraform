@@ -200,7 +200,7 @@ func fillRepSpecs(resourceb *hclwrite.Body, root attrVals) error {
 			return errConfig
 		}
 		if hasVariableShards {
-			resultTokens = append(resultTokens, processNumShards(shardsAttr, specb))
+			resultTokens = append(resultTokens, processNumShardsWhenSomeIsVariable(shardsAttr, specb))
 			continue
 		}
 		shardsVal, err := hcl.GetAttrInt(shardsAttr, errNumShards)

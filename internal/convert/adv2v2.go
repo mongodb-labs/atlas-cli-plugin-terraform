@@ -105,7 +105,7 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 			blockb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
 		}
 		if hasVariableShards {
-			resultTokens = append(resultTokens, processNumShards(shardsAttr, blockb))
+			resultTokens = append(resultTokens, processNumShardsWhenSomeIsVariable(shardsAttr, blockb))
 			continue
 		}
 		numShardsVal := 1 // Default to 1 if num_shards is not set
