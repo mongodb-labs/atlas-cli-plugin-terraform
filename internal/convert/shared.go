@@ -115,13 +115,13 @@ func transformReferences(body *hclwrite.Body, blockName, varName string) {
 // collectBlocks removes and returns all blocks of the given name from body in order of appearance.
 func collectBlocks(body *hclwrite.Body, name string) []*hclwrite.Block {
 	var blocks []*hclwrite.Block
-	for {
-		block := body.FirstMatchingBlock(name, nil)
-		if block == nil {
-			break
+	for _, block := range body.Blocks() {
+		if block.Type() == name {
+			blocks = append(blocks, block)
 		}
+	}
+	for _, block := range blocks {
 		body.RemoveBlock(block)
-		blocks = append(blocks, block)
 	}
 	return blocks
 }
