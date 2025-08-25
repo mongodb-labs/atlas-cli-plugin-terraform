@@ -5,5 +5,5 @@
 	"regions_config_missing_priority": "setting replication_specs: attribute priority not found",
 	"replication_specs_missing_num_shards": "num_shards not found",
 	"replication_specs_missing_regions_config": "setting replication_specs: regions_config not found",
-	"replication_specs_non_literal_num_shards": "setting num_shards: failed to evaluate number"
+	"dynamic_unsupported_tag": "dynamic blocks are not supported for advanced_configuration"
 }

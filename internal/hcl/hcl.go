@@ -65,17 +65,17 @@ func GetAttrInt(attr *hclwrite.Attribute, errPrefix string) (int, error) {
 }
 
 // GetAttrString tries to get an attribute value as a string.
-func GetAttrString(attr *hclwrite.Attribute, errPrefix string) (string, error) {
+func GetAttrString(attr *hclwrite.Attribute) (string, error) {
 	expr, diags := hclsyntax.ParseExpression(attr.Expr().BuildTokens(nil).Bytes(), "", hcl.InitialPos)
 	if diags.HasErrors() {
-		return "", fmt.Errorf("%s: failed to parse string: %s", errPrefix, diags.Error())
+		return "", fmt.Errorf("failed to parse string: %s", diags.Error())
 	}
 	val, diags := expr.Value(nil)
 	if diags.HasErrors() {
-		return "", fmt.Errorf("%s: failed to evaluate string: %s", errPrefix, diags.Error())
+		return "", fmt.Errorf("failed to evaluate string: %s", diags.Error())
 	}
 	if !val.Type().Equals(cty.String) {
-		return "", fmt.Errorf("%s: attribute is not a string", errPrefix)
+		return "", fmt.Errorf("attribute is not a string")
 	}
 	return val.AsString(), nil
 }
@@ -106,15 +106,20 @@ func TokensFromExpr(expr string) hclwrite.Tokens {
 	return hclwrite.Tokens{{Type: hclsyntax.TokenIdent, Bytes: []byte(expr)}}
 }
 
-// TokensObjectFromExpr creates an object with an expression.
-func TokensObjectFromExpr(expr string) hclwrite.Tokens {
-	return EncloseBraces(EncloseNewLines(TokensFromExpr(expr)), false)
-}
-
 // TokensFuncMerge creates the tokens for the HCL merge function.
 func TokensFuncMerge(tokens ...hclwrite.Tokens) hclwrite.Tokens {
 	params := EncloseNewLines(joinTokens(tokens...))
 	ret := TokensFromExpr("merge")
+	return append(ret, EncloseParens(params)...)
+}
+
+// TokensFuncConcat creates the tokens for the HCL concat function.
+func TokensFuncConcat(tokens ...hclwrite.Tokens) hclwrite.Tokens {
+	params := EncloseNewLines(joinTokens(tokens...))
+	if len(tokens) == 1 {
+		return tokens[0] // no need to concat if there's only one element
+	}
+	ret := TokensFromExpr("concat")
 	return append(ret, EncloseParens(params)...)
 }
 

@@ -4,9 +4,9 @@ resource "resource1" "res1" {
 
 resource "mongodbatlas_cluster" "free_cluster" { # comment in the resource
   # comment in own line in the beginning
-  count                       = local.use_free_cluster ? 1 : 0
-  project_id                  = var.project_id # inline comment kept
-  name                        = var.cluster_name
+  count      = local.use_free_cluster ? 1 : 0
+  project_id = var.project_id # inline comment kept
+  name       = var.cluster_name
   # comment in own line in the middle is deleted
   provider_name               = "TENANT" # inline comment for attribute moved is not kept
   provider_region_name        = var.region

@@ -2,7 +2,7 @@ resource "mongodbatlas_cluster" "autoscaling" {
   project_id   = var.project_id
   name         = var.cluster_name
   disk_size_gb = 100
-  num_shards = 1
+  num_shards   = 1
   cluster_type = "REPLICASET"
 
   replication_specs {

@@ -2,7 +2,6 @@ package convert
 
 import (
 	"fmt"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,10 +10,6 @@ import (
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 	"github.com/zclconf/go-cty/cty"
-)
-
-var (
-	dynamicBlockAllowList = []string{nTags, nLabels, nConfigSrc, nRepSpecs}
 )
 
 type attrVals struct {
@@ -67,7 +62,6 @@ func convertResource(block *hclwrite.Block) (bool, error) {
 	if errDyn := checkDynamicBlock(blockb); errDyn != nil {
 		return false, errDyn
 	}
-
 	var err error
 	if isFreeTierCluster(blockb) {
 		err = fillFreeTierCluster(blockb)
@@ -122,8 +116,7 @@ func fillMovedBlocks(body *hclwrite.Body, moveLabels []string) {
 // fillFreeTierCluster is the entry point to convert clusters in free tier
 func fillFreeTierCluster(resourceb *hclwrite.Body) error {
 	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
-	config := hclwrite.NewEmptyFile()
-	configb := config.Body()
+	configb := hclwrite.NewEmptyFile().Body()
 	hcl.SetAttrInt(configb, nPriority, valMaxPriority)
 	if err := hcl.MoveAttr(resourceb, configb, nRegionNameSrc, nRegionName, errFreeCluster); err != nil {
 		return err
@@ -134,15 +127,14 @@ func fillFreeTierCluster(resourceb *hclwrite.Body) error {
 	if err := hcl.MoveAttr(resourceb, configb, nBackingProviderName, nBackingProviderName, errFreeCluster); err != nil {
 		return err
 	}
-	electableSpec := hclwrite.NewEmptyFile()
-	if err := hcl.MoveAttr(resourceb, electableSpec.Body(), nInstanceSizeSrc, nInstanceSize, errFreeCluster); err != nil {
+	electableSpecb := hclwrite.NewEmptyFile().Body()
+	if err := hcl.MoveAttr(resourceb, electableSpecb, nInstanceSizeSrc, nInstanceSize, errFreeCluster); err != nil {
 		return err
 	}
-	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpec.Body()))
-
-	repSpecs := hclwrite.NewEmptyFile()
-	repSpecs.Body().SetAttributeRaw(nConfig, hcl.TokensArraySingle(configb))
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecs.Body()))
+	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpecb))
+	repSpecsb := hclwrite.NewEmptyFile().Body()
+	repSpecsb.SetAttributeRaw(nConfig, hcl.TokensArraySingle(configb))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecsb))
 	return nil
 }
 
@@ -155,7 +147,7 @@ func fillCluster(resourceb *hclwrite.Body) error {
 	resourceb.RemoveAttribute(nNumShards) // num_shards in root is not relevant, only in replication_specs
 	// ok to fail as cloud_backup is optional
 	_ = hcl.MoveAttr(resourceb, resourceb, nCloudBackup, nBackupEnabled, errRepSpecs)
-	if err := fillReplicationSpecs(resourceb, root); err != nil {
+	if err := fillRepSpecs(resourceb, root); err != nil {
 		return err
 	}
 	if err := fillTagsLabelsOpt(resourceb, nTags); err != nil {
@@ -171,8 +163,8 @@ func fillCluster(resourceb *hclwrite.Body) error {
 	return nil
 }
 
-func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
-	d, err := fillReplicationSpecsWithDynamicBlock(resourceb, root)
+func fillRepSpecs(resourceb *hclwrite.Body, root attrVals) error {
+	d, err := fillRepSpecsWithDynamicBlock(resourceb, root)
 	if err != nil {
 		return err
 	}
@@ -181,191 +173,99 @@ func fillReplicationSpecs(resourceb *hclwrite.Body, root attrVals) error {
 		resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
 		return nil
 	}
-	// at least one replication_specs exists here, if not it would be a free tier cluster
-	var specbs []*hclwrite.Body
-	for {
-		var (
-			specSrc = resourceb.FirstMatchingBlock(nRepSpecs, nil)
-			spec    = hclwrite.NewEmptyFile()
-			specb   = spec.Body()
-		)
-		if specSrc == nil {
-			break
-		}
-		specbSrc := specSrc.Body()
-		d, err := fillWithDynamicRegionConfigs(specbSrc, root, false)
-		if err != nil {
-			return err
-		}
-		if d.IsPresent() {
-			resourceb.RemoveBlock(specSrc)
-			resourceb.SetAttributeRaw(nRepSpecs, d.tokens)
-			return nil
-		}
-		// ok to fail as zone_name is optional
+	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
+	if len(repSpecBlocks) == 0 {
+		return fmt.Errorf("must have at least one replication_specs")
+	}
+	dConfig, err := fillConfigsWithDynamicRegion(repSpecBlocks[0].Body(), root, false)
+	if err != nil {
+		return err
+	}
+	if dConfig.IsPresent() {
+		resourceb.SetAttributeRaw(nRepSpecs, dConfig.tokens)
+		return nil
+	}
+	hasVariableShards := hasVariableNumShards(repSpecBlocks)
+	var resultTokens []hclwrite.Tokens
+	var resultBodies []*hclwrite.Body
+	for _, block := range repSpecBlocks {
+		specb := hclwrite.NewEmptyFile().Body()
+		specbSrc := block.Body()
 		_ = hcl.MoveAttr(specbSrc, specb, nZoneName, nZoneName, errRepSpecs)
-		shards := specbSrc.GetAttribute(nNumShards)
-		if shards == nil {
+		shardsAttr := specbSrc.GetAttribute(nNumShards)
+		if shardsAttr == nil {
 			return fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
 		}
-		shardsVal, err := hcl.GetAttrInt(shards, errNumShards)
-		if err != nil {
-			return err
+		if errConfig := fillRegionConfigs(specb, specbSrc, root); errConfig != nil {
+			return errConfig
 		}
-		if err := fillRegionConfigs(specb, specbSrc, root); err != nil {
+		if hasVariableShards {
+			resultTokens = append(resultTokens, processNumShardsWhenSomeIsVariable(shardsAttr, specb))
+			continue
+		}
+		shardsVal, err := hcl.GetAttrInt(shardsAttr, errNumShards)
+		if err != nil {
 			return err
 		}
 		for range shardsVal {
-			specbs = append(specbs, specb)
+			resultBodies = append(resultBodies, specb)
 		}
-		resourceb.RemoveBlock(specSrc)
 	}
-	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(specbs))
-	return nil
-}
-
-func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
-	tokensDynamic, err := extractTagsLabelsDynamicBlock(resourceb, name)
-	if err != nil {
-		return err
-	}
-	tokensIndividual, err := extractTagsLabelsIndividual(resourceb, name)
-	if err != nil {
-		return err
-	}
-	if tokensDynamic != nil && tokensIndividual != nil {
-		resourceb.SetAttributeRaw(name, hcl.TokensFuncMerge(tokensDynamic, tokensIndividual))
-		return nil
-	}
-	if tokensDynamic != nil {
-		resourceb.SetAttributeRaw(name, tokensDynamic)
-	}
-	if tokensIndividual != nil {
-		resourceb.SetAttributeRaw(name, tokensIndividual)
+	if hasVariableShards {
+		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensFuncConcat(resultTokens...))
+	} else {
+		resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArray(resultBodies))
 	}
 	return nil
 }
 
-func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
-	d, err := getDynamicBlock(resourceb, name)
-	if err != nil || !d.IsPresent() {
-		return nil, err
-	}
-	key := d.content.Body().GetAttribute(nKey)
-	value := d.content.Body().GetAttribute(nValue)
-	if key == nil || value == nil {
-		return nil, fmt.Errorf("dynamic block %s: %s or %s not found", name, nKey, nValue)
-	}
-	keyExpr := replaceDynamicBlockExpr(key, name, nKey)
-	valueExpr := replaceDynamicBlockExpr(value, name, nValue)
-	collectionExpr := hcl.GetAttrExpr(d.forEach)
-	forExpr := fmt.Sprintf("for key, value in %s : %s => %s", collectionExpr, keyExpr, valueExpr)
-	tokens := hcl.TokensObjectFromExpr(forExpr)
-	if keyExpr == nKey && valueExpr == nValue { // expression can be simplified and use for_each expression
-		tokens = hcl.TokensFromExpr(collectionExpr)
-	}
-	resourceb.RemoveBlock(d.block)
-	return tokens, nil
-}
-
-func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
-	var (
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
-		found = false
-	)
-	for {
-		block := resourceb.FirstMatchingBlock(name, nil)
-		if block == nil {
-			break
-		}
-		key := block.Body().GetAttribute(nKey)
-		value := block.Body().GetAttribute(nValue)
-		if key == nil || value == nil {
-			return nil, fmt.Errorf("%s: %s or %s not found", name, nKey, nValue)
-		}
-		setKeyValue(fileb, key, value)
-		resourceb.RemoveBlock(block)
-		found = true
-	}
-	if !found {
-		return nil, nil
-	}
-	return hcl.TokensObject(fileb), nil
-}
-
-func fillBlockOpt(resourceb *hclwrite.Body, name string) {
-	block := resourceb.FirstMatchingBlock(name, nil)
-	if block == nil {
-		return
-	}
-	resourceb.RemoveBlock(block)
-	resourceb.SetAttributeRaw(name, hcl.TokensObject(block.Body()))
-}
-
-func fillAdvConfigOpt(resourceb *hclwrite.Body) {
-	block := resourceb.FirstMatchingBlock(nAdvConfig, nil)
-	if block == nil {
-		return
-	}
-	blockBody := block.Body()
-
-	// Remove deprecated attributes from advanced_configuration
-	blockBody.RemoveAttribute(nFailIndexKeyTooLong)
-	blockBody.RemoveAttribute(nDefaultReadConcern)
-
-	fillBlockOpt(resourceb, nAdvConfig)
-}
-
-// fillReplicationSpecsWithDynamicBlock used for dynamic blocks in replication_specs
-func fillReplicationSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dynamicBlock, error) {
+// fillRepSpecsWithDynamicBlock used for dynamic blocks in replication_specs
+func fillRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dynamicBlock, error) {
 	dSpec, err := getDynamicBlock(resourceb, nRepSpecs)
 	if err != nil || !dSpec.IsPresent() {
 		return dynamicBlock{}, err
 	}
-	transformDynamicBlockReferences(dSpec.content.Body(), nRepSpecs, nSpec)
-	dConfig, err := fillWithDynamicRegionConfigs(dSpec.content.Body(), root, true)
+	transformReferences(dSpec.content.Body(), nRepSpecs, nSpec)
+	dConfig, err := fillConfigsWithDynamicRegion(dSpec.content.Body(), root, true)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-	forSpec := hcl.TokensFromExpr(fmt.Sprintf("for %s in %s : ", nSpec, hcl.GetAttrExpr(dSpec.forEach)))
+	forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
 	forSpec = append(forSpec, dConfig.tokens...)
 	tokens := hcl.TokensFuncFlatten(forSpec)
 	dSpec.tokens = tokens
 	return dSpec, nil
 }
 
-// fillWithDynamicRegionConfigs is used for dynamic blocks in region_configs
-func fillWithDynamicRegionConfigs(specbSrc *hclwrite.Body, root attrVals, changeReferences bool) (dynamicBlock, error) {
+// fillConfigsWithDynamicRegion is used for dynamic blocks in region_configs
+func fillConfigsWithDynamicRegion(specbSrc *hclwrite.Body, root attrVals, changeReferences bool) (dynamicBlock, error) {
 	d, err := getDynamicBlock(specbSrc, nConfigSrc)
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
 	}
-	repSpec := hclwrite.NewEmptyFile()
-	repSpecb := repSpec.Body()
+	repSpecb := hclwrite.NewEmptyFile().Body()
 	if zoneName := hcl.GetAttrExpr(specbSrc.GetAttribute(nZoneName)); zoneName != "" {
 		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneName))
 	}
 	forEach := hcl.GetAttrExpr(d.forEach)
 	if changeReferences {
-		forEach = replaceDynamicBlockReferences(forEach, nRepSpecs, nSpec)
+		forEach = transformReference(forEach, nRepSpecs, nSpec)
 	}
 	regionFor, err := getDynamicBlockRegionArray(forEach, d.content, root)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-	priorityForStr := fmt.Sprintf("for %s in range(%d, %d, -1) : ", nPriority, valMaxPriority, valMinPriority)
+	priorityForStr := buildForExpr(nPriority, fmt.Sprintf("range(%d, %d, -1)", valMaxPriority, valMinPriority), true)
 	priorityFor := hcl.TokensComment(commentPriorityFor)
 	priorityFor = append(priorityFor, hcl.TokensFromExpr(priorityForStr)...)
 	priorityFor = append(priorityFor, regionFor...)
 	repSpecb.SetAttributeRaw(nConfig, hcl.TokensFuncFlatten(priorityFor))
-
 	shards := specbSrc.GetAttribute(nNumShards)
 	if shards == nil {
 		return dynamicBlock{}, fmt.Errorf("%s: %s not found", errRepSpecs, nNumShards)
 	}
-	tokens := hcl.TokensFromExpr(fmt.Sprintf("for i in range(%s) :", hcl.GetAttrExpr(shards)))
-	tokens = append(tokens, hcl.EncloseBraces(repSpec.BuildTokens(nil), true)...)
+	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", hcl.GetAttrExpr(shards)), false))
+	tokens = append(tokens, hcl.EncloseBraces(repSpecb.BuildTokens(nil), true)...)
 	d.tokens = hcl.EncloseBracketsNewLines(tokens)
 	return d, nil
 }
@@ -381,7 +281,7 @@ func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 		if err != nil {
 			return err
 		}
-		configs = append(configs, config.Body())
+		configs = append(configs, config)
 		specbSrc.RemoveBlock(configSrc)
 	}
 	if len(configs) == 0 {
@@ -392,9 +292,8 @@ func fillRegionConfigs(specb, specbSrc *hclwrite.Body, root attrVals) error {
 	return nil
 }
 
-func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bool) (*hclwrite.File, error) {
-	file := hclwrite.NewEmptyFile()
-	fileb := file.Body()
+func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bool) (*hclwrite.Body, error) {
+	fileb := hclwrite.NewEmptyFile().Body()
 	fileb.SetAttributeRaw(nProviderName, root.req[nProviderName])
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nRegionName, nRegionName, errRepSpecs); err != nil {
 		return nil, err
@@ -414,13 +313,12 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
 		fileb.SetAttributeRaw(nAutoScaling, autoScaling)
 	}
-	return file, nil
+	return fileb, nil
 }
 
 func getSpec(configSrc *hclwrite.Block, countName string, root attrVals, isDynamicBlock bool) (hclwrite.Tokens, error) {
 	var (
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
+		fileb = hclwrite.NewEmptyFile().Body()
 		count = configSrc.Body().GetAttribute(countName)
 	)
 	if count == nil {
@@ -456,8 +354,7 @@ func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
 			{nComputeMaxInstanceSizeSrc, nComputeMaxInstanceSize},
 			{nComputeScaleDownEnabledSrc, nComputeScaleDownEnabled},
 		}
-		file  = hclwrite.NewEmptyFile()
-		fileb = file.Body()
+		fileb = hclwrite.NewEmptyFile().Body()
 		found = false
 	)
 	for _, tuple := range names {
@@ -482,16 +379,6 @@ func setResourceName(resource *hclwrite.Block, name string) {
 	resource.SetLabels(labels)
 }
 
-// getResourceName returns the first label of a block, if it exists.
-// e.g. in resource "mongodbatlas_cluster" "mycluster", the first label is "mongodbatlas_cluster".
-func getResourceName(resource *hclwrite.Block) string {
-	labels := resource.Labels()
-	if len(labels) == 0 {
-		return ""
-	}
-	return labels[0]
-}
-
 // getResourceLabel returns the second label of a block, if it exists.
 // e.g. in resource "mongodbatlas_cluster" "mycluster", the second label is "mycluster".
 func getResourceLabel(resource *hclwrite.Block) string {
@@ -502,47 +389,6 @@ func getResourceLabel(resource *hclwrite.Block) string {
 	return labels[1]
 }
 
-type dynamicBlock struct {
-	block   *hclwrite.Block
-	forEach *hclwrite.Attribute
-	content *hclwrite.Block
-	tokens  hclwrite.Tokens
-}
-
-func (d dynamicBlock) IsPresent() bool {
-	return d.block != nil
-}
-
-func checkDynamicBlock(body *hclwrite.Body) error {
-	for _, block := range body.Blocks() {
-		name := getResourceName(block)
-		if block.Type() != nDynamic || slices.Contains(dynamicBlockAllowList, name) {
-			continue
-		}
-		return fmt.Errorf("dynamic blocks are not supported for %s", name)
-	}
-	return nil
-}
-
-func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
-	for _, block := range body.Blocks() {
-		if block.Type() != nDynamic || name != getResourceName(block) {
-			continue
-		}
-		blockb := block.Body()
-		forEach := blockb.GetAttribute(nForEach)
-		if forEach == nil {
-			return dynamicBlock{}, fmt.Errorf("dynamic block %s: attribute %s not found", name, nForEach)
-		}
-		content := blockb.FirstMatchingBlock(nContent, nil)
-		if content == nil {
-			return dynamicBlock{}, fmt.Errorf("dynamic block %s: block %s not found", name, nContent)
-		}
-		return dynamicBlock{forEach: forEach, block: block, content: content}, nil
-	}
-	return dynamicBlock{}, nil
-}
-
 func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
 	expr := hcl.GetAttrExpr(attr)
 	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
@@ -551,7 +397,7 @@ func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName strin
 // getDynamicBlockRegionArray returns the region array for a dynamic block in replication_specs.
 // e.g. [ for region in var.replication_specs.regions_config : { ... } if priority == region.priority ]
 func getDynamicBlockRegionArray(forEach string, configSrc *hclwrite.Block, root attrVals) (hclwrite.Tokens, error) {
-	transformDynamicBlockReferences(configSrc.Body(), nConfigSrc, nRegion)
+	transformReferences(configSrc.Body(), nConfigSrc, nRegion)
 	priorityStr := hcl.GetAttrExpr(configSrc.Body().GetAttribute(nPriority))
 	if priorityStr == "" {
 		return nil, fmt.Errorf("%s: %s not found", errRepSpecs, nPriority)
@@ -560,25 +406,10 @@ func getDynamicBlockRegionArray(forEach string, configSrc *hclwrite.Block, root 
 	if err != nil {
 		return nil, err
 	}
-	tokens := hcl.TokensFromExpr(fmt.Sprintf("for %s in %s :", nRegion, forEach))
+	tokens := hcl.TokensFromExpr(buildForExpr(nRegion, forEach, false))
 	tokens = append(tokens, hcl.EncloseBraces(region.BuildTokens(nil), true)...)
 	tokens = append(tokens, hcl.TokensFromExpr(fmt.Sprintf("if %s == %s", nPriority, priorityStr))...)
 	return hcl.EncloseBracketsNewLines(tokens), nil
-}
-
-func transformDynamicBlockReferences(configSrcb *hclwrite.Body, blockName, varName string) {
-	for name, attr := range configSrcb.Attributes() {
-		expr := replaceDynamicBlockReferences(hcl.GetAttrExpr(attr), blockName, varName)
-		configSrcb.SetAttributeRaw(name, hcl.TokensFromExpr(expr))
-	}
-}
-
-// replaceDynamicBlockReferences changes value references,
-// e.g. regions_config.value.electable_nodes to region.electable_nodes
-func replaceDynamicBlockReferences(expr, blockName, varName string) string {
-	return strings.ReplaceAll(expr,
-		fmt.Sprintf("%s.%s.", blockName, nValue),
-		fmt.Sprintf("%s.", varName))
 }
 
 func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
@@ -596,7 +427,7 @@ func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
 }
 
 func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
-	keyStr, err := hcl.GetAttrString(key, "")
+	keyStr, err := hcl.GetAttrString(key)
 	if err == nil {
 		if !hclsyntax.ValidIdentifier(keyStr) {
 			// wrap in quotes so invalid identifiers (e.g. with blanks) can be used as attribute names
