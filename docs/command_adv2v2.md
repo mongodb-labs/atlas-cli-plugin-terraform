@@ -181,7 +181,7 @@ locals {
     [
       {
         priority        = 0
-        provide_name    = "AWS"
+        provider_name   = "AWS"
         region_name     = "US_EAST_1"
         instance_size   = var.instance_size
         electable_node_count = 0
