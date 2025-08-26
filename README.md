@@ -9,7 +9,7 @@ This repository contains the Atlas CLI plugin for [Terraform's MongoDB Atlas Pro
 The plugin provides the following commands to help with your Terraform configurations:
 
 ### 1. clusterToAdvancedCluster (clu2adv)
-Convert `mongodbatlas_cluster` resources to `mongodbatlas_advanced_cluster` Provider 2.0.0 schema.0.0.
+Convert `mongodbatlas_cluster` resources to `mongodbatlas_advanced_cluster` Provider 2.0.0 schema.
 
 **Quick Start:**
 ```bash

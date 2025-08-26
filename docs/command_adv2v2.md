@@ -51,9 +51,9 @@ dynamic "tags" {
 }
 ```
 
-### Dynamic blocks in regions_config
+### Dynamic blocks in region_configs
 
-You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
+You can use `dynamic` blocks for `region_configs`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
 
 This is an example of how to use dynamic blocks in `region_configs`:
 ```hcl
@@ -108,9 +108,9 @@ If you need to use the plugin for `dynamic` block use cases not yet supported, p
 
 #### Dynamic block and individual blocks in the same resource
 
-Dynamic block and individual blocks for `region_configs` or `replication_specs` are not supported at the same time. The recommended way to handle this is to remove the individual `region_configs` or `replication_specs` blocks and use a local `list` variable to add the individual block information to the variable you're using in the `for_each` expression, using [concat](https://developer.hashicorp.com/terraform/language/functions/concat).
+Dynamic block and individual blocks for `region_configs` or `replication_specs` are not supported at the same time. The recommended way to handle this is to remove the individual `region_configs` or `replication_specs` blocks and use a local `list` variable with [concat](https://developer.hashicorp.com/terraform/language/functions/concat) to add the individual block information to the variable you're using in the `for_each` expression.
 
-Let's see an example with `regions_config`, it is the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `region_configs` elements in a `list` variable and we want to add an additional `region_configs` with a read-only node.
+Let's see an example with `region_configs`, it is the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `region_configs` elements in a `list` variable and we want to add an additional `region_configs` with a read-only node.
 ```hcl
 variable "replication_specs" {
   type = object({
@@ -192,8 +192,8 @@ resource "mongodbatlas_advanced_cluster" "this" {
   cluster_type                = var.cluster_type
   replication_specs {
     num_shards = var.replication_specs.num_shards
-    dynamic "regions_config" {
-      for_each = local.regions_config_all # changed to use the local variable
+    dynamic "region_configs" {
+      for_each = local.region_configs_all # changed to use the local variable
       priority      = region_configs.value.priority
       provider_name = region_configs.value.provider_name
       region_name   = region_configs.value.region_name      

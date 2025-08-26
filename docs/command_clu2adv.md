@@ -2,9 +2,9 @@
 
 clusterToAdvancedCluster (clu2adv) command helps you migrate from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` Provider 2.0.0 schema.
 
-## Usage
-
 You can find more information in the [Migration Guide: Cluster to Advanced Cluster](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/guides/cluster-to-advanced-cluster-migration-guide).
+
+## Usage
 
 If you want to convert a Terraform configuration from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster`, use the following command:
 ```bash
@@ -102,7 +102,7 @@ If you need to use the plugin for `dynamic` block use cases not yet supported, p
 
 #### Dynamic block and individual blocks in the same resource
 
-Dynamic block and individual blocks for `regions_config` or `replication_specs` are not supported at the same time. The recommended way to handle this is to remove the individual `regions_config` or `replication_specs` blocks and use a local `list` variable to add the individual block information to the variable you're using in the `for_each` expression, using [concat](https://developer.hashicorp.com/terraform/language/functions/concat).
+Dynamic block and individual blocks for `regions_config` or `replication_specs` are not supported at the same time. The recommended way to handle this is to remove the individual `regions_config` or `replication_specs` blocks and use a local `list` variable with [concat](https://developer.hashicorp.com/terraform/language/functions/concat) to add the individual block information to the variable you're using in the `for_each` expression,.
 
 Let's see an example with `regions_config`, it is the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `regions_config` elements in a `list` variable and we want to add an additional `regions_config` with a read-only node.
 ```hcl
@@ -143,7 +143,7 @@ resource "mongodbatlas_cluster" "this" {
 }
 ```
 
-We modify the configuration file to create an intermediate `local` variable to merge the `regions_config` variable elements and the additional `region_config`:
+We modify the configuration file to create an intermediate `local` variable to merge the `regions_config` variable elements and the additional `regions_config`:
 ```hcl
 variable "replication_specs" {
   type = object({
