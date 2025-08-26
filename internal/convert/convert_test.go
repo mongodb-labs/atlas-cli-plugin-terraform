@@ -27,6 +27,11 @@ func runConvertTests(t *testing.T, cmdName string, convert func(testName string,
 	require.NoError(t, err)
 	err = json.Unmarshal(errContent, &errMap)
 	require.NoError(t, err)
+	unusedErrors := make(map[string]struct{})
+	for name := range errMap {
+		unusedErrors[name] = struct{}{}
+	}
+
 	g := goldie.New(t,
 		goldie.WithFixtureDir(root),
 		goldie.WithNameSuffix(outSuffix))
@@ -46,7 +51,9 @@ func runConvertTests(t *testing.T, cmdName string, convert func(testName string,
 				errMsg, found := errMap[testName]
 				assert.True(t, found, "error not found in file %s for test %s, errMsg: %v", errFilename, testName, err)
 				assert.Contains(t, err.Error(), errMsg)
+				delete(unusedErrors, testName)
 			}
 		})
 	}
+	assert.Empty(t, unusedErrors, "some errors are not being used")
 }
