@@ -2,13 +2,7 @@
 
  advancedClusterToV2 (adv2v2) command helps you migrate previous `mongodbatlas_advanced_cluster` configurations to the new Provider 2.0.0 schema.
 
-## Background
-
-MongoDB Atlas Provider 2.0.0 introduces a new, cleaner structure for `mongodbatlas_advanced_cluster` resources. The main changes include:
-- Simplified `replication_specs` structure
-- `region_configs` is now `config` (as an array)
-- Cleaner handling of `num_shards`
-- Better support for dynamic blocks
+MongoDB Atlas Provider 2.0.0 introduces a new, cleaner structure for `mongodbatlas_advanced_cluster` resources. The main changes include the use of nested attributes instead of blocks and deletion of deprecated attributes like `disk_size_gb` at root level or `num_shards`.
 
 ## Usage
 
@@ -34,446 +28,185 @@ atlas tf adv2v2 -f in.tf -o out.tf
 
 You can find [here](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/tree/main/internal/convert/testdata/adv2v2) examples of input files (suffix .in.tf) and the corresponding output files (suffix .out.tf).
 
-### Basic Conversion Example
-
-**Input (Legacy Format):**
-```hcl
-resource "mongodbatlas_advanced_cluster" "example" {
-  project_id   = var.project_id
-  name         = "example-cluster"
-  cluster_type = "REPLICASET"
-
-  replication_specs {
-    num_shards = 1
-    region_configs {
-      region_name     = "US_EAST_1"
-      priority        = 7
-      provider_name   = "AWS"
-      electable_specs {
-        instance_size = "M10"
-        node_count    = 3
-      }
-    }
-  }
-}
-```
-
-**Output (Provider 2.0.0 Format):**
-```hcl
-resource "mongodbatlas_advanced_cluster" "example" {
-  project_id   = var.project_id
-  name         = "example-cluster"
-  cluster_type = "REPLICASET"
-
-  replication_specs = [{
-    config = [{
-      region_name     = "US_EAST_1"
-      priority        = 7
-      provider_name   = "AWS"
-      electable_specs = {
-        instance_size = "M10"
-        node_count    = 3
-      }
-    }]
-  }]
-}
-```
-
 ## Dynamic Blocks
 
-The converter intelligently handles `dynamic` blocks, transforming them to work with the new Provider 2.0.0 structure.
+`dynamic` blocks are used to generate multiple nested blocks based on a set of values. 
+Given the different ways of using dynamic blocks, we recommend reviewing the output and making sure it fits your needs.
 
-### Dynamic replication_specs
+### Dynamic blocks in tags and labels
 
-When you have dynamic `replication_specs` blocks, the converter will:
-1. Flatten the structure appropriately
-2. Transform `region_configs` to `config`
-3. Handle `num_shards` correctly
-
-**Input:**
+You can use `dynamic` blocks for `tags` and `labels`. The plugin assumes that `for_each` has an expression which is evaluated to a `map` of strings.
+You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, e.g.:
 ```hcl
-dynamic "replication_specs" {
-  for_each = var.replication_specs
-  content {
-    num_shards = replication_specs.value.num_shards
-    zone_name  = replication_specs.value.zone_name
-    dynamic "region_configs" {
-      for_each = replication_specs.value.region_configs
-      content {
-        region_name     = region_configs.value.region_name
-        priority        = region_configs.value.priority
-        provider_name   = region_configs.value.provider_name
-        electable_specs {
-          instance_size = region_configs.value.instance_size
-          node_count    = region_configs.value.node_count
-        }
-      }
-    }
-  }
+tags {
+	key   = "environment"
+	value = var.environment
 }
-```
-
-**Output:**
-```hcl
-replication_specs = flatten([
-  for spec in var.replication_specs : [
-    for i in range(spec.num_shards) : {
-      zone_name = spec.zone_name
-      config = [
-        for region in spec.region_configs : {
-          region_name     = region.region_name
-          priority        = region.priority
-          provider_name   = region.provider_name
-          electable_specs = {
-            instance_size = region.instance_size
-            node_count    = region.node_count
-          }
-        }
-      ]
-    }
-  ]
-])
-```
-
-### Dynamic tags and labels
-
-Dynamic blocks for `tags` and `labels` are preserved but converted to use the new object syntax:
-
-**Input:**
-```hcl
 dynamic "tags" {
-  for_each = var.tags
-  content {
-    key   = tags.key
-    value = tags.value
-  }
+	for_each = var.tags
+	content {
+		key   = tags.key
+		value = replace(tags.value, "/", "_")
+	}
 }
 ```
 
-**Output:**
-```hcl
-tags = {
-  for tag in var.tags : tag.key => tag.value
-}
-```
+### Dynamic blocks in regions_config
 
-## Sharded Clusters
+You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
 
-For sharded clusters (where `num_shards > 1`), the converter correctly expands the replication specs:
-
-**Input:**
+This is an example of how to use dynamic blocks in `region_configs`:
 ```hcl
 replication_specs {
-  num_shards = 3
-  region_configs {
-    region_name     = "US_EAST_1"
-    priority        = 7
-    provider_name   = "AWS"
-    electable_specs {
-      instance_size = "M10"
-      node_count    = 3
-    }
-  }
-}
-```
-
-**Output:**
-```hcl
-replication_specs = [
-  {
-    config = [{
-      region_name     = "US_EAST_1"
-      priority        = 7
-      provider_name   = "AWS"
-      electable_specs = {
-        instance_size = "M10"
-        node_count    = 3
-      }
-    }]
-  },
-  {
-    config = [{
-      region_name     = "US_EAST_1"
-      priority        = 7
-      provider_name   = "AWS"
-      electable_specs = {
-        instance_size = "M10"
-        node_count    = 3
-      }
-    }]
-  },
-  {
-    config = [{
-      region_name     = "US_EAST_1"
-      priority        = 7
-      provider_name   = "AWS"
-      electable_specs = {
-        instance_size = "M10"
-        node_count    = 3
-      }
-    }]
-  }
-]
-```
-
-## Dynamic Block Handling
-
-The converter intelligently handles `dynamic` blocks, transforming them to work with the new Provider 2.0.0 structure.
-
-### Dynamic Blocks in replication_specs
-
-When using dynamic blocks for `replication_specs`, the converter transforms them into a flattened structure:
-
-#### Basic Dynamic replication_specs
-
-**Input (Legacy Format):**
-```hcl
-dynamic "replication_specs" {
-  for_each = var.replication_specs
-  content {
-    num_shards = replication_specs.value.num_shards
-    zone_name  = replication_specs.value.zone_name
-    region_configs {
-      region_name     = replication_specs.value.region_name
-      priority        = 7
-      provider_name   = "AWS"
-      electable_specs {
-        instance_size = replication_specs.value.instance_size
-        node_count    = 3
-      }
-    }
-  }
-}
-```
-
-**Output (Provider 2.0.0 Format):**
-```hcl
-replication_specs = flatten([
-  for spec in var.replication_specs : [
-    for i in range(spec.num_shards) : {
-      zone_name = spec.zone_name
-      config = [{
-        region_name     = spec.region_name
-        priority        = 7
-        provider_name   = "AWS"
-        electable_specs = {
-          instance_size = spec.instance_size
-          node_count    = 3
-        }
-      }]
-    }
-  ]
-])
-```
-
-#### Nested Dynamic Blocks
-
-When you have nested dynamic blocks (dynamic `replication_specs` containing dynamic `region_configs`), the converter handles both levels:
-
-**Input:**
-```hcl
-dynamic "replication_specs" {
-  for_each = var.replication_specs
-  content {
-    num_shards = replication_specs.value.num_shards
-    zone_name  = replication_specs.value.zone_name
-    dynamic "region_configs" {
-      for_each = replication_specs.value.regions
-      content {
-        region_name     = region_configs.value.region_name
-        priority        = region_configs.value.priority
-        provider_name   = region_configs.value.provider_name
-        electable_specs {
-          instance_size = region_configs.value.instance_size
-          node_count    = region_configs.value.node_count
-        }
-      }
-    }
-  }
-}
-```
-
-**Output:**
-```hcl
-replication_specs = flatten([
-  for spec in var.replication_specs : [
-    for i in range(spec.num_shards) : {
-      zone_name = spec.zone_name
-      config = [
-        for region in spec.regions : {
-          region_name     = region.region_name
-          priority        = region.priority
-          provider_name   = region.provider_name
-          electable_specs = {
-            instance_size = region.instance_size
-            node_count    = region.node_count
-          }
-        }
-      ]
-    }
-  ]
-])
-```
-
-### Dynamic Blocks in region_configs
-
-Dynamic blocks within `region_configs` (now `config` in Provider 2.0.0) are transformed to use list comprehensions:
-
-**Input:**
-```hcl
-replication_specs {
-  num_shards = 1
+  num_shards = var.replication_specs.num_shards
+  zone_name  = var.replication_specs.zone_name # only needed if you're using zones
   dynamic "region_configs" {
-    for_each = var.regions
+    for_each = var.replication_specs.region_configs
     content {
-      region_name     = region_configs.value.region_name
-      priority        = region_configs.value.priority
-      provider_name   = "AWS"
+      priority      = region_configs.value.priority
+      provider_name = region_configs.value.provider_name
+      region_name   = region_configs.value.region_name
       electable_specs {
         instance_size = region_configs.value.instance_size
-        node_count    = 3
+        node_count    = region_configs.value.electable_node_count
+      }
+      # read_only_specs, analytics_specs, auto_scaling and analytics_auto_scaling can also be defined
+    }
+  }
+}
+```
+
+### Dynamic blocks in replication_specs
+
+You can use `dynamic` blocks for `replication_specs`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
+
+This is an example of how to use dynamic blocks in `replication_specs`:
+```hcl
+dynamic "replication_specs" {
+  for_each = var.replication_specs
+  content {
+    num_shards = replication_specs.value.num_shards
+    zone_name  = replication_specs.value.zone_name # only needed if you're using zones
+    dynamic "region_configs" {
+      for_each = replication_specs.value.region_configs
+      priority      = region_configs.value.priority
+      provider_name = region_configs.value.provider_name
+      region_name   = region_configs.value.region_name
+      electable_specs {
+        instance_size = region_configs.value.instance_size
+        node_count    = region_configs.value.electable_node_count
+      }
+      # read_only_specs, analytics_specs, auto_scaling and analytics_auto_scaling can also be defined
+    }
+  }
+}
+```
+
+### Limitations
+
+If you need to use the plugin for `dynamic` block use cases not yet supported, please send us [feedback](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues).
+
+#### Dynamic block and individual blocks in the same resource
+
+Dynamic block and individual blocks for `region_configs` or `replication_specs` are not supported at the same time. The recommended way to handle this is to remove the individual `region_configs` or `replication_specs` blocks and use a local `list` variable to add the individual block information to the variable you're using in the `for_each` expression, using [concat](https://developer.hashicorp.com/terraform/language/functions/concat).
+
+Let's see an example with `regions_config`, it is the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `region_configs` elements in a `list` variable and we want to add an additional `region_configs` with a read-only node.
+```hcl
+variable "replication_specs" {
+  type = object({
+    num_shards = number
+    region_configs  = list(object({
+      priority      = number
+      provider_name = string
+      region_name   = string
+      instance_size = string
+      electable_node_count = number
+      read_only_node_count = number
+    }))
+  })
+}
+
+resource "mongodbatlas_advanced_cluster" "this" {
+  project_id                  = var.project_id
+  name                        = var.cluster_name
+  cluster_type                = var.cluster_type
+  replication_specs {
+    num_shards = var.replication_specs.num_shards
+    dynamic "region_configs" {
+      for_each = var.replication_specs.region_configs
+      priority      = region_configs.value.priority
+      provider_name = region_configs.value.provider_name
+      region_name   = region_configs.value.region_name      
+      electable_specs {
+        instance_size = region_configs.value.instance_size
+        node_count    = region_configs.value.electable_node_count
+      }
+      read_only_specs {
+        instance_size = region_configs.value.instance_size
+        node_count    = region_configs.value.read_only_node_count
       }
     }
-  }
-}
-```
-
-**Output:**
-```hcl
-replication_specs = [{
-  config = [
-    for region in var.regions : {
-      region_name     = region.region_name
-      priority        = region.priority
-      provider_name   = "AWS"
-      electable_specs = {
-        instance_size = region.instance_size
-        node_count    = 3
-      }
+    region_configs { # individual region
+      instance_size   = "US_EAST_1"
+      read_only_nodes = 1
     }
-  ]
-}]
-```
-
-### Dynamic Blocks in tags and labels
-
-Dynamic blocks for `tags` and `labels` are converted from block syntax to object syntax:
-
-**Tags Input:**
-```hcl
-dynamic "tags" {
-  for_each = var.tags
-  content {
-    key   = tags.key
-    value = tags.value
   }
 }
 ```
 
-**Tags Output:**
+We modify the configuration file to create an intermediate `local` variable to merge the `region_configs` variable elements and the additional `region_config`:
 ```hcl
-tags = {
-  for tag in var.tags : tag.key => tag.value
-}
-```
-
-### Handling num_shards with Dynamic Blocks
-
-The converter properly handles `num_shards` expansion:
-
-1. **For literal num_shards values**: The converter expands the replication spec for each shard
-2. **For variable num_shards values**: The converter uses `range()` function to handle the expansion dynamically
-
-**Example with variable num_shards:**
-```hcl
-# Input
-dynamic "replication_specs" {
-  for_each = var.specs
-  content {
-    num_shards = replication_specs.value.shards
-    # ... config
-  }
+variable "replication_specs" {
+  type = object({
+    num_shards = number
+    region_configs  = list(object({
+      priority      = number
+      provider_name = string
+      region_name   = string
+      instance_size = string
+      electable_node_count = number
+      read_only_node_count = number
+    }))
+  })
 }
 
-# Output
-replication_specs = flatten([
-  for spec in var.specs : [
-    for i in range(spec.shards) : {
-      # ... config
-    }
-  ]
-])
-```
-
-### Mixed Static and Dynamic Blocks
-
-If you have both static and dynamic blocks for `replication_specs` or `region_configs`, the converter handles them separately:
-
-**Input:**
-```hcl
-replication_specs {
-  num_shards = 1
-  region_configs {
-    region_name = "US_EAST_1"
-    # ... config
-  }
-}
-
-dynamic "replication_specs" {
-  for_each = var.additional_specs
-  content {
-    # ... config
-  }
-}
-```
-
-**Output:**
-```hcl
-replication_specs = concat(
-  [{
-    config = [{
-      region_name = "US_EAST_1"
-      # ... config
-    }]
-  }],
-  flatten([
-    for spec in var.additional_specs : [
-      # ... transformed dynamic content
+locals {
+  region_configs_all = concat(
+    var.replication_specs.region_configs,
+    [
+      {
+        priority        = 0
+        provide_name    = var.provider_aname
+        region_name     = "US_EAST_1"
+        instance_size   = var.instance_size
+        electable_node_count = 0
+        read_only_node_count = 1
+      },
     ]
-  ])
-)
+  )
+}
+
+resource "mongodbatlas_advanced_cluster" "this" {
+  project_id                  = var.project_id
+  name                        = var.cluster_name
+  cluster_type                = var.cluster_type
+  replication_specs {
+    num_shards = var.replication_specs.num_shards
+    dynamic "regions_config" {
+      for_each = local.regions_config_all # changed to use the local variable
+      priority      = region_configs.value.priority
+      provider_name = region_configs.value.provider_name
+      region_name   = region_configs.value.region_name      
+      electable_specs {
+        instance_size = region_configs.value.instance_size
+        node_count    = region_configs.value.electable_node_count
+      }
+      read_only_specs {
+        instance_size = region_configs.value.instance_size
+        node_count    = region_configs.value.read_only_node_count
+      }
+    }
+  }
+}
 ```
-
-## Limitations
-
-### Dynamic Block Limitations
-
-1. **Complex for_each expressions**: While the converter preserves complex expressions in `for_each`, they should be verified after conversion to ensure they work with the new structure.
-
-2. **Custom functions in dynamic blocks**: If you use custom functions or complex conditionals within dynamic blocks, these are preserved but must be tested thoroughly.
-
-3. **Variable references transformation**: The converter updates variable references (e.g., `replication_specs.value` to `spec`), but complex nested references should be reviewed.
-
-4. **Block ordering**: The Provider 2.0.0 schema may handle block ordering differently. Ensure any dependencies on block order are maintained.
-
-### General Limitations
-
-- The converter requires valid HCL syntax in the input file
-- Manual review is recommended for complex configurations
-- Always run `terraform plan` after conversion to verify the changes
-
-If you encounter use cases not yet supported, please send us [feedback](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/issues).
-
-## Best Practices
-
-1. **Review the output**: Always review the converted configuration to ensure it matches your intentions.
-2. **Test incrementally**: Test the converted configuration in a development environment before applying to production.
-3. **Simplify when possible**: If the converter produces complex nested expressions, consider simplifying them manually for better readability.
-4. **Use terraform plan**: Always run `terraform plan` after conversion to verify that the changes are as expected.
-
-## More Examples
-
-You can find more examples of dynamic block conversions in the [test data directory](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/tree/main/internal/convert/testdata/adv2v2), particularly:
-- `dynamic_replication_specs.in.tf` / `.out.tf`
-- `dynamic_region_configs.in.tf` / `.out.tf`
-- `dynamic_tags_labels.in.tf` / `.out.tf`
+This modified configuration file has the same behavior as the original one, but it doesn't have individual blocks anymore, only the `dynamic` block, so it is supported by the plugin.
