@@ -1,12 +1,10 @@
 # Convert mongodbatlas_cluster to mongodbatlas_advanced_cluster
 
-This command helps you migrate from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` (preview provider 2.0.0).
+clusterToAdvancedCluster (clu2adv) command helps you migrate from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` Provider 2.0.0 schema.
 
 ## Usage
 
 You can find more information in the [Migration Guide: Cluster to Advanced Cluster](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/guides/cluster-to-advanced-cluster-migration-guide).
-
-**Note**: In order to use the **Preview for MongoDB Atlas Provider 2.0.0** of `mongodbatlas_advanced_cluster`, you need to set the environment variable `MONGODB_ATLAS_PREVIEW_PROVIDER_V2_ADVANCED_CLUSTER` to `true`.
 
 If you want to convert a Terraform configuration from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster`, use the following command:
 ```bash
@@ -22,9 +20,9 @@ atlas tf clu2adv -f in.tf -o out.tf
 
 - `--file` or `-f`: Input file path containing the `mongodbatlas_cluster` configuration
 - `--output` or `-o`: Output file path for the converted `mongodbatlas_advanced_cluster` configuration
-- `--includeMoved` or `-m`: Include the `moved blocks` in the output file
 - `--replaceOutput` or `-r`: Overwrite the output file if it exists, or even use the same output file as the input file
 - `--watch` or `-w`: Keep the plugin running and watching for changes in the input file
+- `--includeMoved` or `-m`: Include the `moved blocks` in the output file
 
 ## Examples
 
@@ -55,7 +53,8 @@ dynamic "tags" {
 
 ### Dynamic blocks in regions_config
 
-You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` or `set` of objects. See the [dynamic blocks guide](./guide_clu2adv_dynamic_block.md) to learn more about some limitations.
+You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
+
 This is an example of how to use dynamic blocks in `regions_config`:
 ```hcl
 replication_specs {
@@ -75,7 +74,8 @@ replication_specs {
 
 ### Dynamic blocks in replication_specs
 
-You can use `dynamic` blocks for `replication_specs`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects. See the [dynamic blocks guide](./guide_clu2adv_dynamic_block.md) to learn more about some limitations.
+You can use `dynamic` blocks for `replication_specs`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
+
 This is an example of how to use dynamic blocks in `replication_specs`:
 ```hcl
 dynamic "replication_specs" {
@@ -102,9 +102,9 @@ If you need to use the plugin for `dynamic` block use cases not yet supported, p
 
 #### Dynamic block and individual blocks in the same resource
 
-Dynamic block and individual blocks for `regions_config` or `replication_specs` are not supported at the same time. The recommended way to handle this is to remove the individual `regions_config` or `replication_specs` blocks and use a local variable to add the individual block information to the variable you're using in the `for_each` expression, using [concat](https://developer.hashicorp.com/terraform/language/functions/concat) if you're using a list or [setunion](https://developer.hashicorp.com/terraform/language/functions/setunion) for sets.
+Dynamic block and individual blocks for `regions_config` or `replication_specs` are not supported at the same time. The recommended way to handle this is to remove the individual `regions_config` or `replication_specs` blocks and use a local `list` variable to add the individual block information to the variable you're using in the `for_each` expression, using [concat](https://developer.hashicorp.com/terraform/language/functions/concat).
 
-Let's see an example with `regions_config`, it is the same for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `regions_config` elements in a `list` variable and we want to add an additional `region_config` with a read-only node.
+Let's see an example with `regions_config`, it is the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `regions_config` elements in a `list` variable and we want to add an additional `regions_config` with a read-only node.
 ```hcl
 variable "replication_specs" {
   type = object({

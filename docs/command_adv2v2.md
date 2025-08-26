@@ -1,6 +1,6 @@
-# Convert mongodbatlas_advanced_cluster to Provider 2.0.0 Format
+# Convert mongodbatlas_advanced_cluster to Provider 2.0.0 schema
 
-This command helps you migrate `mongodbatlas_advanced_cluster` configurations from the legacy SDKv2 format to the new Provider 2.0.0 format.
+ advancedClusterToV2 (adv2v2) command helps you migrate previous `mongodbatlas_advanced_cluster` configurations to the new Provider 2.0.0 schema.
 
 ## Background
 
@@ -12,7 +12,7 @@ MongoDB Atlas Provider 2.0.0 introduces a new, cleaner structure for `mongodbatl
 
 ## Usage
 
-To convert a Terraform configuration from the legacy `mongodbatlas_advanced_cluster` format to the Provider 2.0.0 format, use the following command:
+To convert a Terraform configuration from the previous `mongodbatlas_advanced_cluster` schema to the Provider 2.0.0 schema, use the following command:
 
 ```bash
 atlas terraform advancedClusterToV2 --file in.tf --output out.tf
@@ -25,9 +25,9 @@ atlas tf adv2v2 -f in.tf -o out.tf
 
 ### Command Options
 
-- `--file` or `-f`: Input file path containing the legacy `mongodbatlas_advanced_cluster` configuration
+- `--file` or `-f`: Input file path containing the `mongodbatlas_advanced_cluster` configuration
 - `--output` or `-o`: Output file path for the converted Provider 2.0.0 configuration
-- `--replaceOutput` or `-r`: Overwrite the output file if it exists
+- `--replaceOutput` or `-r`: Overwrite the output file if it exists, or even use the same output file as the input file
 - `--watch` or `-w`: Keep the plugin running and watching for changes in the input file
 
 ## Examples
@@ -454,7 +454,7 @@ replication_specs = concat(
 
 3. **Variable references transformation**: The converter updates variable references (e.g., `replication_specs.value` to `spec`), but complex nested references should be reviewed.
 
-4. **Block ordering**: The Provider 2.0.0 format may handle block ordering differently. Ensure any dependencies on block order are maintained.
+4. **Block ordering**: The Provider 2.0.0 schema may handle block ordering differently. Ensure any dependencies on block order are maintained.
 
 ### General Limitations
 
