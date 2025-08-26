@@ -159,7 +159,7 @@ resource "mongodbatlas_advanced_cluster" "this" {
 }
 ```
 
-We modify the configuration file to create an intermediate `local` variable to merge the `region_configs` variable elements and the additional `region_config`:
+We modify the configuration file to create an intermediate `local` variable to merge the `region_configs` variable elements and the additional `region_configs`:
 ```hcl
 variable "replication_specs" {
   type = object({
