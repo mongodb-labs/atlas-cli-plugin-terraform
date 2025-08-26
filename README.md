@@ -4,6 +4,25 @@
 
 This repository contains the Atlas CLI plugin for [Terraform's MongoDB Atlas Provider](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs).
 
+## Installation
+
+Install the [Atlas CLI](https://github.com/mongodb/mongodb-atlas-cli) if you haven't done it yet.
+
+Install the plugin by running:
+```bash
+atlas plugin install github.com/mongodb-labs/atlas-cli-plugin-terraform
+```
+ 
+If you have it installed and want to update it to the latest version, run:
+```bash
+atlas plugin update mongodb-labs/atlas-cli-plugin-terraform
+```
+
+If you want to see the list of installed plugins or check if this plugin is installed, run:
+```bash
+atlas plugin list
+```
+
 ## Available Commands
 
 The plugin provides the following commands to help with your Terraform configurations:
@@ -31,25 +50,6 @@ atlas tf adv2v2 -f in.tf -o out.tf
 ```
 
 [📖 Full Documentation](./docs/command_adv2v2.md)
-
-## Installation
-
-Install the [Atlas CLI](https://github.com/mongodb/mongodb-atlas-cli) if you haven't done it yet.
-
-Install the plugin by running:
-```bash
-atlas plugin install github.com/mongodb-labs/atlas-cli-plugin-terraform
-```
- 
-If you have it installed and want to update it to the latest version, run:
-```bash
-atlas plugin update mongodb-labs/atlas-cli-plugin-terraform
-```
-
-If you want to see the list of installed plugins or check if this plugin is installed, run:
-```bash
-atlas plugin list
-```
 
 ## Feedback
 
