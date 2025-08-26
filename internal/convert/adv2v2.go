@@ -85,6 +85,9 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 			return err
 		}
 		if dConfig.IsPresent() {
+			if len(collectBlocks(blockb, nConfig)) > 0 {
+				return errDynamicBockAlone
+			}
 			transformReferences(dConfig.content.Body(), getResourceName(dConfig.block), nRegion)
 			copyAttributesSorted(dConfig.content.Body(), dConfig.content.Body().Attributes())
 			processAllSpecs(dConfig.content.Body(), diskSizeGB)
@@ -129,6 +132,9 @@ func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwri
 	if err != nil || !dSpec.IsPresent() {
 		return dynamicBlock{}, err
 	}
+	if len(collectBlocks(resourceb, nRepSpecs)) > 0 {
+		return dynamicBlock{}, errDynamicBockAlone
+	}
 	transformReferences(dSpec.content.Body(), nRepSpecs, nSpec)
 	dConfig, err := convertConfigsWithDynamicBlock(dSpec.content.Body(), diskSizeGB)
 	if err != nil {
@@ -143,6 +149,9 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 	d, err := getDynamicBlock(specbSrc, nConfig)
 	if err != nil {
 		return dynamicBlock{}, err
+	}
+	if len(collectBlocks(specbSrc, nConfig)) > 0 {
+		return dynamicBlock{}, errDynamicBockAlone
 	}
 	configBody := d.content.Body()
 	transformReferences(configBody, getResourceName(d.block), nRegion)

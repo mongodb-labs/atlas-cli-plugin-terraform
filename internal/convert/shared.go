@@ -1,12 +1,17 @@
 package convert
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
+)
+
+var (
+	errDynamicBockAlone = errors.New("dynamic block must be the only block, see docs for more information")
 )
 
 // hasVariableNumShards checks if any block has a variable (non-literal) num_shards attribute
