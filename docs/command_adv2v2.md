@@ -147,8 +147,13 @@ resource "mongodbatlas_advanced_cluster" "this" {
       }
     }
     region_configs { # individual region
-      instance_size   = "US_EAST_1"
-      read_only_nodes = 1
+      priority      = 0
+      provider_name = "AWS"
+      region_name   = "US_EAST_1"
+      read_only_specs {
+        instance_size = var.instance_size
+        node_count    = 1
+      }
     }
   }
 }
@@ -176,7 +181,7 @@ locals {
     [
       {
         priority        = 0
-        provide_name    = var.provider_aname
+        provide_name    = "AWS"
         region_name     = "US_EAST_1"
         instance_size   = var.instance_size
         electable_node_count = 0
