@@ -226,7 +226,7 @@ func fillRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dyna
 		return dynamicBlock{}, err
 	}
 	if len(collectBlocks(resourceb, nRepSpecs)) > 0 {
-		return dynamicBlock{}, errDynamicBockAlone
+		return dynamicBlock{}, errDynamicBlockAlone
 	}
 	transformReferences(dSpec.content.Body(), nRepSpecs, nSpec)
 	dConfig, err := fillConfigsWithDynamicRegion(dSpec.content.Body(), root, true)
@@ -247,7 +247,7 @@ func fillConfigsWithDynamicRegion(specbSrc *hclwrite.Body, root attrVals, change
 		return dynamicBlock{}, err
 	}
 	if len(collectBlocks(specbSrc, nConfigSrc)) > 0 {
-		return dynamicBlock{}, errDynamicBockAlone
+		return dynamicBlock{}, errDynamicBlockAlone
 	}
 	repSpecb := hclwrite.NewEmptyFile().Body()
 	if zoneName := hcl.GetAttrExpr(specbSrc.GetAttribute(nZoneName)); zoneName != "" {

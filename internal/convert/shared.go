@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	errDynamicBockAlone = errors.New("dynamic block must be the only block, see docs for more information")
+	errDynamicBlockAlone = errors.New("dynamic block must be the only block, see docs for more information")
 )
 
 // hasVariableNumShards checks if any block has a variable (non-literal) num_shards attribute
