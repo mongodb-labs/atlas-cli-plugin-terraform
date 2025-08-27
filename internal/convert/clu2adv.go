@@ -75,7 +75,7 @@ func convertResource(block *hclwrite.Block) (bool, error) {
 }
 
 func isFreeTierCluster(resourceb *hclwrite.Body) bool {
-	d, _ := getDynamicBlock(resourceb, nRepSpecs)
+	d, _ := getDynamicBlock(resourceb, nRepSpecs, true)
 	return resourceb.FirstMatchingBlock(nRepSpecs, nil) == nil && !d.IsPresent()
 }
 
@@ -221,7 +221,7 @@ func fillRepSpecs(resourceb *hclwrite.Body, root attrVals) error {
 
 // fillRepSpecsWithDynamicBlock used for dynamic blocks in replication_specs
 func fillRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dynamicBlock, error) {
-	dSpec, err := getDynamicBlock(resourceb, nRepSpecs)
+	dSpec, err := getDynamicBlock(resourceb, nRepSpecs, true)
 	if err != nil || !dSpec.IsPresent() {
 		return dynamicBlock{}, err
 	}
@@ -239,7 +239,7 @@ func fillRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dyna
 
 // fillConfigsWithDynamicRegion is used for dynamic blocks in region_configs
 func fillConfigsWithDynamicRegion(specbSrc *hclwrite.Body, root attrVals, changeReferences bool) (dynamicBlock, error) {
-	d, err := getDynamicBlock(specbSrc, nConfigSrc)
+	d, err := getDynamicBlock(specbSrc, nConfigSrc, true)
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
 	}

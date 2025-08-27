@@ -80,18 +80,13 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 		blockb := block.Body()
 		shardsAttr := blockb.GetAttribute(nNumShards)
 		blockb.RemoveAttribute(nNumShards)
-		dConfig, err := getDynamicBlock(blockb, nConfig)
+		dConfig, err := convertConfigsWithDynamicBlock(blockb, diskSizeGB, false)
 		if err != nil {
 			return err
 		}
 		if dConfig.IsPresent() {
-			transformReferences(dConfig.content.Body(), getResourceName(dConfig.block), nRegion)
-			copyAttributesSorted(dConfig.content.Body(), dConfig.content.Body().Attributes())
-			processAllSpecs(dConfig.content.Body(), diskSizeGB)
-			tokens := hcl.TokensFromExpr(buildForExpr(nRegion, hcl.GetAttrExpr(dConfig.forEach), false))
-			tokens = append(tokens, hcl.TokensObject(dConfig.content.Body())...)
-			blockb.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(tokens))
 			blockb.RemoveBlock(dConfig.block)
+			blockb.SetAttributeRaw(nConfig, dConfig.tokens)
 		} else {
 			var configs []*hclwrite.Body
 			for _, configBlock := range collectBlocks(blockb, nConfig) {
@@ -125,12 +120,12 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 }
 
 func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) (dynamicBlock, error) {
-	dSpec, err := getDynamicBlock(resourceb, nRepSpecs)
+	dSpec, err := getDynamicBlock(resourceb, nRepSpecs, true)
 	if err != nil || !dSpec.IsPresent() {
 		return dynamicBlock{}, err
 	}
 	transformReferences(dSpec.content.Body(), nRepSpecs, nSpec)
-	dConfig, err := convertConfigsWithDynamicBlock(dSpec.content.Body(), diskSizeGB)
+	dConfig, err := convertConfigsWithDynamicBlock(dSpec.content.Body(), diskSizeGB, true)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
@@ -139,9 +134,10 @@ func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwri
 	return dSpec, nil
 }
 
-func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite.Tokens) (dynamicBlock, error) {
-	d, err := getDynamicBlock(specbSrc, nConfig)
-	if err != nil {
+func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite.Tokens,
+	insideDynamicRepSpec bool) (dynamicBlock, error) {
+	d, err := getDynamicBlock(specbSrc, nConfig, true)
+	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
 	}
 	configBody := d.content.Body()
@@ -158,17 +154,25 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 		}
 		regionConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
 	}
+	forEach := hcl.GetAttrExpr(d.forEach)
+	if insideDynamicRepSpec {
+		forEach = fmt.Sprintf("%s.%s", nSpec, nConfig)
+	}
+	regionTokens := hcl.TokensFromExpr(buildForExpr(nRegion, forEach, false))
+	regionTokens = append(regionTokens, hcl.TokensObject(regionConfigBody)...)
+	if !insideDynamicRepSpec {
+		d.tokens = hcl.EncloseBracketsNewLines(regionTokens)
+		return d, nil
+	}
 	repSpecb := hclwrite.NewEmptyFile().Body()
 	if zoneNameAttr := specbSrc.GetAttribute(nZoneName); zoneNameAttr != nil {
-		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(
-			transformReference(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)))
+		zoneNameExpr := transformReference(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
+		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
 	}
-	regionTokens := hcl.TokensFromExpr(buildForExpr(nRegion, fmt.Sprintf("%s.%s", nSpec, nConfig), false))
-	regionTokens = append(regionTokens, hcl.TokensObject(regionConfigBody)...)
 	repSpecb.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(regionTokens))
 	if numShardsAttr := specbSrc.GetAttribute(nNumShards); numShardsAttr != nil {
-		tokens := hcl.TokensFromExpr(buildForExpr("i",
-			fmt.Sprintf("range(%s)", transformReference(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)), false))
+		numShardsExpr := transformReference(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)
+		tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false))
 		tokens = append(tokens, hcl.TokensObject(repSpecb)...)
 		return dynamicBlock{tokens: hcl.EncloseBracketsNewLines(tokens)}, nil
 	}
