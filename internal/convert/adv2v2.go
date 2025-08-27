@@ -85,7 +85,6 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 			return err
 		}
 		if dConfig.IsPresent() {
-			// Process the dynamic config and set it on this block
 			blockb.RemoveBlock(dConfig.block)
 			blockb.SetAttributeRaw(nConfig, dConfig.tokens)
 		} else {
@@ -135,7 +134,6 @@ func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwri
 	return dSpec, nil
 }
 
-// convertConfigsWithDynamicBlock is used for processing dynamic blocks in region_configs
 func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite.Tokens,
 	insideDynamicRepSpec bool) (dynamicBlock, error) {
 	d, err := getDynamicBlock(specbSrc, nConfig, true)
