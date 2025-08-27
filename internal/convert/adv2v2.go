@@ -121,12 +121,9 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 }
 
 func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) (dynamicBlock, error) {
-	dSpec, err := getDynamicBlock(resourceb, nRepSpecs)
+	dSpec, err := getDynamicBlock(resourceb, nRepSpecs, true)
 	if err != nil || !dSpec.IsPresent() {
 		return dynamicBlock{}, err
-	}
-	if len(collectBlocks(resourceb, nRepSpecs)) > 0 {
-		return dynamicBlock{}, errDynamicBlockAlone
 	}
 	transformReferences(dSpec.content.Body(), nRepSpecs, nSpec)
 	dConfig, err := convertConfigsWithDynamicBlock(dSpec.content.Body(), diskSizeGB, true)
@@ -141,12 +138,9 @@ func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwri
 // convertConfigsWithDynamicBlock is used for processing dynamic blocks in region_configs
 func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite.Tokens,
 	insideDynamicRepSpec bool) (dynamicBlock, error) {
-	d, err := getDynamicBlock(specbSrc, nConfig)
+	d, err := getDynamicBlock(specbSrc, nConfig, true)
 	if err != nil || !d.IsPresent() {
 		return dynamicBlock{}, err
-	}
-	if len(collectBlocks(specbSrc, nConfig)) > 0 {
-		return dynamicBlock{}, errDynamicBlockAlone
 	}
 	configBody := d.content.Body()
 	transformReferences(configBody, getResourceName(d.block), nRegion)

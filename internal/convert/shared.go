@@ -56,8 +56,13 @@ func (d dynamicBlock) IsPresent() bool {
 }
 
 // getDynamicBlock finds and returns a dynamic block with the given name from the body
-func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
+func getDynamicBlock(body *hclwrite.Body, name string, checkAlone bool) (dynamicBlock, error) {
+	var db dynamicBlock
+	staticBlockCount := 0
 	for _, block := range body.Blocks() {
+		if block.Type() == name {
+			staticBlockCount++
+		}
 		if block.Type() != nDynamic || name != getResourceName(block) {
 			continue
 		}
@@ -70,9 +75,14 @@ func getDynamicBlock(body *hclwrite.Body, name string) (dynamicBlock, error) {
 		if content == nil {
 			return dynamicBlock{}, fmt.Errorf("dynamic block %s: block %s not found", name, nContent)
 		}
-		return dynamicBlock{forEach: forEach, block: block, content: content}, nil
+		if !db.IsPresent() {
+			db = dynamicBlock{forEach: forEach, block: block, content: content}
+		}
 	}
-	return dynamicBlock{}, nil
+	if checkAlone && db.IsPresent() && staticBlockCount > 0 {
+		return dynamicBlock{}, errDynamicBlockAlone
+	}
+	return db, nil
 }
 
 func checkDynamicBlock(body *hclwrite.Body) error {
@@ -185,7 +195,7 @@ func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
 }
 
 func extractTagsLabelsDynamicBlock(resourceb *hclwrite.Body, name string) (hclwrite.Tokens, error) {
-	d, err := getDynamicBlock(resourceb, name)
+	d, err := getDynamicBlock(resourceb, name, false)
 	if err != nil || !d.IsPresent() {
 		return nil, err
 	}
