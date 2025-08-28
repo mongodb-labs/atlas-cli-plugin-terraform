@@ -110,9 +110,11 @@ If you need to use the plugin for `dynamic` block use cases not yet supported, p
 
 #### Combination of blocks with dynamic and inline expressions
 
-Dynamic blocks and individual blocks for `region_configs` or `replication_specs` are not supported at the same time. Remove the individual `region_configs` or `replication_specs` blocks and use a local `list` variable with [concat](https://developer.hashicorp.com/terraform/language/functions/concat) to add the individual block information to the variable you're using in the `for_each` expression.
+Dynamic blocks and individual blocks for `region_configs` or `replication_specs` are not supported at the same time. To continue using this plugin, remove `region_configs` or `replication_specs` blocks and use a local `list` variable with [concat](https://developer.hashicorp.com/terraform/language/functions/concat) to add the individual block information to the variable you're using in the `for_each` expression.
 
-Let's see an example with `region_configs`; it's the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `region_configs` elements in a `list` variable and we want to add an additional `region_configs` with a read-only node.
+#### Example
+
+Let's see an example with `region_configs`, the same idea applies for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `region_configs` elements in a `list` variable and we want to add an additional `region_configs` with a read-only node.
 ```hcl
 variable "replication_specs" {
   type = object({
