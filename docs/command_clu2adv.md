@@ -13,7 +13,7 @@ If you want to convert a Terraform configuration from `mongodbatlas_cluster` to 
 atlas terraform clusterToAdvancedCluster --file in.tf --output out.tf
 ```
 
-you can also use shorter aliases, e.g.: 
+You can also use shorter aliases, for example:
 ```bash
 atlas tf clu2adv -f in.tf -o out.tf
 ```
@@ -38,7 +38,7 @@ We recommend reviewing the output and making sure it fits your needs.
 ### Dynamic blocks in tags and labels
 
 You can use `dynamic` blocks for `tags` and `labels`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `map` of strings.
-You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, e.g.:
+You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, for exaple:
 ```hcl
 tags {
 	key   = "environment"
@@ -55,7 +55,7 @@ dynamic "tags" {
 
 ### Dynamic blocks in regions_config
 
-You can use `dynamic` blocks for `regions_config`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
+You can use `dynamic` blocks for `regions_config`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `list` of objects.
 
 This is an example of how to use dynamic blocks in `regions_config`:
 ```hcl
@@ -106,7 +106,7 @@ If you need to use the plugin for `dynamic` block use cases not yet supported, p
 
 Dynamic blocks and individual blocks for `regions_config` or `replication_specs` are not supported at the same time. Remove the individual `regions_config` or `replication_specs` blocks and use a local `list` variable with [concat](https://developer.hashicorp.com/terraform/language/functions/concat) to add the individual block information to the variable you're using in the `for_each` expression.
 
-Let's see an example with `regions_config`, it is the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `regions_config` elements in a `list` variable and we want to add an additional `regions_config` with a read-only node.
+Let's see an example with `regions_config`, it's the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `regions_config` elements in a `list` variable and we want to add an additional `regions_config` with a read-only node.
 ```hcl
 variable "replication_specs" {
   type = object({
@@ -193,4 +193,4 @@ resource "mongodbatlas_cluster" "this" {
   }
 }
 ```
-This modified configuration file has the same behavior as the original one, but it doesn't have individual blocks anymore, only the `dynamic` block, so it is supported by the plugin.
+This modified configuration file has the same behavior as the original one, but it doesn't have individual blocks anymore, only the `dynamic` block, so it's supported by the plugin.

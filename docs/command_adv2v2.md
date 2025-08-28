@@ -37,8 +37,8 @@ We recommend reviewing the output and making sure it fits your needs.
 
 ### Dynamic blocks in tags and labels
 
-You can use `dynamic` blocks for `tags` and `labels`. The plugin assumes that `for_each` has an expression which is evaluated to a `map` of strings.
-You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, e.g.:
+You can use `dynamic` blocks for `tags` and `labels`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `map` of strings.
+You can also combine the use of dynamic blocks in `tags` and `labels` with individual blocks in the same cluster definition, for example:
 ```hcl
 tags {
 	key   = "environment"
@@ -80,7 +80,7 @@ replication_specs {
 
 ### Dynamic blocks in replication_specs
 
-You can use `dynamic` blocks for `replication_specs`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
+You can use `dynamic` blocks for `replication_specs`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `list` of objects.
 
 This is an example of how to use dynamic blocks in `replication_specs`:
 ```hcl
@@ -112,7 +112,7 @@ If you need to use the plugin for `dynamic` block use cases not yet supported, p
 
 Dynamic blocks and individual blocks for `region_configs` or `replication_specs` are not supported at the same time. Remove the individual `region_configs` or `replication_specs` blocks and use a local `list` variable with [concat](https://developer.hashicorp.com/terraform/language/functions/concat) to add the individual block information to the variable you're using in the `for_each` expression.
 
-Let's see an example with `region_configs`; it is the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `region_configs` elements in a `list` variable and we want to add an additional `region_configs` with a read-only node.
+Let's see an example with `region_configs`; it's the same idea for `replication_specs`. In the original configuration file, the `mongodb_cluster` resource is used inside a module that receives the `region_configs` elements in a `list` variable and we want to add an additional `region_configs` with a read-only node.
 ```hcl
 variable "replication_specs" {
   type = object({
