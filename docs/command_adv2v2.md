@@ -33,7 +33,7 @@ You can find [here](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/t
 ## Dynamic Blocks
 
 `dynamic` blocks are used to generate multiple nested blocks based on a set of values. 
-Given the different ways of using dynamic blocks, we recommend reviewing the output and making sure it fits your needs.
+We recommend reviewing the output and making sure it fits your needs.
 
 ### Dynamic blocks in tags and labels
 
