@@ -55,7 +55,7 @@ dynamic "tags" {
 
 ### Dynamic blocks in region_configs
 
-You can use `dynamic` blocks for `region_configs`. The plugin assumes that `for_each` has an expression which is evaluated to a `list` of objects.
+You can use `dynamic` blocks for `region_configs`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `list` of objects.
 
 This is an example of how to use dynamic blocks in `region_configs`:
 ```hcl
