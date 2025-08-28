@@ -1,6 +1,6 @@
 # Convert mongodbatlas_cluster to mongodbatlas_advanced_cluster
 
-clusterToAdvancedCluster (clu2adv) command helps you migrate from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` Provider 2.0.0 schema.
+The clusterToAdvancedCluster (clu2adv) command helps you migrate from `mongodbatlas_cluster` to `mongodbatlas_advanced_cluster` Provider 2.0.0 schema.
 
 This revised file migrates the Terraform configurations and state to the latest version and doesn't modify the resources deployed in MongoDB Atlas.
 
