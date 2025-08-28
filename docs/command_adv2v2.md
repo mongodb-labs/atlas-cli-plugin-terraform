@@ -1,6 +1,6 @@
 # Convert mongodbatlas_advanced_cluster to Provider 2.0.0 schema
 
- advancedClusterToV2 (adv2v2) command helps you migrate previous `mongodbatlas_advanced_cluster` configurations to the new Provider 2.0.0 schema.
+The advancedClusterToV2 (adv2v2) command helps you migrate previous `mongodbatlas_advanced_cluster` configurations to the new Provider 2.0.0 schema.
 
 This revised file migrates the Terraform configurations and state to the latest version and does not modify the resources deployed in MongoDB Atlas.
 
