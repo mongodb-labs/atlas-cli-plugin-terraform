@@ -22,7 +22,7 @@ atlas tf clu2adv -f in.tf -o out.tf
 
 - `--file` or `-f`: Input file path containing the `mongodbatlas_cluster` configuration
 - `--output` or `-o`: Output file path for the converted `mongodbatlas_advanced_cluster` configuration
-- `--replaceOutput` or `-r`: Overwrite the output file if it exists, or even use the same output file as the input file
+- `--replaceOutput` or `-r`: Overwrite the file at the output path if it already exists. You can also modify the input file in-place.
 - `--watch` or `-w`: Keep the plugin running and watching for changes in the input file
 - `--includeMoved` or `-m`: Include the `moved blocks` in the output file
 
