@@ -23,7 +23,7 @@ atlas tf adv2v2 -f in.tf -o out.tf
 
 - `--file` or `-f`: Input file path containing the `mongodbatlas_advanced_cluster` configuration
 - `--output` or `-o`: Output file path for the converted Provider 2.0.0 configuration
-- `--replaceOutput` or `-r`: Overwrite the output file if it exists, or even use the same output file as the input file
+- `--replaceOutput` or `-r`: Overwrite the file at the output path if it already exists. You can pass the input file path to this flag to modify the format in-place.
 - `--watch` or `-w`: Keep the plugin running and watching for changes in the input file
 
 ## Examples
