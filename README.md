@@ -23,6 +23,11 @@ If you want to see the list of installed plugins or check if this plugin is inst
 atlas plugin list
 ```
 
+If you want to uninstall the plugin, run:
+```bash
+atlas plugin uninstall atlas-cli-plugin-terraform
+```
+
 ## Available Commands
 
 The plugin provides the following commands to help with your Terraform configurations:
@@ -61,4 +66,4 @@ See our [CONTRIBUTING.md](CONTRIBUTING.md) guide.
 
 ## License
 
-MongoDB Atlas CLI is released under the Apache 2.0 license. See [LICENSE.md](LICENSE.md)
+MongoDB Atlas CLI is released under the Apache 2.0 license. See [LICENSE.txt](LICENSE.txt)
