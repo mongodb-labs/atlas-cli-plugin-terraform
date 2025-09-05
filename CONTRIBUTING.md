@@ -8,7 +8,19 @@ You can build the binary plugin by running `make build`. You'll need to have Go 
 
 ## Using the plugin from the CLI
 
-You can also use the plugin with your changes from the CLI by running: `make local` and following the instructions displayed.
+You can also use the plugin with your changes from the CLI by running: `make local` and following the instructions displayed. 
+
+**Important:** Before using the local version, uninstall any previously installed version of the plugin to avoid "multiple plugins" errors:
+```bash
+atlas plugin uninstall atlas-cli-plugin-terraform
+```
+
+The `make local` command will:
+1. Clean and build the plugin binary
+2. Generate a local manifest file
+3. Set up the plugin in a local directory
+4. Display instructions to export the `ATLAS_CLI_EXTRA_PLUGIN_DIRECTORY` environment variable
+5. Show you how to verify the plugin is available with `atlas plugin list`
 
 ## Third Party Dependencies and Vulnerability Scanning
 

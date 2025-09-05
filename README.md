@@ -23,6 +23,11 @@ If you want to see the list of installed plugins or check if this plugin is inst
 atlas plugin list
 ```
 
+If you want to uninstall the plugin, run:
+```bash
+atlas plugin uninstall atlas-cli-plugin-terraform
+```
+
 ## Available Commands
 
 The plugin provides the following commands to help with your Terraform configurations:
