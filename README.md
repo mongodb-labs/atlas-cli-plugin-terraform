@@ -66,4 +66,4 @@ See our [CONTRIBUTING.md](CONTRIBUTING.md) guide.
 
 ## License
 
-MongoDB Atlas CLI is released under the Apache 2.0 license. See [LICENSE.md](LICENSE.md)
+MongoDB Atlas CLI is released under the Apache 2.0 license. See [LICENSE.txt](LICENSE.txt)
