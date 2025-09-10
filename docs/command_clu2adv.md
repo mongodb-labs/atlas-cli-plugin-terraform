@@ -56,6 +56,7 @@ dynamic "tags" {
 ### Dynamic blocks in regions_config
 
 You can use `dynamic` blocks for `regions_config`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `list` of objects.
+**Note:** `map` and `set` are not supported.
 
 This is an example of how to use dynamic blocks in `regions_config`:
 ```hcl
@@ -77,6 +78,7 @@ replication_specs {
 ### Dynamic blocks in replication_specs
 
 You can use `dynamic` blocks for `replication_specs`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `list` of objects.
+**Note:** `map` and `set` are not supported.
 
 This is an example of how to use dynamic blocks in `replication_specs`:
 ```hcl
