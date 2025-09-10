@@ -26,6 +26,15 @@ atlas tf clu2adv -f in.tf -o out.tf
 - `--watch` or `-w`: Keep the plugin running and watching for changes in the input file
 - `--includeMoved` or `-m`: Include the `moved blocks` in the output file
 
+## Comments and formatting
+
+During the conversion process, some formatting elements may not be preserved:
+- Some comments from the original resources may not be preserved in the output
+- Custom blank lines and spacing may be modified
+- The output file will have standardized formatting
+
+We recommend reviewing the converted output and re-adding any important comments or documentation that you need to maintain.
+
 ## Examples
 
 You can find [here](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/tree/main/internal/convert/testdata/clu2adv) some examples of input files (suffix .in.tf) and the corresponding output files (suffix .out.tf).
