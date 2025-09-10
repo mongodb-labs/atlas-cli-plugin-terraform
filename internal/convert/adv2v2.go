@@ -129,8 +129,94 @@ func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwri
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-	forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
-	dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, dConfig.tokens...))
+
+	// Check if we have a dynamic region_configs block that was successfully processed
+	if dConfig.tokens != nil {
+		forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
+		dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, dConfig.tokens...))
+		return dSpec, nil
+	}
+
+	// Handle static region_configs blocks inside dynamic replication_specs
+	specBody := dSpec.content.Body()
+
+	// Collect static region_configs blocks
+	staticConfigs := collectBlocks(specBody, nConfig)
+	if len(staticConfigs) == 0 {
+		// No static blocks found, this might be an error case
+		// Check if there's also no dynamic block (which would have been handled above)
+		hasDynamicBlock := false
+		for _, block := range specBody.Blocks() {
+			if block.Type() == nDynamic && getResourceName(block) == nConfig {
+				hasDynamicBlock = true
+				break
+			}
+		}
+		if !hasDynamicBlock {
+			return dynamicBlock{}, fmt.Errorf("replication_specs must have at least one region_configs")
+		}
+		// There's a dynamic block but convertConfigsWithDynamicBlock returned empty
+		// This shouldn't happen, but return the error from that function
+		return dynamicBlock{}, nil
+	}
+
+	repSpecb := hclwrite.NewEmptyFile().Body()
+
+	// Handle zone_name attribute
+	if zoneNameAttr := specBody.GetAttribute(nZoneName); zoneNameAttr != nil {
+		zoneNameExpr := transformReference(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
+		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
+	}
+
+	// Process static region_configs blocks
+	var configs []*hclwrite.Body
+	for _, configBlock := range staticConfigs {
+		configBlockb := configBlock.Body()
+		// Create a new body with sorted attributes
+		newConfigBody := hclwrite.NewEmptyFile().Body()
+
+		// Copy attributes in the expected order
+		attrs := configBlockb.Attributes()
+		// Priority, provider_name, region_name should come first
+		if priority := attrs["priority"]; priority != nil {
+			newConfigBody.SetAttributeRaw("priority", priority.Expr().BuildTokens(nil))
+		}
+		if provider := attrs["provider_name"]; provider != nil {
+			newConfigBody.SetAttributeRaw("provider_name", provider.Expr().BuildTokens(nil))
+		}
+		if region := attrs["region_name"]; region != nil {
+			newConfigBody.SetAttributeRaw("region_name", region.Expr().BuildTokens(nil))
+		}
+
+		// Process spec blocks and convert them to attributes
+		for _, block := range configBlockb.Blocks() {
+			blockType := block.Type()
+			blockBody := hclwrite.NewEmptyFile().Body()
+			copyAttributesSorted(blockBody, block.Body().Attributes())
+			if diskSizeGB != nil &&
+				(blockType == nElectableSpecs || blockType == nReadOnlySpecs || blockType == nAnalyticsSpecs) {
+				blockBody.SetAttributeRaw(nDiskSizeGB, diskSizeGB)
+			}
+			newConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
+		}
+
+		configs = append(configs, newConfigBody)
+	}
+
+	repSpecb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
+
+	// Handle num_shards attribute
+	if numShardsAttr := specBody.GetAttribute(nNumShards); numShardsAttr != nil {
+		numShardsExpr := transformReference(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)
+		forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
+		innerFor := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false))
+		innerFor = append(innerFor, hcl.TokensObject(repSpecb)...)
+		dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, hcl.EncloseBracketsNewLines(innerFor)...))
+	} else {
+		forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
+		dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, hcl.TokensArraySingle(repSpecb)...))
+	}
+
 	return dSpec, nil
 }
 
