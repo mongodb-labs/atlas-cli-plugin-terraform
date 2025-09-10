@@ -230,10 +230,70 @@ func fillRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, root attrVals) (dyna
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-	forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
-	forSpec = append(forSpec, dConfig.tokens...)
-	tokens := hcl.TokensFuncFlatten(forSpec)
-	dSpec.tokens = tokens
+
+	// Check if we have a dynamic region_configs block that was successfully processed
+	if dConfig.tokens != nil {
+		forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
+		forSpec = append(forSpec, dConfig.tokens...)
+		tokens := hcl.TokensFuncFlatten(forSpec)
+		dSpec.tokens = tokens
+		return dSpec, nil
+	}
+
+	// Handle static region_configs blocks inside dynamic replication_specs
+	specBody := dSpec.content.Body()
+
+	// Collect static region_configs blocks
+	staticConfigs := collectBlocks(specBody, nConfigSrc)
+	if len(staticConfigs) == 0 {
+		// No static blocks found, check if there's also no dynamic block
+		hasDynamicBlock := false
+		for _, block := range specBody.Blocks() {
+			if block.Type() == nDynamic && getResourceName(block) == nConfigSrc {
+				hasDynamicBlock = true
+				break
+			}
+		}
+		if !hasDynamicBlock {
+			return dynamicBlock{}, fmt.Errorf("replication_specs must have at least one regions_config")
+		}
+		// There's a dynamic block but fillConfigsWithDynamicRegion returned empty
+		return dynamicBlock{}, nil
+	}
+
+	repSpecb := hclwrite.NewEmptyFile().Body()
+
+	// Handle zone_name attribute
+	if zoneNameAttr := specBody.GetAttribute(nZoneName); zoneNameAttr != nil {
+		zoneNameExpr := transformReference(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
+		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
+	}
+
+	// Process static region_configs blocks
+	var configs []*hclwrite.Body
+	for _, configBlock := range staticConfigs {
+		config, err := getRegionConfig(configBlock, root, false)
+		if err != nil {
+			return dynamicBlock{}, err
+		}
+		configs = append(configs, config)
+	}
+
+	configs = sortConfigsByPriority(configs)
+	repSpecb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
+
+	// Handle num_shards attribute
+	if numShardsAttr := specBody.GetAttribute(nNumShards); numShardsAttr != nil {
+		numShardsExpr := transformReference(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)
+		forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
+		innerFor := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false))
+		innerFor = append(innerFor, hcl.TokensObject(repSpecb)...)
+		dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, hcl.EncloseBracketsNewLines(innerFor)...))
+	} else {
+		forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
+		dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, hcl.TokensArraySingle(repSpecb)...))
+	}
+
 	return dSpec, nil
 }
 
