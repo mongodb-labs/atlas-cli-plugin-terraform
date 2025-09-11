@@ -12,10 +12,11 @@ import (
 )
 
 func RunTF(args ...string) (string, error) {
+	// Ensure Atlas CLI storage warning is silenced before running tests as it is not enabled in GitHub Actions
+	exec.Command("atlas", "config", "set", "silence_storage_warning", "true").Run()
+
 	args = append([]string{"tf"}, args...)
 	cmd := exec.CommandContext(context.Background(), "atlas", args...)
-	// Silence the storage warning that appears in CI environments
-	cmd.Env = append(os.Environ(), "ATLAS_SILENCE_STORAGE_WARNING=true")
 	resp, err := cmd.CombinedOutput()
 	return string(resp), err
 }
