@@ -80,4 +80,5 @@ const (
 	nSpec                       = "spec"
 	nFailIndexKeyTooLong        = "fail_index_key_too_long"
 	nDefaultReadConcern         = "default_read_concern"
+	nTenant                     = "TENANT"
 )

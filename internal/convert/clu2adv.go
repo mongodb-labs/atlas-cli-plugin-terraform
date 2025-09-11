@@ -69,8 +69,8 @@ func convertResource(block *hclwrite.Block) (bool, error) {
 }
 
 func isFreeTierCluster(resourceb *hclwrite.Body) bool {
-	d, _ := getDynamicBlock(resourceb, nRepSpecs, true)
-	return resourceb.FirstMatchingBlock(nRepSpecs, nil) == nil && !d.IsPresent()
+	providerName, _ := hcl.GetAttrString(resourceb.GetAttribute(nProviderName))
+	return providerName == nTenant
 }
 
 func convertDataSource(block *hclwrite.Block) bool {
