@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 )
@@ -13,6 +15,18 @@ import (
 var (
 	errDynamicBlockAlone = errors.New("dynamic block must be the only block, see docs for more information")
 )
+
+// addConversionComments adds appropriate comments to a converted block
+func addConversionComments(block *hclwrite.Block, isUpdatedComment bool) {
+	blockb := block.Body()
+	blockb.AppendNewline()
+	if isUpdatedComment {
+		hcl.AppendComment(blockb, commentUpdatedBy)
+	} else {
+		hcl.AppendComment(blockb, commentGeneratedBy)
+		hcl.AppendComment(blockb, commentConfirmReferences)
+	}
+}
 
 // hasVariableNumShards checks if any block has a variable (non-literal) num_shards attribute
 func hasVariableNumShards(blocks []*hclwrite.Block) bool {
@@ -163,6 +177,23 @@ func fillAdvConfigOpt(resourceb *hclwrite.Body) {
 	fillBlockOpt(resourceb, nAdvConfig)
 }
 
+// processCommonOptionalBlocks processes tags, labels, and other optional blocks
+// This function is used by both adv2v2 and clu2adv conversions
+func processCommonOptionalBlocks(resourceb *hclwrite.Body) error {
+	// Process tags and labels
+	for _, name := range []string{nTags, nLabels} {
+		if err := fillTagsLabelsOpt(resourceb, name); err != nil {
+			return err
+		}
+	}
+	// Process optional configuration blocks
+	fillAdvConfigOpt(resourceb)
+	for _, name := range []string{nBiConnector, nPinnedFCV, nTimeouts} {
+		fillBlockOpt(resourceb, name)
+	}
+	return nil
+}
+
 // buildForExpr builds a for expression with the given variable and collection
 func buildForExpr(varName, collection string, trailingSpace bool) string {
 	expr := fmt.Sprintf("for %s in %s :", varName, collection)
@@ -170,6 +201,26 @@ func buildForExpr(varName, collection string, trailingSpace bool) string {
 		expr += " "
 	}
 	return expr
+}
+
+// handleZoneName adds zone_name attribute to the body if present in source
+func handleZoneName(targetBody, sourceBody *hclwrite.Body, blockName, varName string) {
+	if zoneNameAttr := sourceBody.GetAttribute(nZoneName); zoneNameAttr != nil {
+		zoneNameExpr := transformReference(hcl.GetAttrExpr(zoneNameAttr), blockName, varName)
+		targetBody.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
+	}
+}
+
+// buildNumShardsTokens builds tokens for handling num_shards with for loops
+func buildNumShardsTokens(numShardsAttr *hclwrite.Attribute, repSpecb *hclwrite.Body,
+	blockName, varName string) hclwrite.Tokens {
+	if numShardsAttr == nil {
+		return hcl.TokensArraySingle(repSpecb)
+	}
+	numShardsExpr := transformReference(hcl.GetAttrExpr(numShardsAttr), blockName, varName)
+	tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false))
+	tokens = append(tokens, hcl.TokensObject(repSpecb)...)
+	return hcl.EncloseBracketsNewLines(tokens)
 }
 
 func fillTagsLabelsOpt(resourceb *hclwrite.Body, name string) error {
@@ -234,4 +285,23 @@ func extractTagsLabelsIndividual(resourceb *hclwrite.Body, name string) (hclwrit
 		resourceb.RemoveBlock(block)
 	}
 	return hcl.TokensObject(fileb), nil
+}
+
+func replaceDynamicBlockExpr(attr *hclwrite.Attribute, blockName, attrName string) string {
+	expr := hcl.GetAttrExpr(attr)
+	return strings.ReplaceAll(expr, fmt.Sprintf("%s.%s", blockName, attrName), attrName)
+}
+
+func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
+	keyStr, err := hcl.GetAttrString(key)
+	if err == nil {
+		if !hclsyntax.ValidIdentifier(keyStr) {
+			// wrap in quotes so invalid identifiers (e.g. with blanks) can be used as attribute names
+			keyStr = strconv.Quote(keyStr)
+		}
+	} else {
+		keyStr = strings.TrimSpace(string(key.Expr().BuildTokens(nil).Bytes()))
+		keyStr = "(" + keyStr + ")" // wrap in parentheses so non-literal expressions can be used as attribute names
+	}
+	body.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
 }
