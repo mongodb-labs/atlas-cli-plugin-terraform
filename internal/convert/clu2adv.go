@@ -219,8 +219,6 @@ func processRepSpecsClusterWithDynamicBlock(resourceb *hclwrite.Body, root attrV
 	if err != nil {
 		return dynamicBlock{}, err
 	}
-
-	// Check if we have a dynamic region_configs block that was successfully processed
 	if dConfig.tokens != nil {
 		forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
 		forSpec = append(forSpec, dConfig.tokens...)
@@ -231,31 +229,9 @@ func processRepSpecsClusterWithDynamicBlock(resourceb *hclwrite.Body, root attrV
 
 	// Handle static region_configs blocks inside dynamic replication_specs
 	specBody := dSpec.content.Body()
-
-	// Collect static region_configs blocks
 	staticConfigs := collectBlocks(specBody, nConfigSrc)
-	if len(staticConfigs) == 0 {
-		// No static blocks found, check if there's also no dynamic block
-		hasDynamicBlock := false
-		for _, block := range specBody.Blocks() {
-			if block.Type() == nDynamic && getResourceName(block) == nConfigSrc {
-				hasDynamicBlock = true
-				break
-			}
-		}
-		if !hasDynamicBlock {
-			return dynamicBlock{}, fmt.Errorf("replication_specs must have at least one regions_config")
-		}
-		// There's a dynamic block but fillConfigsWithDynamicRegion returned empty
-		return dynamicBlock{}, nil
-	}
-
 	repSpecb := hclwrite.NewEmptyFile().Body()
-
-	// Handle zone_name attribute
 	handleZoneName(repSpecb, specBody, nRepSpecs, nSpec)
-
-	// Process static region_configs blocks
 	var configs []*hclwrite.Body
 	for _, configBlock := range staticConfigs {
 		config, err := getRegionConfig(configBlock, root, false)
@@ -264,16 +240,12 @@ func processRepSpecsClusterWithDynamicBlock(resourceb *hclwrite.Body, root attrV
 		}
 		configs = append(configs, config)
 	}
-
 	configs = sortConfigsByPriority(configs)
 	repSpecb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
-
-	// Handle num_shards attribute
 	numShardsAttr := specBody.GetAttribute(nNumShards)
 	forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
 	numShardsTokens := buildNumShardsTokens(numShardsAttr, repSpecb, nRepSpecs, nSpec)
 	dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, numShardsTokens...))
-
 	return dSpec, nil
 }
 

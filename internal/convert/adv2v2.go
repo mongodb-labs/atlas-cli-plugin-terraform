@@ -128,48 +128,20 @@ func processRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwri
 
 	// Handle static region_configs blocks inside dynamic replication_specs
 	specBody := dSpec.content.Body()
-
-	// Collect static region_configs blocks
 	staticConfigs := collectBlocks(specBody, nConfig)
-	if len(staticConfigs) == 0 {
-		// No static blocks found, this might be an error case
-		// Check if there's also no dynamic block (which would have been handled above)
-		hasDynamicBlock := false
-		for _, block := range specBody.Blocks() {
-			if block.Type() == nDynamic && getResourceName(block) == nConfig {
-				hasDynamicBlock = true
-				break
-			}
-		}
-		if !hasDynamicBlock {
-			return dynamicBlock{}, fmt.Errorf("replication_specs must have at least one region_configs")
-		}
-		// There's a dynamic block but convertConfigsWithDynamicBlock returned empty
-		// This shouldn't happen, but return the error from that function
-		return dynamicBlock{}, nil
-	}
-
 	repSpecb := hclwrite.NewEmptyFile().Body()
-
-	// Handle zone_name attribute
 	handleZoneName(repSpecb, specBody, nRepSpecs, nSpec)
-
-	// Process static region_configs blocks
 	var configs []*hclwrite.Body
 	for _, configBlock := range staticConfigs {
 		configBlockb := configBlock.Body()
 		newConfigBody := processConfigForDynamicBlock(configBlockb, diskSizeGB)
 		configs = append(configs, newConfigBody)
 	}
-
 	repSpecb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
-
-	// Handle num_shards attribute
 	numShardsAttr := specBody.GetAttribute(nNumShards)
 	forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
 	numShardsTokens := buildNumShardsTokens(numShardsAttr, repSpecb, nRepSpecs, nSpec)
 	dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, numShardsTokens...))
-
 	return dSpec, nil
 }
 
