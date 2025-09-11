@@ -8,6 +8,11 @@ import (
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 )
 
+var (
+	specsWithDisk    = []string{nElectableSpecs, nReadOnlySpecs, nAnalyticsSpecs}
+	specsWithoutDisk = []string{nAutoScaling, nAnalyticsAutoScaling}
+)
+
 // AdvancedClusterToV2 transforms all mongodbatlas_advanced_cluster resource definitions in a
 // Terraform configuration file from SDKv2 schema to TPF (Terraform Plugin Framework) schema.
 // All other resources and data sources are left untouched.
@@ -198,11 +203,9 @@ func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hcl
 }
 
 func processAllSpecs(body *hclwrite.Body, diskSizeGB hclwrite.Tokens) {
-	specsWithDisk := []string{nElectableSpecs, nReadOnlySpecs, nAnalyticsSpecs}
 	for _, spec := range specsWithDisk {
 		fillSpecOpt(body, spec, diskSizeGB)
 	}
-	specsWithoutDisk := []string{nAutoScaling, nAnalyticsAutoScaling}
 	for _, spec := range specsWithoutDisk {
 		fillSpecOpt(body, spec, nil)
 	}
@@ -210,19 +213,12 @@ func processAllSpecs(body *hclwrite.Body, diskSizeGB hclwrite.Tokens) {
 
 func processConfigForDynamicBlock(configBlockb *hclwrite.Body, diskSizeGB hclwrite.Tokens) *hclwrite.Body {
 	newConfigBody := hclwrite.NewEmptyFile().Body()
-	attrs := configBlockb.Attributes()
-	orderedAttrs := []string{nPriority, nProviderName, nRegionName}
-	for _, attrName := range orderedAttrs {
-		if attr := attrs[attrName]; attr != nil {
-			newConfigBody.SetAttributeRaw(attrName, attr.Expr().BuildTokens(nil))
-		}
-	}
+	copyAttributesSorted(newConfigBody, configBlockb.Attributes())
 	for _, block := range configBlockb.Blocks() {
 		blockType := block.Type()
 		blockBody := hclwrite.NewEmptyFile().Body()
 		copyAttributesSorted(blockBody, block.Body().Attributes())
-		if diskSizeGB != nil &&
-			(blockType == nElectableSpecs || blockType == nReadOnlySpecs || blockType == nAnalyticsSpecs) {
+		if diskSizeGB != nil && slices.Contains(specsWithDisk, blockType) {
 			blockBody.SetAttributeRaw(nDiskSizeGB, diskSizeGB)
 		}
 		newConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))

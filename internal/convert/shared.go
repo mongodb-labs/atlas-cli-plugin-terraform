@@ -177,16 +177,13 @@ func fillAdvConfigOpt(resourceb *hclwrite.Body) {
 	fillBlockOpt(resourceb, nAdvConfig)
 }
 
-// processCommonOptionalBlocks processes tags, labels, and other optional blocks
-// This function is used by both adv2v2 and clu2adv conversions
+// processCommonOptionalBlocks processes tags, labels, and other optional blocks.
 func processCommonOptionalBlocks(resourceb *hclwrite.Body) error {
-	// Process tags and labels
 	for _, name := range []string{nTags, nLabels} {
 		if err := fillTagsLabelsOpt(resourceb, name); err != nil {
 			return err
 		}
 	}
-	// Process optional configuration blocks
 	fillAdvConfigOpt(resourceb)
 	for _, name := range []string{nBiConnector, nPinnedFCV, nTimeouts} {
 		fillBlockOpt(resourceb, name)
@@ -194,7 +191,7 @@ func processCommonOptionalBlocks(resourceb *hclwrite.Body) error {
 	return nil
 }
 
-// buildForExpr builds a for expression with the given variable and collection
+// buildForExpr builds a for expression with the given variable and collection.
 func buildForExpr(varName, collection string, trailingSpace bool) string {
 	expr := fmt.Sprintf("for %s in %s :", varName, collection)
 	if trailingSpace {

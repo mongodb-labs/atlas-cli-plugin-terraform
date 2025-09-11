@@ -314,36 +314,27 @@ func getRegionConfig(configSrc *hclwrite.Block, root attrVals, isDynamicBlock bo
 	if err := hcl.MoveAttr(configSrc.Body(), fileb, nPriority, nPriority, errRepSpecs); err != nil {
 		return nil, err
 	}
-	// Process all spec types
-	specMappings := []struct {
-		nodeName string
-		specName string
-	}{
-		{nElectableNodes, nElectableSpecs},
-		{nReadOnlyNodes, nReadOnlySpecs},
-		{nAnalyticsNodes, nAnalyticsSpecs},
-	}
-	for _, mapping := range specMappings {
-		if spec, _ := getSpec(configSrc, mapping.nodeName, root, isDynamicBlock); spec != nil {
-			fileb.SetAttributeRaw(mapping.specName, spec)
-		}
-	}
+	processSpec(fileb, configSrc, nElectableSpecs, nElectableNodes, root, isDynamicBlock)
+	processSpec(fileb, configSrc, nReadOnlySpecs, nReadOnlyNodes, root, isDynamicBlock)
+	processSpec(fileb, configSrc, nAnalyticsSpecs, nAnalyticsNodes, root, isDynamicBlock)
+
 	if autoScaling := getAutoScalingOpt(root.opt); autoScaling != nil {
 		fileb.SetAttributeRaw(nAutoScaling, autoScaling)
 	}
 	return fileb, nil
 }
 
-func getSpec(configSrc *hclwrite.Block, countName string, root attrVals, isDynamicBlock bool) (hclwrite.Tokens, error) {
+func processSpec(configb *hclwrite.Body, configSrc *hclwrite.Block,
+	specName, countName string, root attrVals, isDynamicBlock bool) {
 	var (
 		fileb = hclwrite.NewEmptyFile().Body()
 		count = configSrc.Body().GetAttribute(countName)
 	)
 	if count == nil {
-		return nil, fmt.Errorf("%s: attribute %s not found", errRepSpecs, countName)
+		return
 	}
 	if countVal, errVal := hcl.GetAttrInt(count, errRepSpecs); countVal == 0 && errVal == nil {
-		return nil, fmt.Errorf("%s: attribute %s is 0", errRepSpecs, countName)
+		return
 	}
 	fileb.SetAttributeRaw(nNodeCount, count.Expr().BuildTokens(nil))
 	fileb.SetAttributeRaw(nInstanceSize, root.req[nInstanceSizeSrc])
@@ -360,7 +351,7 @@ func getSpec(configSrc *hclwrite.Block, countName string, root attrVals, isDynam
 	if isDynamicBlock {
 		tokens = append(hcl.TokensFromExpr(fmt.Sprintf("%s == 0 ? null :", hcl.GetAttrExpr(count))), tokens...)
 	}
-	return tokens, nil
+	configb.SetAttributeRaw(specName, tokens)
 }
 
 func getAutoScalingOpt(opt map[string]hclwrite.Tokens) hclwrite.Tokens {
