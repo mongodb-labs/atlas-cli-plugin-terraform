@@ -296,12 +296,12 @@ func setKeyValue(body *hclwrite.Body, key, value *hclwrite.Attribute) {
 	keyStr, err := hcl.GetAttrString(key)
 	if err == nil {
 		if !hclsyntax.ValidIdentifier(keyStr) {
-			// wrap in quotes so invalid identifiers (e.g. with blanks) can be used as attribute names
+			// Wrap in quotes so invalid identifiers (e.g. with blanks) can be used as attribute names
 			keyStr = strconv.Quote(keyStr)
 		}
 	} else {
 		keyStr = strings.TrimSpace(string(key.Expr().BuildTokens(nil).Bytes()))
-		keyStr = "(" + keyStr + ")" // wrap in parentheses so non-literal expressions can be used as attribute names
+		keyStr = "(" + keyStr + ")" // Wrap in parentheses so non-literal expressions can be used as attribute names
 	}
 	body.SetAttributeRaw(keyStr, value.Expr().BuildTokens(nil))
 }

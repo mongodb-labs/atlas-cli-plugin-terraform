@@ -198,12 +198,10 @@ func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hcl
 }
 
 func processAllSpecs(body *hclwrite.Body, diskSizeGB hclwrite.Tokens) {
-	// Process specs that need diskSizeGB
 	specsWithDisk := []string{nElectableSpecs, nReadOnlySpecs, nAnalyticsSpecs}
 	for _, spec := range specsWithDisk {
 		fillSpecOpt(body, spec, diskSizeGB)
 	}
-	// Process specs without diskSizeGB
 	specsWithoutDisk := []string{nAutoScaling, nAnalyticsAutoScaling}
 	for _, spec := range specsWithoutDisk {
 		fillSpecOpt(body, spec, nil)
@@ -211,10 +209,7 @@ func processAllSpecs(body *hclwrite.Body, diskSizeGB hclwrite.Tokens) {
 }
 
 func processConfigForDynamicBlock(configBlockb *hclwrite.Body, diskSizeGB hclwrite.Tokens) *hclwrite.Body {
-	// Create a new body with sorted attributes
 	newConfigBody := hclwrite.NewEmptyFile().Body()
-
-	// Copy attributes in the expected order (priority, provider_name, region_name first)
 	attrs := configBlockb.Attributes()
 	orderedAttrs := []string{nPriority, nProviderName, nRegionName}
 	for _, attrName := range orderedAttrs {
@@ -222,8 +217,6 @@ func processConfigForDynamicBlock(configBlockb *hclwrite.Body, diskSizeGB hclwri
 			newConfigBody.SetAttributeRaw(attrName, attr.Expr().BuildTokens(nil))
 		}
 	}
-
-	// Process spec blocks and convert them to attributes
 	for _, block := range configBlockb.Blocks() {
 		blockType := block.Type()
 		blockBody := hclwrite.NewEmptyFile().Body()
@@ -234,7 +227,6 @@ func processConfigForDynamicBlock(configBlockb *hclwrite.Body, diskSizeGB hclwri
 		}
 		newConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
 	}
-
 	return newConfigBody
 }
 
