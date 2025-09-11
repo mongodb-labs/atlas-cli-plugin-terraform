@@ -8,6 +8,11 @@ import (
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/hcl"
 )
 
+var (
+	specsWithDisk    = []string{nElectableSpecs, nReadOnlySpecs, nAnalyticsSpecs}
+	specsWithoutDisk = []string{nAutoScaling, nAnalyticsAutoScaling}
+)
+
 // AdvancedClusterToV2 transforms all mongodbatlas_advanced_cluster resource definitions in a
 // Terraform configuration file from SDKv2 schema to TPF (Terraform Plugin Framework) schema.
 // All other resources and data sources are left untouched.
@@ -18,20 +23,18 @@ func AdvancedClusterToV2(config []byte) ([]byte, error) {
 	}
 	parserb := parser.Body()
 	for _, block := range parserb.Blocks() {
-		updated, err := updateResource(block)
+		updated, err := processResource(block)
 		if err != nil {
 			return nil, err
 		}
-		if updated { // If the resource was converted, add a comment at the end so user knows the resource was updated
-			blockb := block.Body()
-			blockb.AppendNewline()
-			hcl.AppendComment(blockb, commentUpdatedBy)
+		if updated {
+			addComments(block, true)
 		}
 	}
 	return parser.Bytes(), nil
 }
 
-func updateResource(resource *hclwrite.Block) (bool, error) {
+func processResource(resource *hclwrite.Block) (bool, error) {
 	if resource.Type() != resourceType || getResourceName(resource) != advCluster {
 		return false, nil
 	}
@@ -43,24 +46,17 @@ func updateResource(resource *hclwrite.Block) (bool, error) {
 		return false, nil
 	}
 	diskSizeGB, _ := hcl.PopAttr(resourceb, nDiskSizeGB, errRoot) // ok to fail as it's optional
-	if err := convertRepSpecs(resourceb, diskSizeGB); err != nil {
+	if err := processRepSpecs(resourceb, diskSizeGB); err != nil {
 		return false, err
 	}
-	if err := fillTagsLabelsOpt(resourceb, nTags); err != nil {
+	if err := processCommonOptionalBlocks(resourceb); err != nil {
 		return false, err
 	}
-	if err := fillTagsLabelsOpt(resourceb, nLabels); err != nil {
-		return false, err
-	}
-	fillAdvConfigOpt(resourceb)
-	fillBlockOpt(resourceb, nBiConnector)
-	fillBlockOpt(resourceb, nPinnedFCV)
-	fillBlockOpt(resourceb, nTimeouts)
 	return true, nil
 }
 
-func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error {
-	d, err := convertRepSpecsWithDynamicBlock(resourceb, diskSizeGB)
+func processRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error {
+	d, err := processRepSpecsWithDynamicBlock(resourceb, diskSizeGB)
 	if err != nil {
 		return err
 	}
@@ -80,7 +76,7 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 		blockb := block.Body()
 		shardsAttr := blockb.GetAttribute(nNumShards)
 		blockb.RemoveAttribute(nNumShards)
-		dConfig, err := convertConfigsWithDynamicBlock(blockb, diskSizeGB, false)
+		dConfig, err := processConfigsWithDynamicBlock(blockb, diskSizeGB, false)
 		if err != nil {
 			return err
 		}
@@ -119,22 +115,42 @@ func convertRepSpecs(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) error
 	return nil
 }
 
-func convertRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) (dynamicBlock, error) {
+func processRepSpecsWithDynamicBlock(resourceb *hclwrite.Body, diskSizeGB hclwrite.Tokens) (dynamicBlock, error) {
 	dSpec, err := getDynamicBlock(resourceb, nRepSpecs, true)
 	if err != nil || !dSpec.IsPresent() {
 		return dynamicBlock{}, err
 	}
 	transformReferences(dSpec.content.Body(), nRepSpecs, nSpec)
-	dConfig, err := convertConfigsWithDynamicBlock(dSpec.content.Body(), diskSizeGB, true)
+	dConfig, err := processConfigsWithDynamicBlock(dSpec.content.Body(), diskSizeGB, true)
 	if err != nil {
 		return dynamicBlock{}, err
 	}
+	if dConfig.tokens != nil {
+		forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
+		dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, dConfig.tokens...))
+		return dSpec, nil
+	}
+
+	// Handle static region_configs blocks inside dynamic replication_specs
+	specBody := dSpec.content.Body()
+	staticConfigs := collectBlocks(specBody, nConfig)
+	repSpecb := hclwrite.NewEmptyFile().Body()
+	handleZoneName(repSpecb, specBody, nRepSpecs, nSpec)
+	var configs []*hclwrite.Body
+	for _, configBlock := range staticConfigs {
+		configBlockb := configBlock.Body()
+		newConfigBody := processConfigForDynamicBlock(configBlockb, diskSizeGB)
+		configs = append(configs, newConfigBody)
+	}
+	repSpecb.SetAttributeRaw(nConfig, hcl.TokensArray(configs))
+	numShardsAttr := specBody.GetAttribute(nNumShards)
 	forSpec := hcl.TokensFromExpr(buildForExpr(nSpec, hcl.GetAttrExpr(dSpec.forEach), true))
-	dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, dConfig.tokens...))
+	numShardsTokens := buildNumShardsTokens(numShardsAttr, repSpecb, nRepSpecs, nSpec)
+	dSpec.tokens = hcl.TokensFuncFlatten(append(forSpec, numShardsTokens...))
 	return dSpec, nil
 }
 
-func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite.Tokens,
+func processConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite.Tokens,
 	insideDynamicRepSpec bool) (dynamicBlock, error) {
 	d, err := getDynamicBlock(specbSrc, nConfig, true)
 	if err != nil || !d.IsPresent() {
@@ -142,18 +158,7 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 	}
 	configBody := d.content.Body()
 	transformReferences(configBody, getResourceName(d.block), nRegion)
-	regionConfigBody := hclwrite.NewEmptyFile().Body()
-	copyAttributesSorted(regionConfigBody, configBody.Attributes())
-	for _, block := range configBody.Blocks() {
-		blockType := block.Type()
-		blockBody := hclwrite.NewEmptyFile().Body()
-		copyAttributesSorted(blockBody, block.Body().Attributes())
-		if diskSizeGB != nil &&
-			(blockType == nElectableSpecs || blockType == nReadOnlySpecs || blockType == nAnalyticsSpecs) {
-			blockBody.SetAttributeRaw(nDiskSizeGB, diskSizeGB)
-		}
-		regionConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
-	}
+	regionConfigBody := processConfigForDynamicBlock(configBody, diskSizeGB)
 	forEach := hcl.GetAttrExpr(d.forEach)
 	if insideDynamicRepSpec {
 		forEach = fmt.Sprintf("%s.%s", nSpec, nConfig)
@@ -165,18 +170,11 @@ func convertConfigsWithDynamicBlock(specbSrc *hclwrite.Body, diskSizeGB hclwrite
 		return d, nil
 	}
 	repSpecb := hclwrite.NewEmptyFile().Body()
-	if zoneNameAttr := specbSrc.GetAttribute(nZoneName); zoneNameAttr != nil {
-		zoneNameExpr := transformReference(hcl.GetAttrExpr(zoneNameAttr), nRepSpecs, nSpec)
-		repSpecb.SetAttributeRaw(nZoneName, hcl.TokensFromExpr(zoneNameExpr))
-	}
+	handleZoneName(repSpecb, specbSrc, nRepSpecs, nSpec)
 	repSpecb.SetAttributeRaw(nConfig, hcl.EncloseBracketsNewLines(regionTokens))
-	if numShardsAttr := specbSrc.GetAttribute(nNumShards); numShardsAttr != nil {
-		numShardsExpr := transformReference(hcl.GetAttrExpr(numShardsAttr), nRepSpecs, nSpec)
-		tokens := hcl.TokensFromExpr(buildForExpr("i", fmt.Sprintf("range(%s)", numShardsExpr), false))
-		tokens = append(tokens, hcl.TokensObject(repSpecb)...)
-		return dynamicBlock{tokens: hcl.EncloseBracketsNewLines(tokens)}, nil
-	}
-	return dynamicBlock{tokens: hcl.TokensArraySingle(repSpecb)}, nil
+	numShardsAttr := specbSrc.GetAttribute(nNumShards)
+	tokens := buildNumShardsTokens(numShardsAttr, repSpecb, nRepSpecs, nSpec)
+	return dynamicBlock{tokens: tokens}, nil
 }
 
 // hasExpectedBlocksAsAttributes checks if any of the expected block names
@@ -205,11 +203,27 @@ func copyAttributesSorted(targetBody *hclwrite.Body, sourceAttrs map[string]*hcl
 }
 
 func processAllSpecs(body *hclwrite.Body, diskSizeGB hclwrite.Tokens) {
-	fillSpecOpt(body, nElectableSpecs, diskSizeGB)
-	fillSpecOpt(body, nReadOnlySpecs, diskSizeGB)
-	fillSpecOpt(body, nAnalyticsSpecs, diskSizeGB)
-	fillSpecOpt(body, nAutoScaling, nil)
-	fillSpecOpt(body, nAnalyticsAutoScaling, nil)
+	for _, spec := range specsWithDisk {
+		fillSpecOpt(body, spec, diskSizeGB)
+	}
+	for _, spec := range specsWithoutDisk {
+		fillSpecOpt(body, spec, nil)
+	}
+}
+
+func processConfigForDynamicBlock(configBlockb *hclwrite.Body, diskSizeGB hclwrite.Tokens) *hclwrite.Body {
+	newConfigBody := hclwrite.NewEmptyFile().Body()
+	copyAttributesSorted(newConfigBody, configBlockb.Attributes())
+	for _, block := range configBlockb.Blocks() {
+		blockType := block.Type()
+		blockBody := hclwrite.NewEmptyFile().Body()
+		copyAttributesSorted(blockBody, block.Body().Attributes())
+		if diskSizeGB != nil && slices.Contains(specsWithDisk, blockType) {
+			blockBody.SetAttributeRaw(nDiskSizeGB, diskSizeGB)
+		}
+		newConfigBody.SetAttributeRaw(blockType, hcl.TokensObject(blockBody))
+	}
+	return newConfigBody
 }
 
 func fillSpecOpt(resourceb *hclwrite.Body, name string, diskSizeGBTokens hclwrite.Tokens) {

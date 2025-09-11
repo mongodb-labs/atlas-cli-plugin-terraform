@@ -26,6 +26,15 @@ atlas tf adv2v2 -f in.tf -o out.tf
 - `--replaceOutput` or `-r`: Overwrite the file at the output path if it already exists. You can also modify the input file in-place.
 - `--watch` or `-w`: Keep the plugin running and watching for changes in the input file
 
+## Comments and formatting
+
+During the conversion process, some formatting elements may not be preserved:
+- Some comments from the original resources may not be preserved in the output
+- Custom blank lines and spacing may be modified
+- The output file will have standardized formatting
+
+We recommend reviewing the converted output and re-adding any important comments or documentation that you need to maintain.
+
 ## Examples
 
 You can find [here](https://github.com/mongodb-labs/atlas-cli-plugin-terraform/tree/main/internal/convert/testdata/adv2v2) examples of input files (suffix .in.tf) and the corresponding output files (suffix .out.tf).
@@ -56,6 +65,7 @@ dynamic "tags" {
 ### Dynamic blocks in region_configs
 
 You can use `dynamic` blocks for `region_configs`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `list` of objects.
+**Note:** `map` and `set` are not supported.
 
 This is an example of how to use dynamic blocks in `region_configs`:
 ```hcl
@@ -81,6 +91,7 @@ replication_specs {
 ### Dynamic blocks in replication_specs
 
 You can use `dynamic` blocks for `replication_specs`. The plugin assumes that the value of `for_each` is an expression which evaluates to a `list` of objects.
+**Note:** `map` and `set` are not supported.
 
 This is an example of how to use dynamic blocks in `replication_specs`:
 ```hcl
