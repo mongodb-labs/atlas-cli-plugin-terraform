@@ -113,18 +113,14 @@ func processFreeTierCluster(resourceb *hclwrite.Body) error {
 	configb := hclwrite.NewEmptyFile().Body()
 	hcl.SetAttrInt(configb, nPriority, valMaxPriority)
 
-	// Move required attributes for free tier cluster
-	moveAttrs := []struct {
-		src, dst string
-	}{
-		{nRegionNameSrc, nRegionName},
-		{nProviderName, nProviderName},
-		{nBackingProviderName, nBackingProviderName},
+	if err := hcl.MoveAttr(resourceb, configb, nRegionNameSrc, nRegionName, errFreeCluster); err != nil {
+		return err
 	}
-	for _, attr := range moveAttrs {
-		if err := hcl.MoveAttr(resourceb, configb, attr.src, attr.dst, errFreeCluster); err != nil {
-			return err
-		}
+	if err := hcl.MoveAttr(resourceb, configb, nProviderName, nProviderName, errFreeCluster); err != nil {
+		return err
+	}
+	if err := hcl.MoveAttr(resourceb, configb, nBackingProviderName, nBackingProviderName, errFreeCluster); err != nil {
+		return err
 	}
 	electableSpecb := hclwrite.NewEmptyFile().Body()
 	if err := hcl.MoveAttr(resourceb, electableSpecb, nInstanceSizeSrc, nInstanceSize, errFreeCluster); err != nil {
@@ -432,43 +428,39 @@ func sortConfigsByPriority(configs []*hclwrite.Body) []*hclwrite.Body {
 
 // popRootAttrs deletes the attributes common to all replication_specs/regions_config and returns them.
 func popRootAttrs(body *hclwrite.Body) (attrVals, error) {
-	type attrConfig struct {
-		name     string
-		required bool
+	var (
+		reqNames = []string{
+			nProviderName,
+			nInstanceSizeSrc,
+		}
+		optNames = []string{
+			nElectableNodes,
+			nReadOnlyNodes,
+			nAnalyticsNodes,
+			nDiskSizeGB,
+			nDiskGBEnabledSrc,
+			nComputeEnabledSrc,
+			nComputeMinInstanceSizeSrc,
+			nComputeMaxInstanceSizeSrc,
+			nComputeScaleDownEnabledSrc,
+			nEBSVolumeTypeSrc,
+			nDiskIOPSSrc,
+		}
+		req = make(map[string]hclwrite.Tokens)
+		opt = make(map[string]hclwrite.Tokens)
+	)
+	for _, name := range reqNames {
+		tokens, err := hcl.PopAttr(body, name, errRepSpecs)
+		if err != nil {
+			return attrVals{}, err
+		}
+		req[name] = tokens
 	}
-
-	attrs := []attrConfig{
-		// Required attributes
-		{nProviderName, true},
-		{nInstanceSizeSrc, true},
-		// Optional attributes
-		{nElectableNodes, false},
-		{nReadOnlyNodes, false},
-		{nAnalyticsNodes, false},
-		{nDiskSizeGB, false},
-		{nDiskGBEnabledSrc, false},
-		{nComputeEnabledSrc, false},
-		{nComputeMinInstanceSizeSrc, false},
-		{nComputeMaxInstanceSizeSrc, false},
-		{nComputeScaleDownEnabledSrc, false},
-		{nEBSVolumeTypeSrc, false},
-		{nDiskIOPSSrc, false},
-	}
-
-	req := make(map[string]hclwrite.Tokens)
-	opt := make(map[string]hclwrite.Tokens)
-
-	for _, attr := range attrs {
-		tokens, err := hcl.PopAttr(body, attr.name, errRepSpecs)
-		if attr.required {
-			if err != nil {
-				return attrVals{}, err
-			}
-			req[attr.name] = tokens
-		} else if tokens != nil {
-			opt[attr.name] = tokens
+	for _, name := range optNames {
+		tokens, _ := hcl.PopAttr(body, name, errRepSpecs)
+		if tokens != nil {
+			opt[name] = tokens
 		}
 	}
-
 	return attrVals{req: req, opt: opt}, nil
 }
