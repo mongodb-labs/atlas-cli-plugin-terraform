@@ -107,6 +107,32 @@ func fillMovedBlocks(body *hclwrite.Body, moveLabels []string) {
 	}
 }
 
+// createDefaultReplicationSpec creates a default replication_specs for clusters without any
+// (e.g. upgraded from free tier).
+func createDefaultReplicationSpec(resourceb *hclwrite.Body, root attrVals) error {
+	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
+	configb := hclwrite.NewEmptyFile().Body()
+	hcl.SetAttrInt(configb, nPriority, valMaxPriority)
+	if err := hcl.MoveAttr(resourceb, configb, nRegionNameSrc, nRegionName, errRoot); err != nil {
+		return err
+	}
+	if providerNameTokens, found := root.req[nProviderName]; found {
+		configb.SetAttributeRaw(nProviderName, providerNameTokens)
+	}
+
+	electableSpecb := hclwrite.NewEmptyFile().Body()
+	if instanceSizeTokens, found := root.req[nInstanceSizeSrc]; found {
+		electableSpecb.SetAttributeRaw(nInstanceSize, instanceSizeTokens)
+	}
+	electableSpecb.SetAttributeValue(nNodeCount, cty.NumberIntVal(valDefaultNodeCount))
+	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpecb))
+
+	repSpecsb := hclwrite.NewEmptyFile().Body()
+	repSpecsb.SetAttributeRaw(nConfig, hcl.TokensArraySingle(configb))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecsb))
+	return nil
+}
+
 // fillFreeTierCluster is the entry point to convert clusters in free tier
 func processFreeTierCluster(resourceb *hclwrite.Body) error {
 	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
@@ -160,7 +186,7 @@ func processRepSpecsCluster(resourceb *hclwrite.Body, root attrVals) error {
 	}
 	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
 	if len(repSpecBlocks) == 0 {
-		return fmt.Errorf("must have at least one replication_specs")
+		return createDefaultReplicationSpec(resourceb, root)
 	}
 	dConfig, err := processConfigsWithDynamicRegion(repSpecBlocks[0].Body(), root, false)
 	if err != nil {

@@ -47,7 +47,9 @@ resource "mongodbatlas_advanced_cluster" "count" {
   # Please review the changes and confirm that references to this resource are updated.
 }
 
+
 resource "mongodbatlas_advanced_cluster" "upgrade_from_free_cluster" {
+  # upgraded free cluster to dedicated
   project_id   = var.project_id
   name         = var.cluster_name
   cluster_type = "REPLICASET"
@@ -60,6 +62,7 @@ resource "mongodbatlas_advanced_cluster" "upgrade_from_free_cluster" {
           provider_name = "AWS"
           electable_specs = {
             instance_size = "M10"
+            node_count    = 3
           }
         }
       ]
@@ -71,6 +74,7 @@ resource "mongodbatlas_advanced_cluster" "upgrade_from_free_cluster" {
 }
 
 resource "mongodbatlas_advanced_cluster" "upgrade_from_free_cluster_with_variables" {
+  # upgraded free cluster to dedicated, using variables in all attributes
   project_id   = var.project_id
   name         = var.cluster_name
   cluster_type = "REPLICASET"
@@ -83,6 +87,7 @@ resource "mongodbatlas_advanced_cluster" "upgrade_from_free_cluster_with_variabl
           provider_name = var.provider_name
           electable_specs = {
             instance_size = var.instance_size
+            node_count    = 3
           }
         }
       ]
