@@ -16,8 +16,8 @@ var (
 	errDynamicBlockAlone = errors.New("dynamic block must be the only block, see docs for more information")
 )
 
-// addConversionComments adds appropriate comments to a converted block
-func addConversionComments(block *hclwrite.Block, isUpdatedComment bool) {
+// addComments adds appropriate comments to a converted block
+func addComments(block *hclwrite.Block, isUpdatedComment bool) {
 	blockb := block.Body()
 	blockb.AppendNewline()
 	if isUpdatedComment {

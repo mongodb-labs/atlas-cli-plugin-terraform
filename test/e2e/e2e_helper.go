@@ -14,6 +14,8 @@ import (
 func RunTF(args ...string) (string, error) {
 	args = append([]string{"tf"}, args...)
 	cmd := exec.CommandContext(context.Background(), "atlas", args...)
+	// Silence the storage warning that appears in CI environments
+	cmd.Env = append(os.Environ(), "ATLAS_SILENCE_STORAGE_WARNING=true")
 	resp, err := cmd.CombinedOutput()
 	return string(resp), err
 }

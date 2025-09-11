@@ -23,7 +23,7 @@ func AdvancedClusterToV2(config []byte) ([]byte, error) {
 			return nil, err
 		}
 		if updated {
-			addConversionComments(block, true)
+			addComments(block, true)
 		}
 	}
 	return parser.Bytes(), nil

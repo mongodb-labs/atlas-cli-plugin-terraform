@@ -40,7 +40,7 @@ func ClusterToAdvancedCluster(config []byte, includeMoved bool) ([]byte, error) 
 		}
 		convertedDataSource := convertDataSource(block)
 		if convertedResource || convertedDataSource {
-			addConversionComments(block, false)
+			addComments(block, false)
 		}
 	}
 	fillMovedBlocks(parserb, moveLabels)
