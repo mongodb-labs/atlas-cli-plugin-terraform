@@ -69,8 +69,8 @@ func convertResource(block *hclwrite.Block) (bool, error) {
 }
 
 func isFreeTierCluster(resourceb *hclwrite.Body) bool {
-	d, _ := getDynamicBlock(resourceb, nRepSpecs, true)
-	return resourceb.FirstMatchingBlock(nRepSpecs, nil) == nil && !d.IsPresent()
+	providerName, _ := hcl.GetAttrString(resourceb.GetAttribute(nProviderName))
+	return providerName == nTenant
 }
 
 func convertDataSource(block *hclwrite.Block) bool {
@@ -105,6 +105,32 @@ func fillMovedBlocks(body *hclwrite.Body, moveLabels []string) {
 			body.AppendNewline()
 		}
 	}
+}
+
+// createDefaultRepSpec creates a default replication_specs for clusters without any
+// (e.g. upgraded from free tier).
+func createDefaultRepSpec(resourceb *hclwrite.Body, root attrVals) error {
+	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
+	configb := hclwrite.NewEmptyFile().Body()
+	hcl.SetAttrInt(configb, nPriority, valMaxPriority)
+	if err := hcl.MoveAttr(resourceb, configb, nRegionNameSrc, nRegionName, errRoot); err != nil {
+		return err
+	}
+	if providerNameTokens, found := root.req[nProviderName]; found {
+		configb.SetAttributeRaw(nProviderName, providerNameTokens)
+	}
+
+	electableSpecb := hclwrite.NewEmptyFile().Body()
+	if instanceSizeTokens, found := root.req[nInstanceSizeSrc]; found {
+		electableSpecb.SetAttributeRaw(nInstanceSize, instanceSizeTokens)
+	}
+	electableSpecb.SetAttributeValue(nNodeCount, cty.NumberIntVal(valDefaultNodeCount))
+	configb.SetAttributeRaw(nElectableSpecs, hcl.TokensObject(electableSpecb))
+
+	repSpecsb := hclwrite.NewEmptyFile().Body()
+	repSpecsb.SetAttributeRaw(nConfig, hcl.TokensArraySingle(configb))
+	resourceb.SetAttributeRaw(nRepSpecs, hcl.TokensArraySingle(repSpecsb))
+	return nil
 }
 
 // fillFreeTierCluster is the entry point to convert clusters in free tier
@@ -160,7 +186,7 @@ func processRepSpecsCluster(resourceb *hclwrite.Body, root attrVals) error {
 	}
 	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
 	if len(repSpecBlocks) == 0 {
-		return fmt.Errorf("must have at least one replication_specs")
+		return createDefaultRepSpec(resourceb, root)
 	}
 	dConfig, err := processConfigsWithDynamicRegion(repSpecBlocks[0].Body(), root, false)
 	if err != nil {
