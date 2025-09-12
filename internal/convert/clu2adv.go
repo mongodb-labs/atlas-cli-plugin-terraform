@@ -107,9 +107,9 @@ func fillMovedBlocks(body *hclwrite.Body, moveLabels []string) {
 	}
 }
 
-// createDefaultReplicationSpec creates a default replication_specs for clusters without any
+// createDefaultRepSpec creates a default replication_specs for clusters without any
 // (e.g. upgraded from free tier).
-func createDefaultReplicationSpec(resourceb *hclwrite.Body, root attrVals) error {
+func createDefaultRepSpec(resourceb *hclwrite.Body, root attrVals) error {
 	resourceb.SetAttributeValue(nClusterType, cty.StringVal(valClusterType))
 	configb := hclwrite.NewEmptyFile().Body()
 	hcl.SetAttrInt(configb, nPriority, valMaxPriority)
@@ -186,7 +186,7 @@ func processRepSpecsCluster(resourceb *hclwrite.Body, root attrVals) error {
 	}
 	repSpecBlocks := collectBlocks(resourceb, nRepSpecs)
 	if len(repSpecBlocks) == 0 {
-		return createDefaultReplicationSpec(resourceb, root)
+		return createDefaultRepSpec(resourceb, root)
 	}
 	dConfig, err := processConfigsWithDynamicRegion(repSpecBlocks[0].Body(), root, false)
 	if err != nil {
