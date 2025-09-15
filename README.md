@@ -42,7 +42,7 @@ atlas terraform clusterToAdvancedCluster --file in.tf --output out.tf
 atlas tf clu2adv -f in.tf -o out.tf
 ```
 
-[📖 Full Documentation](./docs/command_clu2adv.md) | [🔄 Migration Guide: Cluster to Advanced Cluster](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/guides/cluster-to-advanced-cluster-migration-guide)
+[Full Documentation](./docs/command_clu2adv.md) | [Migration Guide: Cluster to Advanced Cluster](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/guides/cluster-to-advanced-cluster-migration-guide)
 
 ### 2. advancedClusterToV2 (adv2v2)
 Convert previous `mongodbatlas_advanced_cluster` configurations to the new Provider 2.0.0 schema with simplified structure.
@@ -54,7 +54,7 @@ atlas terraform advancedClusterToV2 --file in.tf --output out.tf
 atlas tf adv2v2 -f in.tf -o out.tf
 ```
 
-[📖 Full Documentation](./docs/command_adv2v2.md)
+[Full Documentation](./docs/command_adv2v2.md) | [Migration Guide: Advanced Cluster (v1.x → v2.0.0)](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/guides/migrate-to-advanced-cluster-2.0)
 
 ## Feedback
 
