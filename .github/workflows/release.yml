@@ -96,9 +96,12 @@ jobs:
     needs: compliance
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: terraform-provider-mongodbatlas-checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - uses: ./.github/templates/run-script-and-commit
+        with:
+          repository: mongodb/terraform-provider-mongodbatlas
+          ref: master
+      - uses: mongodb/terraform-provider-mongodbatlas/.github/templates/run-script-and-commit@master
         with:
           script_call: |
             TAG="${{ inputs.version_number }}"
