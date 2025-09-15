@@ -54,7 +54,7 @@ atlas terraform advancedClusterToV2 --file in.tf --output out.tf
 atlas tf adv2v2 -f in.tf -o out.tf
 ```
 
-[📖 Full Documentation](./docs/command_adv2v2.md)
+[📖 Full Documentation](./docs/command_adv2v2.md) | [🔄 Migration Guide: Advanced Cluster (v1.x → v2.0.0)](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs/guides/migrate-to-advanced-cluster-2.0)
 
 ## Feedback
 
