@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: write
     steps: 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
       - name: Get the latest commit SHA
         id: get-sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"  
@@ -41,7 +41,7 @@ jobs:
     permissions: 
       contents: write
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
         with:
             ref: ${{ inputs.version_number }}
             fetch-depth: 0
@@ -73,7 +73,7 @@ jobs:
     env:
       SILKBOMB_IMG: ${{ vars.SILKBOMB_IMG }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
         with:
             ref: ${{ inputs.version_number }}
       - name: Generate PURLs and SBOM
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: terraform-provider-mongodbatlas-checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
         with:
           repository: mongodb/terraform-provider-mongodbatlas
           ref: master
