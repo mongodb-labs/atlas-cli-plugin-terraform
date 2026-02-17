@@ -3,7 +3,7 @@ package clu2adv
 import (
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/convert"
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/flag"
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/flags"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +29,7 @@ func Builder() *cobra.Command {
 		RunE:    o.RunE,
 	}
 	cli.SetupCommonFlags(cmd, &o.BaseOpts)
-	cmd.Flags().BoolVarP(&o.includeMoved, flag.IncludeMoved, flag.IncludeMovedShort, false,
+	cmd.Flags().BoolVarP(&o.includeMoved, flags.IncludeMoved, flags.IncludeMovedShort, false,
 		"include moved blocks in the output file")
 	return cmd
 }
