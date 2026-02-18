@@ -6,7 +6,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/file"
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/flag"
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/flags"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -119,12 +119,12 @@ func (o *BaseOpts) waitForFileEvent(watcher *fsnotify.Watcher) error {
 
 // SetupCommonFlags sets up the common flags used by all commands.
 func SetupCommonFlags(cmd *cobra.Command, opts *BaseOpts) {
-	cmd.Flags().StringVarP(&opts.File, flag.File, flag.FileShort, "", "input file")
-	_ = cmd.MarkFlagRequired(flag.File)
-	cmd.Flags().StringVarP(&opts.Output, flag.Output, flag.OutputShort, "", "output file")
-	_ = cmd.MarkFlagRequired(flag.Output)
-	cmd.Flags().BoolVarP(&opts.ReplaceOutput, flag.ReplaceOutput, flag.ReplaceOutputShort, false,
+	cmd.Flags().StringVarP(&opts.File, flags.File, flags.FileShort, "", "input file")
+	_ = cmd.MarkFlagRequired(flags.File)
+	cmd.Flags().StringVarP(&opts.Output, flags.Output, flags.OutputShort, "", "output file")
+	_ = cmd.MarkFlagRequired(flags.Output)
+	cmd.Flags().BoolVarP(&opts.ReplaceOutput, flags.ReplaceOutput, flags.ReplaceOutputShort, false,
 		"replace output file if exists")
-	cmd.Flags().BoolVarP(&opts.Watch, flag.Watch, flag.WatchShort, false,
+	cmd.Flags().BoolVarP(&opts.Watch, flags.Watch, flags.WatchShort, false,
 		"keeps the plugin running and watches the input file for changes")
 }
