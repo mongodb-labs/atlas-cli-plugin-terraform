@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"maps"
 	"os"
 	"os/exec"
 	"strconv"
@@ -112,12 +113,8 @@ func RunTests(t *testing.T, cmdName string, extraTests map[string]TestCase) {
 	}
 
 	allTests := make(map[string]TestCase)
-	for name, test := range commonTests {
-		allTests[name] = test
-	}
-	for name, test := range extraTests {
-		allTests[name] = test
-	}
+	maps.Copy(allTests, commonTests)
+	maps.Copy(allTests, extraTests)
 
 	for name, tc := range allTests {
 		t.Run(name, func(t *testing.T) {
