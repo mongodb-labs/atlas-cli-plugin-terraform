@@ -1,7 +1,6 @@
 package clu2adv
 
 import (
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/convert"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/flags"
 	"github.com/spf13/afero"
@@ -10,10 +9,10 @@ import (
 
 func Builder() *cobra.Command {
 	o := &struct {
-		cli.BaseOpts
+		convert.BaseOpts
 		includeMoved bool
 	}{
-		BaseOpts: cli.BaseOpts{
+		BaseOpts: convert.BaseOpts{
 			Fs: afero.NewOsFs(),
 		},
 	}
@@ -28,7 +27,7 @@ func Builder() *cobra.Command {
 		Aliases: []string{"clu2adv"},
 		RunE:    o.RunE,
 	}
-	cli.SetupCommonFlags(cmd, &o.BaseOpts)
+	convert.SetupCommonFlags(cmd, &o.BaseOpts)
 	cmd.Flags().BoolVarP(&o.includeMoved, flags.IncludeMoved, flags.IncludeMovedShort, false,
 		"include moved blocks in the output file")
 	return cmd

@@ -1,6 +1,8 @@
 package flags
 
 const (
+	Debug              = "debug"
+	DebugShort         = "D"
 	File               = "file"
 	FileShort          = "f"
 	Output             = "output"
