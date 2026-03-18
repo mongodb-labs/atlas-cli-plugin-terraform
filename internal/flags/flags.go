@@ -5,6 +5,8 @@ const (
 	DebugShort         = "D"
 	File               = "file"
 	FileShort          = "f"
+	Input              = "input"
+	InputShort         = "i"
 	Output             = "output"
 	OutputShort        = "o"
 	ReplaceOutput      = "replaceOutput"
