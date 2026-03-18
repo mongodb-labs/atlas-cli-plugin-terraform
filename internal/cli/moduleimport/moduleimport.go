@@ -65,7 +65,7 @@ func (opts *ModuleImportOpts) PreRun(cmd *cobra.Command, args []string) error {
 
 func (opts *ModuleImportOpts) Run(cmd *cobra.Command, args []string) error {
 	log.Debugf("[module-import] RunE - input: %s\n", opts.input)
-	userAgent := config.UserAgent(Version) // TODO(non-spike): Look into differentiating the plugin's UserAgent from the cli one
-	err := modulegen.Run(opts.httpClient, userAgent)
+	userAgent := config.UserAgent(Version) // TODO@non-spike: Look into differentiating the plugin's UserAgent from the cli one
+	err := modulegen.Run(opts.httpClient, userAgent, modulegen.ModuleGenArgs{InputPath: opts.input, OutputPath: opts.output})
 	return err
 }
