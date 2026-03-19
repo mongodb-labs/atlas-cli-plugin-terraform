@@ -106,6 +106,18 @@ func (l *Logger) Warningf(format string, a ...any) (int, error) {
 	return fmt.Fprintf(l.w, format, a...)
 }
 
+func (l *Logger) Info(a ...any) (int, error) {
+	return fmt.Fprint(l.w, a...)
+}
+
+func (l *Logger) Infoln(a ...any) (int, error) {
+	return fmt.Fprintln(l.w, a...)
+}
+
+func (l *Logger) Infof(format string, a ...any) (int, error) {
+	return fmt.Fprintf(l.w, format, a...)
+}
+
 var std = New(os.Stderr, WarningLevel)
 
 func Writer() io.Writer {
@@ -154,4 +166,16 @@ func Warningln(a ...any) (int, error) {
 
 func Warningf(format string, a ...any) (int, error) {
 	return std.Warningf(format, a...)
+}
+
+func Info(a ...any) (int, error) {
+	return std.Info(a...)
+}
+
+func Infoln(a ...any) (int, error) {
+	return std.Infoln(a...)
+}
+
+func Infof(format string, a ...any) (int, error) {
+	return std.Infof(format, a...)
 }
