@@ -1,6 +1,7 @@
 package modulegen
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,6 +15,13 @@ import (
 	"go.mongodb.org/atlas-sdk/v20250312014/admin"
 )
 
+type Input struct {
+	Modules      []ModuleType `hcl:"modules"`
+	OrgID        string       `hcl:"org_id,optional"`
+	ProjectID    string       `hcl:"project_id,optional"`
+	ClusterNames []string     `hcl:"cluster_names,optional"`
+}
+
 type ModuleType string
 
 const (
@@ -26,14 +34,29 @@ func (m ModuleType) GetModuleGenerator() (ModuleGenerator, error) {
 	case ModuleTypeProject:
 		return ProjectGenerator{}, nil
 	case ModuleTypeCluster:
-		return ClusterGenerator{}, nil
+		return ClustersGenerator{}, nil
 	}
 	return nil, fmt.Errorf("invalid module type: %s", m)
 }
 
-type RunState struct {
-	atlasClient *admin.APIClient
-	// awsClient, gcpClient, azureClient
+type ResourceType string
+
+const (
+	ResourceTypeOrganization ResourceType = "organization"
+	ResourceTypeProject      ResourceType = "project"
+	ResourceTypeClusters     ResourceType = "clusters"
+)
+
+type ResourceStore struct {
+	organization *admin.AtlasOrganization
+	project      *admin.Group
+	clusters     []admin.ClusterDescription20240805
+}
+
+type AtlasClientArgs struct {
+	AtlasBaseUrl string
+	UserAgent    string
+	HttpClient   *http.Client
 }
 
 type ModuleGenArgs struct {
@@ -41,21 +64,12 @@ type ModuleGenArgs struct {
 	OutputPath string
 }
 
-type Input struct {
-	Modules      []ModuleType `hcl:"modules"`
-	OrgID        string       `hcl:"org_id,optional"`
-	ProjectID    string       `hcl:"project_id,optional"`
-	ClusterNames []string     `hcl:"cluster_names,optional"`
-}
-
-func Run(httpClient *http.Client, userAgent string, args ModuleGenArgs) error {
-	log.Debug("[modulegen] Run\n")
-
-	runState := &RunState{}
+func Run(ctx context.Context, args *ModuleGenArgs, clientArgs *AtlasClientArgs) error {
 	var err error
+	_, _ = log.Debugln("[modulegen] Run")
 
 	// == Parse input ==
-	log.Debug("[modulegen] Parsing input...\n")
+	_, _ = log.Debugln("[modulegen] Parsing input...")
 	var input Input
 	if err = parseInput(args.InputPath, &input); err != nil {
 		return err
@@ -83,37 +97,39 @@ func Run(httpClient *http.Client, userAgent string, args ModuleGenArgs) error {
 		}
 	}
 	if len(invalidFieldsPerModule) > 0 {
-		log.Warning("invalid input:\n")
+		_, _ = log.Warningln("invalid input:")
 		for field, moduleNames := range invalidFieldsPerModule {
-			log.Warningf("\t[%s] `%s` missing or invalid\n", strings.Join(moduleNames, ", "), field)
+			_, _ = log.Warningf("\t[%s] `%s` missing or invalid\n", strings.Join(moduleNames, ", "), field)
 		}
 		return errors.New("invalid input")
 	}
 
 	// == Gather resources to fetch ==
-	// TODO
+	// It is currently safe to assume that there is only one resource of each type (except clusters), so gathering
+	// the resource type is enough in this step. If this assumption is no longer true, we can collect resource type & id instead.
+	resourcesToFetch := map[ResourceType]bool{}
+	for _, generator := range generators {
+		generator.GetResourcesToFetch(&input, resourcesToFetch)
+	}
 
-	// == Build clients ==
-	// Note: Assuming that we always build the Atlas client
-	runState.atlasClient, err = newAtlasClient(httpClient, userAgent)
+	// == Fetch resources ==
+	// Fetch all resources needed for generating the requested modules.
+	// No network calls are made outside of this step.
+	resourceStore, err := fetchResources(ctx, clientArgs, &input, resourcesToFetch)
 	if err != nil {
 		return err
 	}
 
-	// == Fetch resources ==
-
 	// == Generate (internal structure) ==
+	// TODO
+	for _, generator := range generators {
+		generator.Generate(&input, resourceStore)
+	}
 
 	// == Generate output files ==
+	// TODO
 
 	return nil
-}
-
-func newAtlasClient(httpClient *http.Client, userAgent string) (*admin.APIClient, error) {
-	return admin.NewClient(
-		admin.UseHTTPClient(httpClient),
-		admin.UseUserAgent(userAgent),
-	)
 }
 
 func parseInput(inputPath string, input *Input) error {
@@ -134,15 +150,96 @@ func parseInput(inputPath string, input *Input) error {
 	return nil
 }
 
+type Clients struct {
+	atlasClient *admin.APIClient
+	// awsClient, gcpClient, azureClient
+}
+
+func initClients(clientArgs *AtlasClientArgs, resourcesToFetch map[ResourceType]bool) (Clients, error) {
+	var err error
+	clients := Clients{}
+
+	// Note: Assuming that we always need the Atlas client
+	clients.atlasClient, err = admin.NewClient(
+		//admin.UseDebug(log.IsDebugLevel()) // Uncomment to see Atlas SDK debug logs when tool is run in debug mode.
+		admin.UseBaseURL(clientArgs.AtlasBaseUrl),
+		admin.UseHTTPClient(clientArgs.HttpClient),
+		admin.UseUserAgent(clientArgs.UserAgent),
+	)
+	if err != nil {
+		return clients, fmt.Errorf("failed to create atlas client: %w", err)
+	}
+
+	// TODO: Initialize other clients based on the resources to fetch
+
+	return clients, nil
+}
+
+// fetchResources fetches all resources needed for generating the requested modules and populates them in resourceStore.
+// Note: For testing, mock this whole function. No network calls are made outside of this function.
+func fetchResources(ctx context.Context, clientArgs *AtlasClientArgs, input *Input, resourcesToFetch map[ResourceType]bool) (*ResourceStore, error) {
+	clients, err := initClients(clientArgs, resourcesToFetch)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Parallelize
+	// TODO: Parallelize
+	// TODO: Parallelize
+	resourceStore := ResourceStore{}
+	for resourceType := range resourcesToFetch {
+		switch resourceType {
+		case ResourceTypeOrganization:
+			_, _ = log.Infof("Reading organization `%s` from MongoDB Atlas...\n", input.OrgID)
+			org, _, err := clients.atlasClient.OrganizationsApi.GetOrg(ctx, input.OrgID).Execute()
+			if err != nil {
+				return nil, fmt.Errorf("error reading organization `%s` from MongoDB Atlas: %w", input.OrgID, err)
+			}
+			resourceStore.organization = org
+		case ResourceTypeProject:
+			_, _ = log.Infof("Reading project `%s` from MongoDB Atlas...\n", input.ProjectID)
+			project, _, err := clients.atlasClient.ProjectsApi.GetGroup(ctx, input.ProjectID).Execute()
+			if err != nil {
+				return nil, fmt.Errorf("error reading project `%s` from MongoDB Atlas: %w", input.ProjectID, err)
+			}
+			resourceStore.project = project
+		case ResourceTypeClusters:
+			_, _ = log.Infof("Reading clusters [`%s`] from MongoDB Atlas...\n", strings.Join(input.ClusterNames, "`, `"))
+			clusters := make([]*admin.ClusterDescription20240805, len(input.ClusterNames))
+			for i, clusterName := range input.ClusterNames {
+				cluster, _, err := clients.atlasClient.ClustersApi.GetCluster(ctx, input.ProjectID, clusterName).Execute()
+				if err != nil {
+					return nil, fmt.Errorf("error reading cluster `%s` from MongoDB Atlas: %w", clusterName, err)
+				}
+				clusters[i] = cluster
+			}
+		}
+	}
+	return &resourceStore, nil
+}
+
+// ==== Generators ====
+
 type ModuleGenerator interface {
 	ModuleType() ModuleType
 	// CheckInput returns a list of missing or invalid input fields for the module
 	CheckInput(input *Input) []string
+	// GetResourcesToFetch returns a map (set) of the resource types that should be fetched for the module given the input.
+	// Note: If necessary, we can use the bool to indicate whether the resource is required or optional (fetch wouldn't fail for optionals)
+	GetResourcesToFetch(input *Input, resourcesToFetch map[ResourceType]bool)
+	Generate(input *Input, store *ResourceStore) error
 }
+
+// === Project Generator ===
 
 var _ ModuleGenerator = ProjectGenerator{}
 
 type ProjectGenerator struct{}
+
+func (g ProjectGenerator) Generate(input *Input, store *ResourceStore) error {
+	// TODO
+	return nil
+}
 
 func (g ProjectGenerator) ModuleType() ModuleType {
 	return ModuleTypeProject
@@ -150,6 +247,7 @@ func (g ProjectGenerator) ModuleType() ModuleType {
 
 func (g ProjectGenerator) CheckInput(input *Input) []string {
 	var fields []string
+	// TODO@remove: We don't actually need the org id for the project module. We can get it from the fetched project.
 	if input.OrgID == "" {
 		fields = append(fields, "org_id")
 	}
@@ -159,15 +257,28 @@ func (g ProjectGenerator) CheckInput(input *Input) []string {
 	return fields
 }
 
-var _ ModuleGenerator = ClusterGenerator{}
+func (g ProjectGenerator) GetResourcesToFetch(input *Input, resourcesToFetch map[ResourceType]bool) {
+	// TODO@remove: We don't actually need to fetch the org for the project module. Doing it for now just for testing.
+	resourcesToFetch[ResourceTypeOrganization] = true
+	resourcesToFetch[ResourceTypeProject] = true
+}
 
-type ClusterGenerator struct{}
+// === Cluster Generator ===
 
-func (g ClusterGenerator) ModuleType() ModuleType {
+var _ ModuleGenerator = ClustersGenerator{}
+
+type ClustersGenerator struct{}
+
+func (g ClustersGenerator) Generate(input *Input, store *ResourceStore) error {
+	// TODO
+	return nil
+}
+
+func (g ClustersGenerator) ModuleType() ModuleType {
 	return ModuleTypeCluster
 }
 
-func (g ClusterGenerator) CheckInput(input *Input) []string {
+func (g ClustersGenerator) CheckInput(input *Input) []string {
 	var fields []string
 	if input.ProjectID == "" {
 		fields = append(fields, "project_id")
@@ -176,4 +287,10 @@ func (g ClusterGenerator) CheckInput(input *Input) []string {
 		fields = append(fields, "cluster_names")
 	}
 	return fields
+}
+
+func (g ClustersGenerator) GetResourcesToFetch(input *Input, resourcesToFetch map[ResourceType]bool) {
+	//TODO@remove: no need to fetch the project for the cluster module. Just testing.
+	resourcesToFetch[ResourceTypeProject] = true
+	resourcesToFetch[ResourceTypeClusters] = true
 }

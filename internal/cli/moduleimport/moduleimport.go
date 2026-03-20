@@ -13,13 +13,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	CloudServiceURL    = "https://cloud.mongodb.com/"
+	CloudGovServiceURL = "https://cloud.mongodbgov.com/"
+)
+
 // TODO@non-spike: Support tracking plugin versions, used in UserAgent header.
 var Version = "dev"
 
 type ModuleImportOpts struct {
-	input      string
-	output     string
-	httpClient *http.Client
+	input        string
+	output       string
+	atlasBaseUrl string
+	httpClient   *http.Client
 }
 
 func Builder() *cobra.Command {
@@ -40,11 +46,20 @@ func Builder() *cobra.Command {
 }
 
 func (opts *ModuleImportOpts) PreRun(cmd *cobra.Command, args []string) error {
-	log.Debug("[module-import] PreRunE\n")
+	_, _ = log.Debugln("[module-import] PreRunE")
 
 	profile, err := config.LoadAtlasCLIConfig()
 	if err != nil {
 		return err
+	}
+
+	// Use user-overridden url, otherwise if gov use gov url, otherwise use default.
+	if opts.atlasBaseUrl = profile.OpsManagerURL(); opts.atlasBaseUrl == "" {
+		if profile.Service() == config.CloudService {
+			opts.atlasBaseUrl = CloudGovServiceURL
+		} else {
+			opts.atlasBaseUrl = CloudServiceURL
+		}
 	}
 
 	// Check that Atlas credentials are configured.
@@ -64,8 +79,18 @@ func (opts *ModuleImportOpts) PreRun(cmd *cobra.Command, args []string) error {
 }
 
 func (opts *ModuleImportOpts) Run(cmd *cobra.Command, args []string) error {
-	log.Debugf("[module-import] RunE - input: %s\n", opts.input)
-	userAgent := config.UserAgent(Version) // TODO@non-spike: Look into differentiating the plugin's UserAgent from the cli one
-	err := modulegen.Run(opts.httpClient, userAgent, modulegen.ModuleGenArgs{InputPath: opts.input, OutputPath: opts.output})
+	_, _ = log.Debugln("[module-import] RunE")
+	err := modulegen.Run(
+		cmd.Context(),
+		&modulegen.ModuleGenArgs{
+			InputPath:  opts.input,
+			OutputPath: opts.output,
+		},
+		&modulegen.AtlasClientArgs{
+			AtlasBaseUrl: opts.atlasBaseUrl,
+			UserAgent:    config.UserAgent(Version), // TODO@non-spike: Look into differentiating the plugin's UserAgent from the cli one
+			HttpClient:   opts.httpClient,
+		},
+	)
 	return err
 }
