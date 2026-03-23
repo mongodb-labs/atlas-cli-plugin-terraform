@@ -26,6 +26,9 @@ const debugfF = "Debugf"
 const warningF = "Warning"
 const warninglnF = "Warningln"
 const warningfF = "Warningf"
+const infoF = "Info"
+const infolnF = "Infoln"
+const infofF = "Infof"
 
 func TestLogger(t *testing.T) {
 	testCases := []struct {
@@ -57,6 +60,18 @@ func TestLogger(t *testing.T) {
 		{input: []any{"test"}, level: DebugLevel, f: warningF, expected: "test"},
 		{input: []any{"test"}, level: DebugLevel, f: warninglnF, expected: "test\n"},
 		{input: []any{"test%v", 1}, level: DebugLevel, f: warningfF, expected: "test1"},
+
+		{input: []any{"test"}, level: NoneLevel, f: infoF, expected: "test"},
+		{input: []any{"test"}, level: NoneLevel, f: infolnF, expected: "test\n"},
+		{input: []any{"test%v", 1}, level: NoneLevel, f: infofF, expected: "test1"},
+
+		{input: []any{"test"}, level: WarningLevel, f: infoF, expected: "test"},
+		{input: []any{"test"}, level: WarningLevel, f: infolnF, expected: "test\n"},
+		{input: []any{"test%v", 1}, level: WarningLevel, f: infofF, expected: "test1"},
+
+		{input: []any{"test"}, level: DebugLevel, f: infoF, expected: "test"},
+		{input: []any{"test"}, level: DebugLevel, f: infolnF, expected: "test\n"},
+		{input: []any{"test%v", 1}, level: DebugLevel, f: infofF, expected: "test1"},
 	}
 
 	for i, testCase := range testCases {
@@ -77,6 +92,12 @@ func TestLogger(t *testing.T) {
 				_, err = logger.Warningln(testCase.input...)
 			case warningfF:
 				_, err = logger.Warningf(testCase.input[0].(string), testCase.input[1:]...)
+			case infoF:
+				_, err = logger.Info(testCase.input...)
+			case infolnF:
+				_, err = logger.Infoln(testCase.input...)
+			case infofF:
+				_, err = logger.Infof(testCase.input[0].(string), testCase.input[1:]...)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -119,6 +140,18 @@ func TestPackage(t *testing.T) {
 		{input: []any{"test"}, level: DebugLevel, f: warningF, expected: "test"},
 		{input: []any{"test"}, level: DebugLevel, f: warninglnF, expected: "test\n"},
 		{input: []any{"test%v", 1}, level: DebugLevel, f: warningfF, expected: "test1"},
+
+		{input: []any{"test"}, level: NoneLevel, f: infoF, expected: "test"},
+		{input: []any{"test"}, level: NoneLevel, f: infolnF, expected: "test\n"},
+		{input: []any{"test%v", 1}, level: NoneLevel, f: infofF, expected: "test1"},
+
+		{input: []any{"test"}, level: WarningLevel, f: infoF, expected: "test"},
+		{input: []any{"test"}, level: WarningLevel, f: infolnF, expected: "test\n"},
+		{input: []any{"test%v", 1}, level: WarningLevel, f: infofF, expected: "test1"},
+
+		{input: []any{"test"}, level: DebugLevel, f: infoF, expected: "test"},
+		{input: []any{"test"}, level: DebugLevel, f: infolnF, expected: "test\n"},
+		{input: []any{"test%v", 1}, level: DebugLevel, f: infofF, expected: "test1"},
 	}
 
 	oldWriter := Writer()
@@ -141,6 +174,12 @@ func TestPackage(t *testing.T) {
 				_, err = Warningln(testCase.input...)
 			case warningfF:
 				_, err = Warningf(testCase.input[0].(string), testCase.input[1:]...)
+			case infoF:
+				_, err = Info(testCase.input...)
+			case infolnF:
+				_, err = Infoln(testCase.input...)
+			case infofF:
+				_, err = Infof(testCase.input[0].(string), testCase.input[1:]...)
 			}
 			if err != nil {
 				t.Fatal(err)
