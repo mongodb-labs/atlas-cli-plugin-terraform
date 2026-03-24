@@ -1,0 +1,19 @@
+# Import Guide
+
+The following files were generated:
+- `variables.tf`: variable declarations
+- `terraform.tfvars`: pre-populated variable values
+{{- range .ModuleTypes}}
+- `{{.}}.tf`: import and module blocks for the `{{.}}` module
+{{- end}}
+
+## Next Steps
+
+1. Run `terraform init`
+2. Run `terraform plan -var-file=./terraform.tfvars` and review the output. Expected diffs are listed below.
+3. Run `terraform apply -var-file=./terraform.tfvars` to import the resources.
+4. Remove import blocks (optional).
+
+## Expected Diffs
+
+<!-- TODO: Expected diffs will be populated here once modules emit ExpectedDiff entries. -->

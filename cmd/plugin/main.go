@@ -8,7 +8,7 @@ import (
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli/clu2adv"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli/moduleimport"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/flags"
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/log"
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -21,9 +21,9 @@ func main() {
 		Short:   "Utilities for Terraform's MongoDB Atlas Provider",
 		Aliases: []string{"tf"},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			log.SetWriter(cmd.ErrOrStderr())
+			logger.SetWriter(cmd.ErrOrStderr())
 			if debugLevel {
-				log.SetLevel(log.DebugLevel)
+				logger.SetLevel(logger.DebugLevel)
 			}
 
 			return nil

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package log
+package logger
 
 import (
 	"fmt"
@@ -25,6 +25,7 @@ type Level int
 const (
 	NoneLevel Level = iota
 	WarningLevel
+	InfoLevel
 	DebugLevel
 )
 
@@ -58,6 +59,10 @@ func (l *Logger) Level() Level {
 
 func (l *Logger) IsDebugLevel() bool {
 	return l.level >= DebugLevel
+}
+
+func (l *Logger) IsInfoLevel() bool {
+	return l.level >= InfoLevel
 }
 
 func (l *Logger) IsWarningLevel() bool {
@@ -107,18 +112,27 @@ func (l *Logger) Warningf(format string, a ...any) (int, error) {
 }
 
 func (l *Logger) Info(a ...any) (int, error) {
+	if !l.IsInfoLevel() {
+		return 0, nil
+	}
 	return fmt.Fprint(l.w, a...)
 }
 
 func (l *Logger) Infoln(a ...any) (int, error) {
+	if !l.IsInfoLevel() {
+		return 0, nil
+	}
 	return fmt.Fprintln(l.w, a...)
 }
 
 func (l *Logger) Infof(format string, a ...any) (int, error) {
+	if !l.IsInfoLevel() {
+		return 0, nil
+	}
 	return fmt.Fprintf(l.w, format, a...)
 }
 
-var std = New(os.Stderr, WarningLevel)
+var std = New(os.Stderr, InfoLevel)
 
 func Writer() io.Writer {
 	return std.Writer()
@@ -134,6 +148,10 @@ func SetLevel(level Level) {
 
 func IsDebugLevel() bool {
 	return std.IsDebugLevel()
+}
+
+func IsInfoLevel() bool {
+	return std.IsInfoLevel()
 }
 
 func IsWarningLevel() bool {

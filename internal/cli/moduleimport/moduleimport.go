@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/flags"
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/log"
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/logger"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/modulegen"
 	"github.com/mongodb/atlas-cli-core/config"
 	"github.com/mongodb/atlas-cli-core/transport"
@@ -21,15 +21,15 @@ const (
 // TODO@non-spike: Support tracking plugin versions, used in UserAgent header.
 var Version = "dev"
 
-type ModuleImportOpts struct {
+type Opts struct {
+	httpClient   *http.Client
 	input        string
 	output       string
-	atlasBaseUrl string
-	httpClient   *http.Client
+	atlasBaseURL string
 }
 
 func Builder() *cobra.Command {
-	opts := &ModuleImportOpts{}
+	opts := &Opts{}
 	cmd := &cobra.Command{
 		Use:     "module-import",
 		Short:   "Generate Terraform module configurations",
@@ -38,15 +38,21 @@ func Builder() *cobra.Command {
 		RunE:    opts.Run,
 	}
 
-	cmd.Flags().StringVarP(&opts.input, flags.Input, flags.InputShort, "", "path to the input file")
+	cmd.Flags().StringVarP(
+		&opts.input, flags.Input, flags.InputShort, "",
+		"path to the input file",
+	)
 	_ = cmd.MarkFlagRequired(flags.Input)
-	cmd.Flags().StringVarP(&opts.output, flags.Output, flags.OutputShort, "", "path where to the directory where to generate the output files")
+	cmd.Flags().StringVarP(
+		&opts.output, flags.Output, flags.OutputShort, "",
+		"path where to the directory where to generate the output files",
+	)
 	_ = cmd.MarkFlagRequired(flags.Output)
 	return cmd
 }
 
-func (opts *ModuleImportOpts) PreRun(cmd *cobra.Command, args []string) error {
-	_, _ = log.Debugln("[module-import] PreRunE")
+func (opts *Opts) PreRun(cmd *cobra.Command, args []string) error {
+	_, _ = logger.Debugln("[module-import] PreRunE")
 
 	profile, err := config.LoadAtlasCLIConfig()
 	if err != nil {
@@ -54,11 +60,11 @@ func (opts *ModuleImportOpts) PreRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Use user-overridden url, otherwise if gov use gov url, otherwise use default.
-	if opts.atlasBaseUrl = profile.OpsManagerURL(); opts.atlasBaseUrl == "" {
+	if opts.atlasBaseURL = profile.OpsManagerURL(); opts.atlasBaseURL == "" {
 		if profile.Service() == config.CloudService {
-			opts.atlasBaseUrl = CloudGovServiceURL
+			opts.atlasBaseURL = CloudGovServiceURL
 		} else {
-			opts.atlasBaseUrl = CloudServiceURL
+			opts.atlasBaseURL = CloudServiceURL
 		}
 	}
 
@@ -78,18 +84,19 @@ func (opts *ModuleImportOpts) PreRun(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func (opts *ModuleImportOpts) Run(cmd *cobra.Command, args []string) error {
-	_, _ = log.Debugln("[module-import] RunE")
+func (opts *Opts) Run(cmd *cobra.Command, args []string) error {
+	_, _ = logger.Debugln("[module-import] RunE")
 	err := modulegen.Run(
 		cmd.Context(),
-		&modulegen.ModuleGenArgs{
+		&modulegen.GenArgs{
 			InputPath:  opts.input,
 			OutputPath: opts.output,
 		},
 		&modulegen.AtlasClientArgs{
-			AtlasBaseUrl: opts.atlasBaseUrl,
-			UserAgent:    config.UserAgent(Version), // TODO@non-spike: Look into differentiating the plugin's UserAgent from the cli one
-			HttpClient:   opts.httpClient,
+			AtlasBaseURL: opts.atlasBaseURL,
+			// TODO@non-spike: Look into differentiating the plugin's UserAgent from the cli one
+			UserAgent:  config.UserAgent(Version),
+			HTTPClient: opts.httpClient,
 		},
 	)
 	return err
