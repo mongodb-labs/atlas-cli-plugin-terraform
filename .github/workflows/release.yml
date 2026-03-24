@@ -52,7 +52,7 @@ jobs:
           VERSION: ${{ inputs.version_number }}
         run: make generate-all-manifests
       - name: Log in to MongoDB Docker registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
         with:
           registry: ${{ secrets.ARTIFACTORY_REGISTRY }}
           username: ${{ secrets.ARTIFACTORY_USER }}
@@ -85,7 +85,7 @@ jobs:
           KONDUKTO_REPO: ${{ vars.KONDUKTO_REPO }}
           KONDUKTO_BRANCH_PREFIX: ${{ vars.KONDUKTO_BRANCH_PREFIX }}
       - name: Upload SBOM as release artifact
-        uses: softprops/action-gh-release@26e8ad27a09a225049a7075d7ec1caa2df6ff332
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe
         with:
           files: compliance/sbom.json
           tag_name: ${{ inputs.version_number }}
