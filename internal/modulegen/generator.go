@@ -85,7 +85,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		return err
 	}
 
-	// == Generate internal module structure ==
+	// == Generate internal modules & versions structures ==
 	generatedModules := make([]*GenerateModuleResult, len(generators))
 	for i, generator := range generators {
 		generatedModules[i], err = generator.Generate(&input, resourceStore)
@@ -93,8 +93,9 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 			return fmt.Errorf("failed to generate module %s: %w", string(generator.ModuleType()), err)
 		}
 	}
+	generatedVersions := generateVersions(generatedModules)
 
-	// == Generate output files ==
+	// == Render and write output files ==
 	_, _ = logger.Infoln("Generating output...")
 
 	// read/write/execute for owner. read/execute for group and others.
@@ -118,48 +119,30 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 	}
 
 	{ // versions.tf
-		// Highest required terraform version
-		var tfVersion Version
-
-		// Collect all providers and deduplicate by type, taking the one with the highest required version.
-		// Providers follow the order in which they were generated within a module. No extra sorting needed.
-		var providers []ProviderInfo
-		providerMap := make(map[ProviderType]*ProviderInfo) // Ptr to providers slice
-
-		for _, generatedModule := range generatedModules {
-			for _, provider := range generatedModule.Providers {
-				if existing, ok := providerMap[provider.ProviderType]; ok {
-					pMajor, pMinor := provider.Version.Major, provider.Version.Minor
-					eMajor, eMinor := existing.Version.Major, existing.Version.Minor
-					if pMajor > eMajor || (pMajor == eMajor && pMinor > eMinor) {
-						*existing = provider
-					}
-					_, _ = logger.Debugf("[modulegen] Deduplicated provider: %s %s\n", provider.ProviderType, existing.Version)
-				} else {
-					providers = append(providers, provider)
-					providerMap[provider.ProviderType] = &providers[len(providers)-1]
-				}
-			}
-
-			tfMajor, tfMinor := generatedModule.TerraformVersion.Major, generatedModule.TerraformVersion.Minor
-			if tfMajor > tfVersion.Major || (tfMajor == tfVersion.Major && tfMinor > tfVersion.Minor) {
-				tfVersion = generatedModule.TerraformVersion
-				_, _ = logger.Debugf("[modulegen] Required Terraform version updated to: %s\n", tfVersion)
-			}
-		}
-
 		// Render and write
 		filePath := filepath.Join(args.OutputPath, "versions.tf")
-		if err := os.WriteFile(filePath, RenderVersionsAndProviders(tfVersion, providers), fileDirPermissions); err != nil {
+		rendered := RenderVersionsAndProviders(generatedVersions.TFVersion, generatedVersions.Blocks)
+		if err := os.WriteFile(filePath, rendered, fileDirPermissions); err != nil {
 			return fmt.Errorf("failed to write to file %s: %w", filePath, err)
 		}
 	}
 
 	{ // variables.tf and terraform.tfvars
 		// Collect all variables and deduplicate using the name set.
-		// Variables follow the order in which they were generated within a module. No extra sorting needed.
+		// Provider variables go first, other variables follow the order in which they were generated within a module,
+		// no extra sorting needed.
 		var variables []*Variable
 		variableNameSet := make(map[string]bool)
+
+		for _, variable := range generatedVersions.Variables {
+			if _, ok := variableNameSet[variable.Name]; ok {
+				_, _ = logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
+				continue
+			}
+			variableNameSet[variable.Name] = true
+			variables = append(variables, variable)
+		}
+
 		for _, generatedModule := range generatedModules {
 			for _, variable := range generatedModule.Variables {
 				if _, ok := variableNameSet[variable.Name]; ok {
@@ -222,16 +205,6 @@ func parseInput(inputPath string, input *Input) error {
 	return nil
 }
 
-func (m ModuleType) GetModuleGenerator() (ModuleGenerator, error) {
-	switch m {
-	case ModuleTypeProject:
-		return ProjectGenerator{}, nil
-	case ModuleTypeCluster:
-		return ClustersGenerator{}, nil
-	}
-	return nil, fmt.Errorf("invalid module type: %s", m)
-}
-
 type Clients struct {
 	atlasClient *admin.APIClient
 	// awsClient, gcpClient, azureClient
@@ -291,6 +264,38 @@ func fetchResources(
 				return nil, fmt.Errorf("error reading project `%s` from MongoDB Atlas: %w", input.ProjectID, err)
 			}
 			resourceStore.Project = project
+		/* TODO@non-spike: See project_generator.go
+		case ResourceTypeProjectLimits:
+			_, _ = logger.Infof("Reading project limits for `%s` from MongoDB Atlas...\n", input.ProjectID)
+			projectLimits, _, err := clients.atlasClient.ProjectsApi.ListGroupLimits(ctx, input.ProjectID).Execute()
+			if err != nil {
+				return nil, fmt.Errorf("error reading project limits for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
+			}
+			resourceStore.ProjectLimits = projectLimits
+		*/
+		case ResourceTypeProjectSettings:
+			_, _ = logger.Infof("Reading project settings for `%s` from MongoDB Atlas...\n", input.ProjectID)
+			ps, _, err := clients.atlasClient.ProjectsApi.GetGroupSettings(ctx, input.ProjectID).Execute()
+			if err != nil {
+				return nil, fmt.Errorf("error reading project settings for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
+			}
+			resourceStore.ProjectSettings = ps
+		case ResourceTypeProjectIPAccessList:
+			_, _ = logger.Infof("Reading project IP access list for `%s` from MongoDB Atlas...\n", input.ProjectID)
+			list, _, err := clients.atlasClient.ProjectIPAccessListApi.ListAccessListEntries(ctx, input.ProjectID).Execute()
+			if err != nil {
+				return nil, fmt.Errorf("error reading project IP access list for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
+			}
+			resourceStore.ProjectIPAccessList = list
+		case ResourceTypeProjectMaintenanceWindow:
+			_, _ = logger.Infof("Reading project maintenance window for `%s` from MongoDB Atlas...\n", input.ProjectID)
+			mw, _, err := clients.atlasClient.MaintenanceWindowsApi.GetMaintenanceWindow(ctx, input.ProjectID).Execute()
+			if err != nil {
+				return nil, fmt.Errorf(
+					"error reading project maintenance window for `%s` from MongoDB Atlas: %w", input.ProjectID, err,
+				)
+			}
+			resourceStore.ProjectMaintenanceWindow = mw
 		case ResourceTypeClusters:
 			_, _ = logger.Infof("Reading clusters [`%s`] from MongoDB Atlas...\n", strings.Join(input.ClusterNames, "`, `"))
 			clusters := make([]*admin.ClusterDescription20240805, len(input.ClusterNames))
@@ -307,125 +312,71 @@ func fetchResources(
 	return &resourceStore, nil
 }
 
-// === Project Generator ===
+func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersionsResult {
+	// Highest required terraform version
+	var tfVersion Version
+	// Collect all provider requirements and deduplicate by type, taking the one with the highest required version.
+	// Providers follow the order in which they were generated within a module, no extra sorting needed.
+	var providers []ProviderRequirement
+	providerMap := make(map[ProviderType]*ProviderRequirement) // Ptr to providers slice
 
-var _ ModuleGenerator = ProjectGenerator{}
+	for _, generatedModule := range generatedModules {
+		for _, provider := range generatedModule.Providers {
+			if existing, ok := providerMap[provider.ProviderType]; ok {
+				pMajor, pMinor := provider.Version.Major, provider.Version.Minor
+				eMajor, eMinor := existing.Version.Major, existing.Version.Minor
+				if pMajor > eMajor || (pMajor == eMajor && pMinor > eMinor) {
+					*existing = provider
+				}
+				_, _ = logger.Debugf("[modulegen] Deduplicated provider: %s %s\n", provider.ProviderType, existing.Version)
+			} else {
+				providers = append(providers, provider)
+				providerMap[provider.ProviderType] = &providers[len(providers)-1]
+			}
+		}
 
-type ProjectGenerator struct{}
-
-func (g ProjectGenerator) ModuleType() ModuleType {
-	return ModuleTypeProject
-}
-
-func (g ProjectGenerator) CheckInput(input *Input) []string {
-	var fields []string
-	// TODO@remove: We don't actually need the org id for the project module. We can get it from the fetched project.
-	if input.OrgID == "" {
-		fields = append(fields, "org_id")
-	}
-	if input.ProjectID == "" {
-		fields = append(fields, "project_id")
-	}
-	return fields
-}
-
-func (g ProjectGenerator) GetResourcesToFetch(input *Input, resourcesToFetch map[ResourceType]bool) {
-	// TODO@remove: We don't actually need to fetch the org for the project module. Doing it for now just for testing.
-	resourcesToFetch[ResourceTypeOrganization] = true
-	resourcesToFetch[ResourceTypeProject] = true
-	// TODO project settings
-	// TODO ip access list
-	// TODO maintenance window
-}
-
-func (g ProjectGenerator) Generate(input *Input, store *ResourceStore) (*GenerateModuleResult, error) {
-	projectRs := store.Project
-	result := GenerateModuleResult{
-		ModuleType:       g.ModuleType(),
-		TerraformVersion: Version{Operator: ">=", Major: 1, Minor: 9},
-		Providers: []ProviderInfo{
-			{
-				ProviderType: ProviderTypeAtlas,
-				Version:      Version{Operator: "~>", Major: 2, Minor: 1},
-			},
-		},
-		ImportBlocks: []*ImportBlock{
-			{
-				ID: *projectRs.Id,
-				To: "module.project.mongodbatlas_project.this",
-			},
-			// TODO other resources
-		},
-		Variables: []*Variable{},
+		tfMajor, tfMinor := generatedModule.TerraformVersion.Major, generatedModule.TerraformVersion.Minor
+		if tfMajor > tfVersion.Major || (tfMajor == tfVersion.Major && tfMinor > tfVersion.Minor) {
+			tfVersion = generatedModule.TerraformVersion
+			_, _ = logger.Debugf("[modulegen] Required Terraform version updated to: %s\n", tfVersion)
+		}
 	}
 
-	moduleBlock := ModuleBlock{
-		Name:       "atlas_project",
-		Source:     "terraform-mongodbatlas-modules/project/mongodbatlas",
-		Version:    "~> 0.0",
-		Attributes: []Attribute{},
+	var blocks []*ProviderInfo
+	var variables []*Variable
+	for _, p := range providers {
+		switch p.ProviderType { //nolint:gocritic
+		case ProviderTypeAtlas:
+			clientID := &Variable{
+				Name:         "atlas_client_id",
+				Description:  "Atlas Service Account Client ID",
+				Type:         cty.String,
+				Value:        cty.StringVal(""),
+				DefaultValue: new(cty.StringVal("")),
+			}
+			clientSecret := &Variable{
+				Name:         "atlas_client_secret",
+				Description:  "Atlas Service Account Client Secret",
+				Type:         cty.String,
+				Value:        cty.StringVal(""),
+				DefaultValue: new(cty.StringVal("")),
+			}
+			variables = append(variables, clientID, clientSecret)
+			blocks = append(blocks, &ProviderInfo{
+				Name:    "mongodbatlas",
+				Source:  "mongodb/mongodbatlas",
+				Version: p.Version,
+				Attributes: []Attribute{
+					{Name: "client_id", Value: AttributeValue{Variable: clientID}},
+					{Name: "client_secret", Value: AttributeValue{Variable: clientSecret}},
+				},
+			})
+		}
 	}
-	result.ModuleBlocks = append(result.ModuleBlocks, &moduleBlock)
 
-	moduleBlock.Attributes = append(moduleBlock.Attributes, Attribute{
-		Name:    "name",
-		Literal: new(cty.StringVal(projectRs.Name)),
-	})
-
-	orgIDVar := Variable{
-		Name:        "org_id",
-		Description: "Atlas Organization ID",
-		Type:        cty.String,
-		Value:       cty.StringVal(projectRs.OrgId),
+	return GenerateVersionsResult{
+		TFVersion: tfVersion,
+		Blocks:    blocks,
+		Variables: variables,
 	}
-	result.Variables = append(result.Variables, &orgIDVar)
-	moduleBlock.Attributes = append(moduleBlock.Attributes, Attribute{
-		Name:     "org_id",
-		Variable: &orgIDVar,
-	})
-
-	moduleBlock.Attributes = append(moduleBlock.Attributes, Attribute{
-		Name: "project_settings",
-		NestedInputs: []Attribute{
-			{
-				Name:    "is_extended_storage_sizes_enabled",
-				Literal: new(cty.BoolVal(true)), // TODO: Fetch project settings
-			},
-		},
-	})
-
-	// TODO: ...
-
-	return &result, nil
-}
-
-// === Cluster Generator ===
-
-var _ ModuleGenerator = ClustersGenerator{}
-
-type ClustersGenerator struct{}
-
-func (g ClustersGenerator) ModuleType() ModuleType {
-	return ModuleTypeCluster
-}
-
-func (g ClustersGenerator) CheckInput(input *Input) []string {
-	var fields []string
-	if input.ProjectID == "" {
-		fields = append(fields, "project_id")
-	}
-	if len(input.ClusterNames) == 0 {
-		fields = append(fields, "cluster_names")
-	}
-	return fields
-}
-
-func (g ClustersGenerator) GetResourcesToFetch(input *Input, resourcesToFetch map[ResourceType]bool) {
-	// TODO@remove: no need to fetch the project for the cluster module. Just testing.
-	resourcesToFetch[ResourceTypeProject] = true
-	resourcesToFetch[ResourceTypeClusters] = true
-}
-
-func (g ClustersGenerator) Generate(input *Input, store *ResourceStore) (*GenerateModuleResult, error) {
-	return nil, errors.New("not implemented")
 }

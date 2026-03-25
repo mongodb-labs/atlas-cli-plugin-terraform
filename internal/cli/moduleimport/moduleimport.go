@@ -61,7 +61,7 @@ func (opts *Opts) PreRun(cmd *cobra.Command, args []string) error {
 
 	// Use user-overridden url, otherwise if gov use gov url, otherwise use default.
 	if opts.atlasBaseURL = profile.OpsManagerURL(); opts.atlasBaseURL == "" {
-		if profile.Service() == config.CloudService {
+		if profile.Service() == config.CloudGovService {
 			opts.atlasBaseURL = CloudGovServiceURL
 		} else {
 			opts.atlasBaseURL = CloudServiceURL
