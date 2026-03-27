@@ -1,4 +1,4 @@
-package cli
+package convert
 
 import (
 	"errors"
@@ -11,12 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ConvertFn func(config []byte) ([]byte, error)
+type Fn func(config []byte) ([]byte, error)
 
 // BaseOpts contains common functionality for CLI commands that convert files.
 type BaseOpts struct {
 	Fs            afero.Fs
-	Convert       ConvertFn
+	Convert       Fn
 	File          string
 	Output        string
 	ReplaceOutput bool

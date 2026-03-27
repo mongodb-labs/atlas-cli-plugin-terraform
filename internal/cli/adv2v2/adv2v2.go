@@ -1,14 +1,13 @@
 package adv2v2
 
 import (
-	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/cli"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/convert"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
 func Builder() *cobra.Command {
-	o := &cli.BaseOpts{
+	o := &convert.BaseOpts{
 		Fs:      afero.NewOsFs(),
 		Convert: convert.AdvancedClusterToV2,
 	}
@@ -20,6 +19,6 @@ func Builder() *cobra.Command {
 		Aliases: []string{"adv2v2"},
 		RunE:    o.RunE,
 	}
-	cli.SetupCommonFlags(cmd, o)
+	convert.SetupCommonFlags(cmd, o)
 	return cmd
 }

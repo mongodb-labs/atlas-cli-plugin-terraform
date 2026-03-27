@@ -1,0 +1,29 @@
+# Import Guide
+
+The following files were generated:
+- `variables.tf`: variable declarations
+- `terraform.tfvars`: pre-populated variable values
+{{- range .ModuleTypes}}
+- `{{.}}.tf`: import and module blocks for the `{{.}}` module
+{{- end}}
+
+## Next Steps
+
+1. Run `terraform init`
+2. Ensure your MongoDB Atlas credentials are set up:
+```bash
+# Through environment variables
+export MONGODB_ATLAS_CLIENT_ID="<ATLAS_CLIENT_ID>"
+export MONGODB_ATLAS_CLIENT_SECRET="<ATLAS_CLIENT_SECRET>"
+
+# Or setting the values in the generated `./terraform.tfvars`
+atlas_client_id     = "<ATLAS_CLIENT_ID>"
+atlas_client_secret = "<ATLAS_CLIENT_SECRET>"
+```
+3. Run `terraform plan -var-file=./terraform.tfvars` and review the output. Expected diffs are listed below.
+4. Run `terraform apply -var-file=./terraform.tfvars` to import the resources.
+5. Remove import blocks (optional).
+
+## Expected Diffs
+
+<!-- TODO: Expected diffs will be populated here once modules emit ExpectedDiff entries. -->
