@@ -11,14 +11,14 @@ func (g ClustersGenerator) ModuleType() ModuleType {
 }
 
 func (g ClustersGenerator) CheckInput(input *Input) []string {
-	var fields []string
+	var invalidFields []string
 	if input.ProjectID == "" {
-		fields = append(fields, "project_id")
+		invalidFields = append(invalidFields, "project_id")
 	}
 	if len(input.ClusterNames) == 0 {
-		fields = append(fields, "cluster_names")
+		invalidFields = append(invalidFields, "cluster_names")
 	}
-	return fields
+	return invalidFields
 }
 
 func (g ClustersGenerator) GetResourcesToFetch(input *Input, resourcesToFetch map[ResourceType]bool) {

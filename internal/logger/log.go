@@ -148,38 +148,38 @@ func Default() *Logger {
 	return std
 }
 
-func Debug(a ...any) (int, error) {
-	return std.Debug(a...)
+func Debug(a ...any) {
+	_, _ = std.Debug(a...)
 }
 
-func Debugln(a ...any) (int, error) {
-	return std.Debugln(a...)
+func Debugln(a ...any) {
+	_, _ = std.Debugln(a...)
 }
 
-func Debugf(format string, a ...any) (int, error) {
-	return std.Debugf(format, a...)
+func Debugf(format string, a ...any) {
+	_, _ = std.Debugf(format, a...)
 }
 
-func Warning(a ...any) (int, error) {
-	return std.Warning(a...)
+func Warning(a ...any) {
+	_, _ = std.Warning(a...)
 }
 
-func Warningln(a ...any) (int, error) {
-	return std.Warningln(a...)
+func Warningln(a ...any) {
+	_, _ = std.Warningln(a...)
 }
 
-func Warningf(format string, a ...any) (int, error) {
-	return std.Warningf(format, a...)
+func Warningf(format string, a ...any) {
+	_, _ = std.Warningf(format, a...)
 }
 
-func Info(a ...any) (int, error) {
-	return std.Info(a...)
+func Info(a ...any) {
+	_, _ = std.Info(a...)
 }
 
-func Infoln(a ...any) (int, error) {
-	return std.Infoln(a...)
+func Infoln(a ...any) {
+	_, _ = std.Infoln(a...)
 }
 
-func Infof(format string, a ...any) (int, error) {
-	return std.Infof(format, a...)
+func Infof(format string, a ...any) {
+	_, _ = std.Infof(format, a...)
 }

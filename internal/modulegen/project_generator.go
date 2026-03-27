@@ -3,6 +3,7 @@ package modulegen
 import (
 	"net"
 
+	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/logger"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -15,11 +16,11 @@ func (g ProjectGenerator) ModuleType() ModuleType {
 }
 
 func (g ProjectGenerator) CheckInput(input *Input) []string {
-	var fields []string
+	var invalidFields []string
 	if input.ProjectID == "" {
-		fields = append(fields, "project_id")
+		invalidFields = append(invalidFields, "project_id")
 	}
-	return fields
+	return invalidFields
 }
 
 func (g ProjectGenerator) GetResourcesToFetch(input *Input, resourcesToFetch map[ResourceType]bool) {
@@ -55,19 +56,11 @@ func (g ProjectGenerator) Generate(_ *Input, store *ResourceStore) (*GenerateMod
 		To: "module.atlas_project.mongodbatlas_project.this",
 	})
 
-	attributes = append(attributes, Attribute{
-		Name:  "name",
-		Value: AttributeValue{Literal: new(cty.StringVal(projectRs.Name))},
-	})
+	attributes = append(attributes, StringAttr("name", projectRs.Name))
 
-	v := &Variable{
-		Name:        "org_id",
-		Description: "Atlas Organization ID",
-		Type:        cty.String,
-		Value:       cty.StringVal(projectRs.OrgId),
-	}
+	v := NewStringVar("org_id", "Atlas Organization ID", projectRs.OrgId)
 	variables = append(variables, v)
-	attributes = append(attributes, Attribute{Name: v.Name, Value: AttributeValue{Variable: v}})
+	attributes = append(attributes, VarAttr(v.Name, v))
 
 	if attr := generateProjectSettings(store); attr != nil {
 		attributes = append(attributes, *attr)
@@ -75,18 +68,11 @@ func (g ProjectGenerator) Generate(_ *Input, store *ResourceStore) (*GenerateMod
 
 	if projectRs.WithDefaultAlertsSettings != nil {
 		value := *projectRs.WithDefaultAlertsSettings
-		attributes = append(attributes, Attribute{
-			Name:           "with_default_alerts_settings",
-			IsDefaultValue: value,
-			Value:          AttributeValue{Literal: new(cty.BoolVal(value))},
-		})
+		attributes = append(attributes, BoolAttr("with_default_alerts_settings", value).WithIsDefault(value))
 	}
 
 	if projectRs.RegionUsageRestrictions != nil {
-		attributes = append(attributes, Attribute{
-			Name:  "region_usage_restrictions",
-			Value: AttributeValue{Literal: new(cty.StringVal(*projectRs.RegionUsageRestrictions))},
-		})
+		attributes = append(attributes, StringAttr("region_usage_restrictions", *projectRs.RegionUsageRestrictions))
 	}
 
 	// TODO@project-import-readiness: Module default for tags is `{}`, which does not match the API default `nil`.
@@ -96,10 +82,7 @@ func (g ProjectGenerator) Generate(_ *Input, store *ResourceStore) (*GenerateMod
 		for _, tag := range *projectRs.Tags {
 			tagsMap[tag.Key] = cty.StringVal(tag.Value)
 		}
-		attributes = append(attributes, Attribute{
-			Name:  "tags",
-			Value: AttributeValue{Literal: new(cty.MapVal(tagsMap))},
-		})
+		attributes = append(attributes, LiteralAttr("tags", cty.MapVal(tagsMap)))
 	}
 
 	if attr, importBlock := generateIPAccessList(store); attr != nil {
@@ -155,52 +138,30 @@ func generateProjectSettings(store *ResourceStore) *Attribute {
 	var attrs []Attribute
 	ps := store.ProjectSettings
 	if ps.IsSchemaAdvisorEnabled != nil {
-		attrs = append(attrs, Attribute{
-			Name:  "is_schema_advisor_enabled",
-			Value: AttributeValue{Literal: new(cty.BoolVal(*ps.IsSchemaAdvisorEnabled))},
-		})
+		attrs = append(attrs, BoolAttr("is_schema_advisor_enabled", *ps.IsSchemaAdvisorEnabled))
 	}
 	if ps.IsCollectDatabaseSpecificsStatisticsEnabled != nil {
-		attrs = append(attrs, Attribute{
-			Name:  "is_collect_database_specifics_enabled",
-			Value: AttributeValue{Literal: new(cty.BoolVal(*ps.IsCollectDatabaseSpecificsStatisticsEnabled))},
-		})
+		attrs = append(attrs, BoolAttr("is_collect_database_specifics_enabled", *ps.IsCollectDatabaseSpecificsStatisticsEnabled))
 	}
 	if ps.IsDataExplorerEnabled != nil {
-		attrs = append(attrs, Attribute{
-			Name:  "is_data_explorer_enabled",
-			Value: AttributeValue{Literal: new(cty.BoolVal(*ps.IsDataExplorerEnabled))},
-		})
+		attrs = append(attrs, BoolAttr("is_data_explorer_enabled", *ps.IsDataExplorerEnabled))
 	}
 	if ps.IsPerformanceAdvisorEnabled != nil {
-		attrs = append(attrs, Attribute{
-			Name:  "is_performance_advisor_enabled",
-			Value: AttributeValue{Literal: new(cty.BoolVal(*ps.IsPerformanceAdvisorEnabled))},
-		})
+		attrs = append(attrs, BoolAttr("is_performance_advisor_enabled", *ps.IsPerformanceAdvisorEnabled))
 	}
 	if ps.IsRealtimePerformancePanelEnabled != nil {
-		attrs = append(attrs, Attribute{
-			Name:  "is_realtime_performance_panel_enabled",
-			Value: AttributeValue{Literal: new(cty.BoolVal(*ps.IsRealtimePerformancePanelEnabled))},
-		})
+		attrs = append(attrs, BoolAttr("is_realtime_performance_panel_enabled", *ps.IsRealtimePerformancePanelEnabled))
 	}
 	if ps.IsExtendedStorageSizesEnabled != nil {
-		attrs = append(attrs, Attribute{
-			Name:  "is_extended_storage_sizes_enabled",
-			Value: AttributeValue{Literal: new(cty.BoolVal(*ps.IsExtendedStorageSizesEnabled))},
-		})
+		attrs = append(attrs, BoolAttr("is_extended_storage_sizes_enabled", *ps.IsExtendedStorageSizesEnabled))
 	}
 	if len(attrs) == 0 {
 		return nil
 	}
-	return &Attribute{
-		Name: "project_settings",
-		Comment: new(
-			"You can remove any of the following settings without any secondary effects.\n" +
-				"Their current value will remain unchanged in Atlas.",
-		),
-		Value: AttributeValue{Object: attrs},
-	}
+	return new(ObjectAttr("project_settings", attrs).WithComment(
+		"You can remove any of the following settings without any secondary effects.\n" +
+			"Their current value will remain unchanged in Atlas.",
+	))
 }
 
 func generateIPAccessList(store *ResourceStore) (*Attribute, *ImportBlock) {
@@ -230,18 +191,15 @@ func generateIPAccessList(store *ResourceStore) (*Attribute, *ImportBlock) {
 		case entry.AwsSecurityGroup != nil:
 			source = *entry.AwsSecurityGroup
 		default:
-			continue // Cannot happen, either cidr, ip or sec group are set in Atlas.
+			// Cannot happen, either cidr, ip or sec group are set in Atlas.
+			logger.Warning("access list entry does not contain a cidr, ip address or aws security group, skipping...")
+			continue
 		}
 
 		sources = append(sources, source)
-		element := []Attribute{
-			{Name: "source", Value: AttributeValue{Literal: new(cty.StringVal(source))}},
-		}
+		element := []Attribute{StringAttr("source", source)}
 		if entry.Comment != nil && *entry.Comment != "" {
-			element = append(element, Attribute{
-				Name:  "comment",
-				Value: AttributeValue{Literal: new(cty.StringVal(*entry.Comment))},
-			})
+			element = append(element, StringAttr("comment", *entry.Comment))
 		}
 		list = append(list, element)
 	}
@@ -267,45 +225,29 @@ func generateMaintenanceWindow(store *ResourceStore) (*Attribute, *ImportBlock) 
 	}
 
 	attrs := []Attribute{
-		{Name: "enabled", Value: AttributeValue{Literal: new(cty.BoolVal(true))}},
-		{Name: "day_of_week", Value: AttributeValue{Literal: new(cty.NumberIntVal(int64(mw.DayOfWeek)))}},
+		BoolAttr("enabled", true),
+		IntAttr("day_of_week", mw.DayOfWeek),
 	}
 
 	if mw.HourOfDay != nil {
-		attrs = append(attrs, Attribute{
-			Name:  "hour_of_day",
-			Value: AttributeValue{Literal: new(cty.NumberIntVal(int64(*mw.HourOfDay)))},
-		})
+		attrs = append(attrs, IntAttr("hour_of_day", *mw.HourOfDay))
 	}
 
 	if mw.AutoDeferOnceEnabled != nil {
 		value := *mw.AutoDeferOnceEnabled
-		attrs = append(attrs, Attribute{
-			Name:           "auto_defer_once_enabled",
-			IsDefaultValue: !value,
-			Value:          AttributeValue{Literal: new(cty.BoolVal(value))},
-		})
+		attrs = append(attrs, BoolAttr("auto_defer_once_enabled", value).WithIsDefault(!value))
 	}
 
 	if mw.ProtectedHours != nil {
 		var phAttrs []Attribute
 		if mw.ProtectedHours.StartHourOfDay != nil {
-			phAttrs = append(phAttrs, Attribute{
-				Name:  "start_hour_of_day",
-				Value: AttributeValue{Literal: new(cty.NumberIntVal(int64(*mw.ProtectedHours.StartHourOfDay)))},
-			})
+			phAttrs = append(phAttrs, IntAttr("start_hour_of_day", *mw.ProtectedHours.StartHourOfDay))
 		}
 		if mw.ProtectedHours.EndHourOfDay != nil {
-			phAttrs = append(phAttrs, Attribute{
-				Name:  "end_hour_of_day",
-				Value: AttributeValue{Literal: new(cty.NumberIntVal(int64(*mw.ProtectedHours.EndHourOfDay)))},
-			})
+			phAttrs = append(phAttrs, IntAttr("end_hour_of_day", *mw.ProtectedHours.EndHourOfDay))
 		}
 		if len(phAttrs) > 0 {
-			attrs = append(attrs, Attribute{
-				Name:  "protected_hours",
-				Value: AttributeValue{Object: phAttrs},
-			})
+			attrs = append(attrs, ObjectAttr("protected_hours", phAttrs))
 		}
 	}
 

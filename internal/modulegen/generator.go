@@ -30,10 +30,10 @@ type GenArgs struct {
 }
 
 func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error {
-	_, _ = logger.Debugln("[modulegen] Run")
+	logger.Debugln("[modulegen] Run")
 
 	// == Parse input ==
-	_, _ = logger.Infof("Reading input from %s...\n", args.InputPath)
+	logger.Infof("Reading input from %s...\n", args.InputPath)
 	var input Input
 	if err := parseInput(args.InputPath, &input); err != nil {
 		return err
@@ -61,9 +61,9 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		}
 	}
 	if len(invalidFieldsPerModule) > 0 {
-		_, _ = logger.Warningln("invalid input:")
+		logger.Warningln("invalid input:")
 		for field, moduleNames := range invalidFieldsPerModule {
-			_, _ = logger.Warningf("\t[%s] `%s` missing or invalid\n", strings.Join(moduleNames, ", "), field)
+			logger.Warningf("\t[%s] `%s` missing or invalid\n", strings.Join(moduleNames, ", "), field)
 		}
 		return errors.New("invalid input")
 	}
@@ -96,7 +96,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 	generatedVersions := generateVersions(generatedModules)
 
 	// == Render and write output files ==
-	_, _ = logger.Infoln("Generating output...")
+	logger.Infoln("Generating output...")
 
 	// read/write/execute for owner. read/execute for group and others.
 	const fileDirPermissions = 0o755
@@ -136,7 +136,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 
 		for _, variable := range generatedVersions.Variables {
 			if _, ok := variableNameSet[variable.Name]; ok {
-				_, _ = logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
+				logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
 				continue
 			}
 			variableNameSet[variable.Name] = true
@@ -146,7 +146,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		for _, generatedModule := range generatedModules {
 			for _, variable := range generatedModule.Variables {
 				if _, ok := variableNameSet[variable.Name]; ok {
-					_, _ = logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
+					logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
 					continue
 				}
 				variableNameSet[variable.Name] = true
@@ -181,8 +181,8 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		}
 	}
 
-	_, _ = logger.Infof("Done! Output written to: %s\n", args.OutputPath)
-	_, _ = logger.Infoln("See the IMPORT_GUIDE.md for next steps.")
+	logger.Infof("Done! Output written to: %s\n", args.OutputPath)
+	logger.Infoln("See the IMPORT_GUIDE.md for next steps.")
 
 	return nil
 }
@@ -251,14 +251,14 @@ func fetchResources(
 	for resourceType := range resourcesToFetch {
 		switch resourceType {
 		case ResourceTypeOrganization:
-			_, _ = logger.Infof("Reading organization `%s` from MongoDB Atlas...\n", input.OrgID)
+			logger.Infof("Reading organization `%s` from MongoDB Atlas...\n", input.OrgID)
 			org, _, err := clients.atlasClient.OrganizationsApi.GetOrg(ctx, input.OrgID).Execute()
 			if err != nil {
 				return nil, fmt.Errorf("error reading organization `%s` from MongoDB Atlas: %w", input.OrgID, err)
 			}
 			resourceStore.Organization = org
 		case ResourceTypeProject:
-			_, _ = logger.Infof("Reading project `%s` from MongoDB Atlas...\n", input.ProjectID)
+			logger.Infof("Reading project `%s` from MongoDB Atlas...\n", input.ProjectID)
 			project, _, err := clients.atlasClient.ProjectsApi.GetGroup(ctx, input.ProjectID).Execute()
 			if err != nil {
 				return nil, fmt.Errorf("error reading project `%s` from MongoDB Atlas: %w", input.ProjectID, err)
@@ -266,7 +266,7 @@ func fetchResources(
 			resourceStore.Project = project
 		/* TODO@non-spike: See project_generator.go
 		case ResourceTypeProjectLimits:
-			_, _ = logger.Infof("Reading project limits for `%s` from MongoDB Atlas...\n", input.ProjectID)
+			logger.Infof("Reading project limits for `%s` from MongoDB Atlas...\n", input.ProjectID)
 			projectLimits, _, err := clients.atlasClient.ProjectsApi.ListGroupLimits(ctx, input.ProjectID).Execute()
 			if err != nil {
 				return nil, fmt.Errorf("error reading project limits for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
@@ -274,21 +274,21 @@ func fetchResources(
 			resourceStore.ProjectLimits = projectLimits
 		*/
 		case ResourceTypeProjectSettings:
-			_, _ = logger.Infof("Reading project settings for `%s` from MongoDB Atlas...\n", input.ProjectID)
+			logger.Infof("Reading project settings for `%s` from MongoDB Atlas...\n", input.ProjectID)
 			ps, _, err := clients.atlasClient.ProjectsApi.GetGroupSettings(ctx, input.ProjectID).Execute()
 			if err != nil {
 				return nil, fmt.Errorf("error reading project settings for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
 			}
 			resourceStore.ProjectSettings = ps
 		case ResourceTypeProjectIPAccessList:
-			_, _ = logger.Infof("Reading project IP access list for `%s` from MongoDB Atlas...\n", input.ProjectID)
+			logger.Infof("Reading project IP access list for `%s` from MongoDB Atlas...\n", input.ProjectID)
 			list, _, err := clients.atlasClient.ProjectIPAccessListApi.ListAccessListEntries(ctx, input.ProjectID).Execute()
 			if err != nil {
 				return nil, fmt.Errorf("error reading project IP access list for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
 			}
 			resourceStore.ProjectIPAccessList = list
 		case ResourceTypeProjectMaintenanceWindow:
-			_, _ = logger.Infof("Reading project maintenance window for `%s` from MongoDB Atlas...\n", input.ProjectID)
+			logger.Infof("Reading project maintenance window for `%s` from MongoDB Atlas...\n", input.ProjectID)
 			mw, _, err := clients.atlasClient.MaintenanceWindowsApi.GetMaintenanceWindow(ctx, input.ProjectID).Execute()
 			if err != nil {
 				return nil, fmt.Errorf(
@@ -297,7 +297,7 @@ func fetchResources(
 			}
 			resourceStore.ProjectMaintenanceWindow = mw
 		case ResourceTypeClusters:
-			_, _ = logger.Infof("Reading clusters [`%s`] from MongoDB Atlas...\n", strings.Join(input.ClusterNames, "`, `"))
+			logger.Infof("Reading clusters [`%s`] from MongoDB Atlas...\n", strings.Join(input.ClusterNames, "`, `"))
 			clusters := make([]*admin.ClusterDescription20240805, len(input.ClusterNames))
 			for i, clusterName := range input.ClusterNames {
 				cluster, _, err := clients.atlasClient.ClustersApi.GetCluster(ctx, input.ProjectID, clusterName).Execute()
@@ -323,22 +323,19 @@ func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersions
 	for _, generatedModule := range generatedModules {
 		for _, provider := range generatedModule.Providers {
 			if existing, ok := providerMap[provider.ProviderType]; ok {
-				pMajor, pMinor := provider.Version.Major, provider.Version.Minor
-				eMajor, eMinor := existing.Version.Major, existing.Version.Minor
-				if pMajor > eMajor || (pMajor == eMajor && pMinor > eMinor) {
+				if provider.Version.GreaterThan(existing.Version) {
 					*existing = provider
 				}
-				_, _ = logger.Debugf("[modulegen] Deduplicated provider: %s %s\n", provider.ProviderType, existing.Version)
+				logger.Debugf("[modulegen] Deduplicated provider: %s %s\n", provider.ProviderType, existing.Version)
 			} else {
 				providers = append(providers, provider)
 				providerMap[provider.ProviderType] = &providers[len(providers)-1]
 			}
 		}
 
-		tfMajor, tfMinor := generatedModule.TerraformVersion.Major, generatedModule.TerraformVersion.Minor
-		if tfMajor > tfVersion.Major || (tfMajor == tfVersion.Major && tfMinor > tfVersion.Minor) {
+		if generatedModule.TerraformVersion.GreaterThan(tfVersion) {
 			tfVersion = generatedModule.TerraformVersion
-			_, _ = logger.Debugf("[modulegen] Required Terraform version updated to: %s\n", tfVersion)
+			logger.Debugf("[modulegen] Required Terraform version updated to: %s\n", tfVersion)
 		}
 	}
 
@@ -367,8 +364,8 @@ func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersions
 				Source:  "mongodb/mongodbatlas",
 				Version: p.Version,
 				Attributes: []Attribute{
-					{Name: "client_id", Value: AttributeValue{Variable: clientID}},
-					{Name: "client_secret", Value: AttributeValue{Variable: clientSecret}},
+					VarAttr("client_id", clientID),
+					VarAttr("client_secret", clientSecret),
 				},
 			})
 		}

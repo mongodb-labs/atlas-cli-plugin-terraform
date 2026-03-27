@@ -76,9 +76,32 @@ type GenerateModuleResult struct {
 	TerraformVersion Version
 }
 
+type GenerateVersionsResult struct {
+	Blocks    []*ProviderInfo
+	Variables []*Variable
+	TFVersion Version
+}
+
+type ProviderType string
+
+const (
+	ProviderTypeAtlas   ProviderType = "mongodbatlas"
+	ProviderTypeAWS     ProviderType = "aws"
+	ProviderTypeAzure   ProviderType = "azurerm"
+	ProviderTypeAzureAD ProviderType = "azuread"
+	ProviderTypeGCP     ProviderType = "google"
+)
+
 type ProviderRequirement struct {
 	ProviderType ProviderType
 	Version      Version
+}
+
+type ProviderInfo struct {
+	Name       string
+	Source     string
+	Attributes []Attribute
+	Version    Version
 }
 
 type Version struct {
@@ -94,6 +117,16 @@ func (v Version) String() string {
 	return fmt.Sprintf("%s %d.%d", v.Operator, v.Major, v.Minor)
 }
 
+func (v Version) GreaterThan(o Version) bool {
+	return v.Major > o.Major || (v.Major == o.Major && v.Minor > o.Minor)
+}
+
+type ImportBlock struct {
+	ID      string
+	To      string
+	ForEach []string
+}
+
 type ModuleBlock struct {
 	Name       string
 	Source     string
@@ -101,16 +134,12 @@ type ModuleBlock struct {
 	Version    Version
 }
 
-type ProviderType string
-
-const (
-	ProviderTypeAtlas ProviderType = "mongodbatlas"
-)
-
-type ImportBlock struct {
-	ID      string
-	To      string
-	ForEach []string
+type Variable struct {
+	Value        cty.Value
+	Type         cty.Type
+	DefaultValue *cty.Value
+	Name         string
+	Description  string
 }
 
 type Attribute struct {
@@ -128,23 +157,50 @@ type AttributeValue struct {
 	ObjectList [][]Attribute
 }
 
-type Variable struct {
-	Value        cty.Value
-	Type         cty.Type
-	DefaultValue *cty.Value
-	Name         string
-	Description  string
+func LiteralAttr(name string, value cty.Value) Attribute {
+	return Attribute{Name: name, Value: AttributeValue{Literal: &value}}
 }
 
-type ProviderInfo struct {
-	Name       string
-	Source     string
-	Attributes []Attribute
-	Version    Version
+func StringAttr(name, value string) Attribute {
+	return LiteralAttr(name, cty.StringVal(value))
 }
 
-type GenerateVersionsResult struct {
-	Blocks    []*ProviderInfo
-	Variables []*Variable
-	TFVersion Version
+func BoolAttr(name string, value bool) Attribute {
+	return LiteralAttr(name, cty.BoolVal(value))
+}
+
+func IntAttr(name string, value int) Attribute {
+	return LiteralAttr(name, cty.NumberIntVal(int64(value)))
+}
+
+func ObjectAttr(name string, attrs []Attribute) Attribute {
+	return Attribute{Name: name, Value: AttributeValue{Object: attrs}}
+}
+
+func VarAttr(name string, v *Variable) Attribute {
+	return Attribute{Name: name, Value: AttributeValue{Variable: v}}
+}
+
+func (a Attribute) WithIsDefault(isDefault bool) Attribute {
+	a.IsDefaultValue = isDefault
+	return a
+}
+
+func (a Attribute) WithComment(comment string) Attribute {
+	a.Comment = &comment
+	return a
+}
+
+func NewStringVar(name, description, value string) *Variable {
+	return &Variable{
+		Name:        name,
+		Description: description,
+		Type:        cty.String,
+		Value:       cty.StringVal(value),
+	}
+}
+
+func (v *Variable) WithDefault(defaultValue cty.Value) *Variable {
+	v.DefaultValue = &defaultValue
+	return v
 }

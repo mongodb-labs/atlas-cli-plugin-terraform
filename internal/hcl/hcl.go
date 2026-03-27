@@ -145,7 +145,7 @@ func AppendComment(body *hclwrite.Body, comment string) {
 // TokensComment returns the tokens for a comment.
 func TokensComment(comment string) hclwrite.Tokens {
 	var tokens hclwrite.Tokens
-	for _, line := range strings.Split(comment, "\n") {
+	for line := range strings.SplitSeq(comment, "\n") {
 		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenComment, Bytes: []byte("# " + line + "\n")})
 	}
 	return tokens

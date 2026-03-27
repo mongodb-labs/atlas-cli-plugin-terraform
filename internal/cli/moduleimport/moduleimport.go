@@ -52,7 +52,7 @@ func Builder() *cobra.Command {
 }
 
 func (opts *Opts) PreRun(cmd *cobra.Command, args []string) error {
-	_, _ = logger.Debugln("[module-import] PreRunE")
+	logger.Debugln("[module-import] PreRunE")
 
 	profile, err := config.LoadAtlasCLIConfig()
 	if err != nil {
@@ -85,7 +85,7 @@ func (opts *Opts) PreRun(cmd *cobra.Command, args []string) error {
 }
 
 func (opts *Opts) Run(cmd *cobra.Command, args []string) error {
-	_, _ = logger.Debugln("[module-import] RunE")
+	logger.Debugln("[module-import] RunE")
 	err := modulegen.Run(
 		cmd.Context(),
 		&modulegen.GenArgs{
