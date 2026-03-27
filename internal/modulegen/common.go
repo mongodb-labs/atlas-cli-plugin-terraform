@@ -21,18 +21,37 @@ const (
 	ModuleTypeCluster ModuleType = "cluster"
 )
 
-type ResourceType string
+func (m ModuleType) GetModuleGenerator() (ModuleGenerator, error) {
+	switch m {
+	case ModuleTypeProject:
+		return ProjectGenerator{}, nil
+	case ModuleTypeCluster:
+		return ClustersGenerator{}, nil
+	}
+	return nil, fmt.Errorf("invalid module type: %s", m)
+}
+
+type ResourceType int
 
 const (
-	ResourceTypeOrganization ResourceType = "organization"
-	ResourceTypeProject      ResourceType = "project"
-	ResourceTypeClusters     ResourceType = "clusters"
+	ResourceTypeOrganization ResourceType = iota
+	ResourceTypeProject
+	// TODO@non-spike: See project_generator.go
+	// ResourceTypeProjectLimits
+	ResourceTypeProjectSettings
+	ResourceTypeProjectIPAccessList
+	ResourceTypeProjectMaintenanceWindow
+	ResourceTypeClusters
 )
 
 type ResourceStore struct {
-	Organization *admin.AtlasOrganization
-	Project      *admin.Group
-	Clusters     []*admin.ClusterDescription20240805
+	Organization             *admin.AtlasOrganization
+	Project                  *admin.Group
+	ProjectLimits            []admin.DataFederationLimit
+	ProjectSettings          *admin.GroupSettings
+	ProjectIPAccessList      *admin.PaginatedNetworkAccess
+	ProjectMaintenanceWindow *admin.GroupMaintenanceWindow
+	Clusters                 []*admin.ClusterDescription20240805
 }
 
 type ModuleGenerator interface {
@@ -48,13 +67,18 @@ type ModuleGenerator interface {
 
 type GenerateModuleResult struct {
 	ModuleType   ModuleType
-	Providers    []ProviderInfo
+	Providers    []ProviderRequirement
 	ImportBlocks []*ImportBlock
 	ModuleBlocks []*ModuleBlock
 	Variables    []*Variable
 	// TODO add outputs
 	// OutputBlocks []*OutputBlock // nolint:gocritic
 	TerraformVersion Version
+}
+
+type ProviderRequirement struct {
+	ProviderType ProviderType
+	Version      Version
 }
 
 type Version struct {
@@ -73,8 +97,8 @@ func (v Version) String() string {
 type ModuleBlock struct {
 	Name       string
 	Source     string
-	Version    string
 	Attributes []Attribute
+	Version    Version
 }
 
 type ProviderType string
@@ -83,39 +107,44 @@ const (
 	ProviderTypeAtlas ProviderType = "mongodbatlas"
 )
 
-func ProviderSource(providerType ProviderType) string {
-	switch providerType { //nolint:gocritic
-	case ProviderTypeAtlas:
-		return "mongodb/mongodbatlas"
-	}
-	panic("unsupported provider type")
-}
-
-// TODO@check: Provider type should be enough to generate the provider version + provider block. So we should only need
-// the min version per module to then use the highest one across modules.
-type ProviderInfo struct {
-	ProviderType ProviderType
-	Version      Version
-}
-
 type ImportBlock struct {
-	ID string
-	To string
+	ID      string
+	To      string
+	ForEach []string
 }
 
 type Attribute struct {
-	Name    string
-	Comment *string // Comments to be included right above this input in the generated config
+	Comment        *string
+	Name           string
+	Value          AttributeValue
+	IsDefaultValue bool
+}
 
-	// The attribute value, only one of the following is set
-	Literal      *cty.Value
-	Variable     *Variable
-	NestedInputs []Attribute
+type AttributeValue struct {
+	// Only one of the following is set
+	Literal    *cty.Value
+	Variable   *Variable
+	Object     []Attribute
+	ObjectList [][]Attribute
 }
 
 type Variable struct {
-	Value       cty.Value
-	Type        cty.Type
-	Name        string
-	Description string
+	Value        cty.Value
+	Type         cty.Type
+	DefaultValue *cty.Value
+	Name         string
+	Description  string
+}
+
+type ProviderInfo struct {
+	Name       string
+	Source     string
+	Attributes []Attribute
+	Version    Version
+}
+
+type GenerateVersionsResult struct {
+	Blocks    []*ProviderInfo
+	Variables []*Variable
+	TFVersion Version
 }
