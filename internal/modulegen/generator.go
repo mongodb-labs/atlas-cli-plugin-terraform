@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/logger"
 	"github.com/zclconf/go-cty/cty"
-	"go.mongodb.org/atlas-sdk/v20250312014/admin"
 )
 
 type AtlasClientArgs struct {
@@ -72,7 +71,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 	// It is currently safe to assume that there is only one resource of each type (except clusters), so gathering
 	// the resource type is enough in this step. If this assumption is no longer true, we can collect resource type &
 	// id instead.
-	resourcesToFetch := map[ResourceType]bool{}
+	resourcesToFetch := NewResourcesToFetch()
 	for _, generator := range generators {
 		generator.GetResourcesToFetch(&input, resourcesToFetch)
 	}
@@ -80,7 +79,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 	// == Fetch resources ==
 	// Fetch all resources needed for generating the requested modules.
 	// No network calls are made outside of this step.
-	resourceStore, err := fetchResources(ctx, clientArgs, &input, resourcesToFetch)
+	resourceStore, err := FetchResources(ctx, clientArgs, &input, resourcesToFetch)
 	if err != nil {
 		return err
 	}
@@ -93,7 +92,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 			return fmt.Errorf("failed to generate module %s: %w", string(generator.ModuleType()), err)
 		}
 	}
-	generatedVersions := generateVersions(generatedModules)
+	generatedVersions := generateVersions(clientArgs.AtlasBaseURL, &input, generatedModules)
 
 	// == Render and write output files ==
 	logger.Infoln("Generating output...")
@@ -205,114 +204,9 @@ func parseInput(inputPath string, input *Input) error {
 	return nil
 }
 
-type Clients struct {
-	atlasClient *admin.APIClient
-	// awsClient, gcpClient, azureClient
-}
-
-func initClients(clientArgs *AtlasClientArgs, resourcesToFetch map[ResourceType]bool) (Clients, error) {
-	var err error
-	clients := Clients{}
-
-	// Note: Assuming that we always need the Atlas client
-	clients.atlasClient, err = admin.NewClient(
-		// Uncomment to see Atlas SDK debug logs when tool is run in debug mode.
-		// admin.UseDebug(log.IsDebugLevel()) //nolint:gocritic
-		admin.UseBaseURL(clientArgs.AtlasBaseURL),
-		admin.UseHTTPClient(clientArgs.HTTPClient),
-		admin.UseUserAgent(clientArgs.UserAgent),
-	)
-	if err != nil {
-		return clients, fmt.Errorf("failed to create atlas client: %w", err)
-	}
-
-	// TODO: Initialize other clients based on the resources to fetch
-
-	return clients, nil
-}
-
-// fetchResources fetches all resources needed for generating the requested modules and populates them in resourceStore.
-// Note: For testing, mock this whole function. No network calls are made outside of this function.
-func fetchResources(
-	ctx context.Context,
-	clientArgs *AtlasClientArgs,
-	input *Input,
-	resourcesToFetch map[ResourceType]bool,
-) (*ResourceStore, error) {
-	clients, err := initClients(clientArgs, resourcesToFetch)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Parallelize
-	// TODO: Parallelize
-	// TODO: Parallelize
-	resourceStore := ResourceStore{}
-	for resourceType := range resourcesToFetch {
-		switch resourceType {
-		case ResourceTypeOrganization:
-			logger.Infof("Reading organization `%s` from MongoDB Atlas...\n", input.OrgID)
-			org, _, err := clients.atlasClient.OrganizationsApi.GetOrg(ctx, input.OrgID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading organization `%s` from MongoDB Atlas: %w", input.OrgID, err)
-			}
-			resourceStore.Organization = org
-		case ResourceTypeProject:
-			logger.Infof("Reading project `%s` from MongoDB Atlas...\n", input.ProjectID)
-			project, _, err := clients.atlasClient.ProjectsApi.GetGroup(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading project `%s` from MongoDB Atlas: %w", input.ProjectID, err)
-			}
-			resourceStore.Project = project
-		/* TODO@non-spike: See project_generator.go
-		case ResourceTypeProjectLimits:
-			logger.Infof("Reading project limits for `%s` from MongoDB Atlas...\n", input.ProjectID)
-			projectLimits, _, err := clients.atlasClient.ProjectsApi.ListGroupLimits(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading project limits for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
-			}
-			resourceStore.ProjectLimits = projectLimits
-		*/
-		case ResourceTypeProjectSettings:
-			logger.Infof("Reading project settings for `%s` from MongoDB Atlas...\n", input.ProjectID)
-			ps, _, err := clients.atlasClient.ProjectsApi.GetGroupSettings(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading project settings for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
-			}
-			resourceStore.ProjectSettings = ps
-		case ResourceTypeProjectIPAccessList:
-			logger.Infof("Reading project IP access list for `%s` from MongoDB Atlas...\n", input.ProjectID)
-			list, _, err := clients.atlasClient.ProjectIPAccessListApi.ListAccessListEntries(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading project IP access list for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
-			}
-			resourceStore.ProjectIPAccessList = list
-		case ResourceTypeProjectMaintenanceWindow:
-			logger.Infof("Reading project maintenance window for `%s` from MongoDB Atlas...\n", input.ProjectID)
-			mw, _, err := clients.atlasClient.MaintenanceWindowsApi.GetMaintenanceWindow(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf(
-					"error reading project maintenance window for `%s` from MongoDB Atlas: %w", input.ProjectID, err,
-				)
-			}
-			resourceStore.ProjectMaintenanceWindow = mw
-		case ResourceTypeClusters:
-			logger.Infof("Reading clusters [`%s`] from MongoDB Atlas...\n", strings.Join(input.ClusterNames, "`, `"))
-			clusters := make([]*admin.ClusterDescription20240805, len(input.ClusterNames))
-			for i, clusterName := range input.ClusterNames {
-				cluster, _, err := clients.atlasClient.ClustersApi.GetCluster(ctx, input.ProjectID, clusterName).Execute()
-				if err != nil {
-					return nil, fmt.Errorf("error reading cluster `%s` from MongoDB Atlas: %w", clusterName, err)
-				}
-				clusters[i] = cluster
-			}
-			resourceStore.Clusters = clusters
-		}
-	}
-	return &resourceStore, nil
-}
-
-func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersionsResult {
+func generateVersions(
+	atlasBaseURL string, input *Input, generatedModules []*GenerateModuleResult,
+) GenerateVersionsResult {
 	// Highest required terraform version
 	var tfVersion Version
 	// Collect all provider requirements and deduplicate by type, taking the one with the highest required version.
@@ -342,8 +236,16 @@ func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersions
 	var blocks []*ProviderInfo
 	var variables []*Variable
 	for _, p := range providers {
-		switch p.ProviderType { //nolint:gocritic
+		switch p.ProviderType {
 		case ProviderTypeAtlas:
+			var attributes []Attribute
+			if atlasBaseURL != "https://cloud.mongodb.com" {
+				if atlasBaseURL == "https://cloud.mongodbgov.com" {
+					attributes = append(attributes, BoolAttr("is_mongodbgov_cloud", true))
+				} else {
+					attributes = append(attributes, StringAttr("base_url", atlasBaseURL))
+				}
+			}
 			clientID := &Variable{
 				Name:         "atlas_client_id",
 				Description:  "Atlas Service Account Client ID",
@@ -359,13 +261,44 @@ func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersions
 				DefaultValue: new(cty.StringVal("")),
 			}
 			variables = append(variables, clientID, clientSecret)
+			attributes = append(attributes, VarAttr("client_id", clientID), VarAttr("client_secret", clientSecret))
 			blocks = append(blocks, &ProviderInfo{
-				Name:    "mongodbatlas",
-				Source:  "mongodb/mongodbatlas",
+				Name:       "mongodbatlas",
+				Source:     "mongodb/mongodbatlas",
+				Version:    p.Version,
+				Attributes: attributes,
+			})
+		case ProviderTypeAWS:
+			blocks = append(blocks, &ProviderInfo{
+				Name:       "aws",
+				Source:     "hashicorp/aws",
+				Version:    p.Version,
+				Attributes: []Attribute{StringAttr("region", input.MultiSDK.AWSRegion)},
+			})
+		case ProviderTypeAzureRM:
+			blocks = append(blocks, &ProviderInfo{
+				Name:    "azurerm",
+				Source:  "hashicorp/azurerm",
 				Version: p.Version,
 				Attributes: []Attribute{
-					VarAttr("client_id", clientID),
-					VarAttr("client_secret", clientSecret),
+					StringAttr("subscription_id", input.MultiSDK.AzureSubscriptionID),
+					BlockAttr("features", nil),
+				},
+			})
+		case ProviderTypeAzureAD:
+			blocks = append(blocks, &ProviderInfo{
+				Name:    "azuread",
+				Source:  "hashicorp/azuread",
+				Version: p.Version,
+			})
+		case ProviderTypeGoogle:
+			blocks = append(blocks, &ProviderInfo{
+				Name:    "google",
+				Source:  "hashicorp/google",
+				Version: p.Version,
+				Attributes: []Attribute{
+					StringAttr("project", input.MultiSDK.GCPProjectID),
+					StringAttr("region", input.MultiSDK.GCPRegion),
 				},
 			})
 		}

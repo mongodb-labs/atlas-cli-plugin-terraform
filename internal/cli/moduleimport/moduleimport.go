@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	CloudServiceURL    = "https://cloud.mongodb.com/"
-	CloudGovServiceURL = "https://cloud.mongodbgov.com/"
+	CloudServiceURL    = "https://cloud.mongodb.com"
+	CloudGovServiceURL = "https://cloud.mongodbgov.com"
 )
 
 // TODO@non-spike: Support tracking plugin versions, used in UserAgent header.
