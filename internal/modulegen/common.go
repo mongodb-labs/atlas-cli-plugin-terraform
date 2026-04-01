@@ -105,8 +105,6 @@ const (
 	GCPResourceTypeStorageBucket GCPResourceType = iota
 )
 
-// ResourcesToFetch groups fetch requests by cloud provider.
-// A non-empty map for a given provider signals that its SDK clients should be initialized.
 type ResourcesToFetch struct {
 	Atlas map[AtlasResourceType]bool
 	AWS   map[AWSResourceType]bool
@@ -131,29 +129,29 @@ type ResourceStore struct {
 }
 
 type AtlasResources struct {
-	Organization             *admin.AtlasOrganization
-	Project                  *admin.Group
-	ProjectSettings          *admin.GroupSettings
-	ProjectIPAccessList      *admin.PaginatedNetworkAccess
-	ProjectMaintenanceWindow *admin.GroupMaintenanceWindow
-	CPARoleAWS               *admin.CloudProviderAccessAWSIAMRole
-	CPARoleAzure             *admin.CloudProviderAccessAzureServicePrincipal
-	CPARoleGCP               *admin.CloudProviderAccessGCPServiceAccount
-	ProjectLimits            []admin.DataFederationLimit
-	Clusters                 []*admin.ClusterDescription20240805
+	Organization             *admin.AtlasOrganization                        `json:",omitempty"`
+	Project                  *admin.Group                                    `json:",omitempty"`
+	ProjectSettings          *admin.GroupSettings                            `json:",omitempty"`
+	ProjectIPAccessList      *admin.PaginatedNetworkAccess                   `json:",omitempty"`
+	ProjectMaintenanceWindow *admin.GroupMaintenanceWindow                   `json:",omitempty"`
+	CPARoleAWS               *admin.CloudProviderAccessAWSIAMRole            `json:",omitempty"`
+	CPARoleAzure             *admin.CloudProviderAccessAzureServicePrincipal `json:",omitempty"`
+	CPARoleGCP               *admin.CloudProviderAccessGCPServiceAccount     `json:",omitempty"`
+	ProjectLimits            []admin.DataFederationLimit                     `json:",omitempty"`
+	Clusters                 []*admin.ClusterDescription20240805             `json:",omitempty"`
 }
 
 type AWSResources struct {
-	S3Bucket *s3.HeadBucketOutput
+	S3Bucket *s3.HeadBucketOutput `json:",omitempty"`
 }
 
 type AzureResources struct {
-	ADGroup       graphmodels.Groupable
-	ResourceGroup *armresources.ResourceGroup
+	ADGroup       *graphmodels.Group          `json:",omitempty"`
+	ResourceGroup *armresources.ResourceGroup `json:",omitempty"`
 }
 
 type GCPResources struct {
-	StorageBucket *storage.BucketAttrs
+	StorageBucket *storage.BucketAttrs `json:",omitempty"`
 }
 
 type ModuleGenerator interface {

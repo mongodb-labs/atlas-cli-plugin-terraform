@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,18 +16,13 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type AtlasClientArgs struct {
-	HTTPClient   *http.Client
-	AtlasBaseURL string
-	UserAgent    string
-}
-
 type GenArgs struct {
-	InputPath  string
-	OutputPath string
+	InputPath    string
+	OutputPath   string
+	AtlasBaseURL string
 }
 
-func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error {
+func Run(ctx context.Context, args *GenArgs, client Client) error {
 	logger.Debugln("[modulegen] Run")
 
 	// == Parse input ==
@@ -79,7 +73,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 	// == Fetch resources ==
 	// Fetch all resources needed for generating the requested modules.
 	// No network calls are made outside of this step.
-	resourceStore, err := FetchResources(ctx, clientArgs, &input, resourcesToFetch)
+	resourceStore, err := client.FetchResources(ctx, &input, resourcesToFetch)
 	if err != nil {
 		return err
 	}
@@ -92,14 +86,13 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 			return fmt.Errorf("failed to generate module %s: %w", string(generator.ModuleType()), err)
 		}
 	}
-	generatedVersions := generateVersions(clientArgs.AtlasBaseURL, &input, generatedModules)
+	generatedVersions := generateVersions(args.AtlasBaseURL, &input, generatedModules)
 
 	// == Render and write output files ==
 	logger.Infoln("Generating output...")
 
-	// read/write/execute for owner. read/execute for group and others.
-	const fileDirPermissions = 0o755
-	if err = os.MkdirAll(args.OutputPath, fileDirPermissions); err != nil {
+	const dirPermissions, filePermissions = 0o700, 0o600 // owner: read/write/execute for dir, read/write for file.
+	if err = os.MkdirAll(args.OutputPath, dirPermissions); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %w", args.OutputPath, err)
 	}
 
@@ -112,7 +105,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		buffer.Write(RenderModuleBlocks(generatedModule.ModuleBlocks))
 
 		filePath := filepath.Join(args.OutputPath, string(generatedModule.ModuleType)+".tf")
-		if err := os.WriteFile(filePath, buffer.Bytes(), fileDirPermissions); err != nil {
+		if err := os.WriteFile(filePath, buffer.Bytes(), filePermissions); err != nil {
 			return fmt.Errorf("failed to write to file %s: %w", filePath, err)
 		}
 	}
@@ -121,7 +114,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		// Render and write
 		filePath := filepath.Join(args.OutputPath, "versions.tf")
 		rendered := RenderVersionsAndProviders(generatedVersions.TFVersion, generatedVersions.Blocks)
-		if err := os.WriteFile(filePath, rendered, fileDirPermissions); err != nil {
+		if err := os.WriteFile(filePath, rendered, filePermissions); err != nil {
 			return fmt.Errorf("failed to write to file %s: %w", filePath, err)
 		}
 	}
@@ -158,12 +151,12 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 			rendered := RenderVariables(variables)
 
 			variablesPath := filepath.Join(args.OutputPath, "variables.tf")
-			if err := os.WriteFile(variablesPath, rendered.Blocks, fileDirPermissions); err != nil {
+			if err := os.WriteFile(variablesPath, rendered.Blocks, filePermissions); err != nil {
 				return fmt.Errorf("failed to write to file %s: %w", variablesPath, err)
 			}
 
 			tfvarsPath := filepath.Join(args.OutputPath, "terraform.tfvars")
-			if err := os.WriteFile(tfvarsPath, rendered.Definitions, fileDirPermissions); err != nil {
+			if err := os.WriteFile(tfvarsPath, rendered.Definitions, filePermissions); err != nil {
 				return fmt.Errorf("failed to write to file %s: %w", tfvarsPath, err)
 			}
 		}
@@ -175,7 +168,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 			guideData.ModuleTypes = append(guideData.ModuleTypes, m.ModuleType)
 		}
 		filePath := filepath.Join(args.OutputPath, "IMPORT_GUIDE.md")
-		if err := os.WriteFile(filePath, RenderImportGuide(guideData), fileDirPermissions); err != nil {
+		if err := os.WriteFile(filePath, RenderImportGuide(guideData), filePermissions); err != nil {
 			return fmt.Errorf("failed to write to file %s: %w", filePath, err)
 		}
 	}
@@ -239,8 +232,8 @@ func generateVersions(
 		switch p.ProviderType {
 		case ProviderTypeAtlas:
 			var attributes []Attribute
-			if atlasBaseURL != "https://cloud.mongodb.com" {
-				if atlasBaseURL == "https://cloud.mongodbgov.com" {
+			if atlasBaseURL != CloudServiceURL {
+				if atlasBaseURL == CloudGovServiceURL {
 					attributes = append(attributes, BoolAttr("is_mongodbgov_cloud", true))
 				} else {
 					attributes = append(attributes, StringAttr("base_url", atlasBaseURL))
@@ -276,12 +269,19 @@ func generateVersions(
 				Attributes: []Attribute{StringAttr("region", input.MultiSDK.AWSRegion)},
 			})
 		case ProviderTypeAzureRM:
+			subscriptionID := &Variable{
+				Name:        "azure_subscription_id",
+				Description: "Azure subscription ID",
+				Type:        cty.String,
+				Value:       cty.StringVal(input.MultiSDK.AzureSubscriptionID),
+			}
+			variables = append(variables, subscriptionID)
 			blocks = append(blocks, &ProviderInfo{
 				Name:    "azurerm",
 				Source:  "hashicorp/azurerm",
 				Version: p.Version,
 				Attributes: []Attribute{
-					StringAttr("subscription_id", input.MultiSDK.AzureSubscriptionID),
+					VarAttr("subscription_id", subscriptionID),
 					BlockAttr("features", nil),
 				},
 			})
@@ -292,12 +292,19 @@ func generateVersions(
 				Version: p.Version,
 			})
 		case ProviderTypeGoogle:
+			projectID := &Variable{
+				Name:        "gcp_project_id",
+				Description: "GCP project ID",
+				Type:        cty.String,
+				Value:       cty.StringVal(input.MultiSDK.GCPProjectID),
+			}
+			variables = append(variables, projectID)
 			blocks = append(blocks, &ProviderInfo{
 				Name:    "google",
 				Source:  "hashicorp/google",
 				Version: p.Version,
 				Attributes: []Attribute{
-					StringAttr("project", input.MultiSDK.GCPProjectID),
+					VarAttr("project", projectID),
 					StringAttr("region", input.MultiSDK.GCPRegion),
 				},
 			})

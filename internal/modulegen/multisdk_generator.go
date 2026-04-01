@@ -111,11 +111,9 @@ func (g MultiSDKGenerator) Generate(input *Input, store *ResourceStore) (*Genera
 	addVar("project_id", "MongoDB Atlas project ID", input.ProjectID)
 
 	// AWS
-	addVar("aws_region", "AWS region for the provider", input.MultiSDK.AWSRegion)
 	addVar("aws_bucket_name", "Name of the S3 bucket", input.MultiSDK.AWSBucketName)
 
 	// Azure
-	addVar("azure_subscription_id", "Azure subscription ID", input.MultiSDK.AzureSubscriptionID)
 	addVar("azure_tenant_id", "Azure tenant ID", input.MultiSDK.AzureTenantID)
 	addVar("atlas_azure_app_id", "MongoDB Atlas Azure application ID", azureRole.GetAtlasAzureAppId())
 	addVar(
@@ -128,7 +126,6 @@ func (g MultiSDKGenerator) Generate(input *Input, store *ResourceStore) (*Genera
 	addVar("azure_ad_group_name", "Display name for the Azure AD security group", *store.Azure.ADGroup.GetDisplayName())
 
 	// GCP
-	addVar("gcp_project_id", "GCP project ID", input.MultiSDK.GCPProjectID)
 	addVar("gcp_region", "GCP region", input.MultiSDK.GCPRegion)
 	addVar("gcp_bucket_name", "Name of the GCS bucket", input.MultiSDK.GCPBucketName)
 

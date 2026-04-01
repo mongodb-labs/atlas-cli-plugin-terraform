@@ -193,7 +193,7 @@ func generateIPAccessList(store *ResourceStore) (*Attribute, *ImportBlock) {
 			source = *entry.AwsSecurityGroup
 		default:
 			// Cannot happen, either cidr, ip or sec group are set in Atlas.
-			logger.Warning("access list entry does not contain a cidr, ip address or aws security group, skipping...")
+			logger.Warningln("access list entry does not contain a cidr, ip address or aws security group, skipping...")
 			continue
 		}
 

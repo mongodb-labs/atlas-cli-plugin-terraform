@@ -1,5 +1,6 @@
 bin
 bin-plugin
+internal/modulegen/recordings/
 .vscode
 .DS_Store
 .idea

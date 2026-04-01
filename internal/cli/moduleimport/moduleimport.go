@@ -13,11 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	CloudServiceURL    = "https://cloud.mongodb.com"
-	CloudGovServiceURL = "https://cloud.mongodbgov.com"
-)
-
 // TODO@non-spike: Support tracking plugin versions, used in UserAgent header.
 var Version = "dev"
 
@@ -62,9 +57,9 @@ func (opts *Opts) PreRun(cmd *cobra.Command, args []string) error {
 	// Use user-overridden url, otherwise if gov use gov url, otherwise use default.
 	if opts.atlasBaseURL = profile.OpsManagerURL(); opts.atlasBaseURL == "" {
 		if profile.Service() == config.CloudGovService {
-			opts.atlasBaseURL = CloudGovServiceURL
+			opts.atlasBaseURL = modulegen.CloudGovServiceURL
 		} else {
-			opts.atlasBaseURL = CloudServiceURL
+			opts.atlasBaseURL = modulegen.CloudServiceURL
 		}
 	}
 
@@ -89,10 +84,11 @@ func (opts *Opts) Run(cmd *cobra.Command, args []string) error {
 	err := modulegen.Run(
 		cmd.Context(),
 		&modulegen.GenArgs{
-			InputPath:  opts.input,
-			OutputPath: opts.output,
+			InputPath:    opts.input,
+			OutputPath:   opts.output,
+			AtlasBaseURL: opts.atlasBaseURL,
 		},
-		&modulegen.AtlasClientArgs{
+		&modulegen.DefaultClient{
 			AtlasBaseURL: opts.atlasBaseURL,
 			// TODO@non-spike: Look into differentiating the plugin's UserAgent from the cli one
 			UserAgent:  config.UserAgent(Version),

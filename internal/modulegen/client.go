@@ -3,6 +3,7 @@ package modulegen
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"cloud.google.com/go/storage"
@@ -11,51 +12,71 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
+	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/logger"
 	"go.mongodb.org/atlas-sdk/v20250312014/admin"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 )
 
-type AWSClients struct {
+const (
+	CloudServiceURL    = "https://cloud.mongodb.com"
+	CloudGovServiceURL = "https://cloud.mongodbgov.com"
+	CloudDevServiceURL = "https://cloud-dev.mongodb.com"
+)
+
+var _ Client = &DefaultClient{}
+
+// Client mock-able interface for tests
+type Client interface {
+	// FetchResources fetches all resources needed for generating the requested modules.
+	FetchResources(ctx context.Context, input *Input, resourcesToFetch *ResourcesToFetch) (*ResourceStore, error)
+}
+
+type DefaultClient struct {
+	HTTPClient   *http.Client
+	AtlasBaseURL string
+	UserAgent    string
+}
+
+type apiClients struct {
+	atlas *admin.APIClient
+	aws   awsClients
+	azure azureClients
+	gcp   gcpClients
+}
+
+type awsClients struct {
 	S3 *s3.Client
 	// Other AWS clients...
 }
 
-type AzureClients struct {
+type azureClients struct {
 	Graph          *msgraphsdk.GraphServiceClient
 	ResourceGroups *armresources.ResourceGroupsClient
 	// Other Azure clients...
 }
 
-type GCPClients struct {
+type gcpClients struct {
 	Storage *storage.Client
 	// Other GCP clients...
 }
 
-type Clients struct {
-	atlas *admin.APIClient
-	aws   AWSClients
-	azure AzureClients
-	gcp   GCPClients
-}
-
-func initClients(
+func (c *DefaultClient) initAPIClients(
 	ctx context.Context,
-	clientArgs *AtlasClientArgs,
 	input *Input,
 	resourcesToFetch *ResourcesToFetch,
-) (*Clients, error) {
+) (*apiClients, error) {
 	var err error
-	clients := Clients{}
+	clients := apiClients{}
 
 	if len(resourcesToFetch.Atlas) > 0 {
 		clients.atlas, err = admin.NewClient(
 			// Uncomment to see Atlas SDK debug logs when tool is run in debug mode.
 			// admin.UseDebug(log.IsDebugLevel()) //nolint:gocritic
-			admin.UseBaseURL(clientArgs.AtlasBaseURL),
-			admin.UseHTTPClient(clientArgs.HTTPClient),
-			admin.UseUserAgent(clientArgs.UserAgent),
+			admin.UseBaseURL(c.AtlasBaseURL),
+			admin.UseHTTPClient(c.HTTPClient),
+			admin.UseUserAgent(c.UserAgent),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create atlas client: %w", err)
@@ -125,15 +146,12 @@ func initClients(
 	return &clients, nil
 }
 
-// FetchResources fetches all resources needed for generating the requested modules and populates them in resourceStore.
-// Note: For testing, mock this whole function. No network calls are made outside of this function.
-func FetchResources(
+func (c *DefaultClient) FetchResources(
 	ctx context.Context,
-	clientArgs *AtlasClientArgs,
 	input *Input,
 	resourcesToFetch *ResourcesToFetch,
 ) (*ResourceStore, error) {
-	clients, err := initClients(ctx, clientArgs, input, resourcesToFetch)
+	clients, err := c.initAPIClients(ctx, input, resourcesToFetch)
 	if err != nil {
 		return nil, err
 	}
@@ -276,11 +294,15 @@ func FetchResources(
 		switch resourceType {
 		case AzureResourceTypeADGroup:
 			logger.Infof("Reading active directory group `%s` from Azure...\n", input.MultiSDK.AzureADGroupID)
-			group, err := clients.azure.Graph.Groups().ByGroupId(input.MultiSDK.AzureADGroupID).Get(ctx, nil)
+			groupable, err := clients.azure.Graph.Groups().ByGroupId(input.MultiSDK.AzureADGroupID).Get(ctx, nil)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"error reading active directory group `%s` from Azure: %w", input.MultiSDK.AzureADGroupID, err,
 				)
+			}
+			group, ok := groupable.(*graphmodels.Group)
+			if !ok {
+				return nil, fmt.Errorf("unexpected type for Azure AD group: %T", groupable)
 			}
 			resourceStore.Azure.ADGroup = group
 		case AzureResourceTypeResourceGroup:

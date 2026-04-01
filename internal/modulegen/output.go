@@ -51,7 +51,7 @@ func RenderModuleBlocks(moduleBlocks []*ModuleBlock) []byte {
 		if moduleBlock.Version != nil {
 			blockBody.SetAttributeValue("version", versionValue(*moduleBlock.Version))
 		}
-		body.AppendNewline()
+		blockBody.AppendNewline()
 		for _, attr := range moduleBlock.Attributes {
 			appendAttr(blockBody, &attr)
 		}

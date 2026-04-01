@@ -1,0 +1,116 @@
+-- IMPORT_GUIDE.md --
+# Import Guide
+
+The following files were generated:
+- `variables.tf`: variable declarations
+- `terraform.tfvars`: pre-populated variable values
+- `project.tf`: import and module blocks for the `project` module
+
+## Next Steps
+
+1. Run `terraform init`
+2. Ensure your MongoDB Atlas credentials are set up:
+```bash
+# Through environment variables
+export MONGODB_ATLAS_CLIENT_ID="<ATLAS_CLIENT_ID>"
+export MONGODB_ATLAS_CLIENT_SECRET="<ATLAS_CLIENT_SECRET>"
+
+# Or setting the values in the generated `./terraform.tfvars`
+atlas_client_id     = "<ATLAS_CLIENT_ID>"
+atlas_client_secret = "<ATLAS_CLIENT_SECRET>"
+```
+3. Run `terraform plan -var-file=./terraform.tfvars` and review the output. Expected diffs are listed below.
+4. Run `terraform apply -var-file=./terraform.tfvars` to import the resources.
+5. Remove import blocks (optional).
+
+## Expected Diffs
+
+<!-- TODO: Expected diffs will be populated here once modules emit ExpectedDiff entries. -->
+-- project.tf --
+import {
+  id = "a1b2c3d4e5f6a1b2c3d4e5f6"
+  to = module.atlas_project.mongodbatlas_project.this
+}
+
+import {
+  for_each = toset(["203.0.113.12/32", "1.2.3.0/24"])
+  id       = "a1b2c3d4e5f6a1b2c3d4e5f6-${each.value}"
+  to       = module.atlas_project.module.ip_access_list[0].mongodbatlas_project_ip_access_list.this[each.value]
+}
+
+import {
+  id = "a1b2c3d4e5f6a1b2c3d4e5f6"
+  to = module.atlas_project.module.maintenance_window[0].mongodbatlas_maintenance_window.this
+}
+
+module "atlas_project" {
+  source  = "terraform-mongodbatlas-modules/project/mongodbatlas"
+  version = "~> 0.1"
+
+  name   = "test-project-0"
+  org_id = var.org_id
+  # You can remove any of the following settings without any secondary effects.
+  # Their current value will remain unchanged in Atlas.
+  project_settings = {
+    is_schema_advisor_enabled             = true
+    is_collect_database_specifics_enabled = false
+    is_data_explorer_enabled              = false
+    is_performance_advisor_enabled        = true
+    is_realtime_performance_panel_enabled = false
+    is_extended_storage_sizes_enabled     = true
+  }
+  tags = {
+    test-tag = "works"
+  }
+  ip_access_list = [
+    {
+      source  = "203.0.113.12/32"
+      comment = "Created as part of the Auto Setup process"
+    },
+    {
+      source  = "1.2.3.0/24"
+      comment = "Test entry"
+    }
+  ]
+  maintenance_window = {
+    enabled     = true
+    day_of_week = 4
+    hour_of_day = 11
+  }
+}
+-- terraform.tfvars --
+atlas_client_id     = ""
+atlas_client_secret = ""
+org_id              = "b2c3d4e5f6a1b2c3d4e5f6a1"
+-- variables.tf --
+variable "atlas_client_id" {
+  type        = string
+  description = "Atlas Service Account Client ID"
+  default     = ""
+}
+
+variable "atlas_client_secret" {
+  type        = string
+  description = "Atlas Service Account Client Secret"
+  default     = ""
+}
+
+variable "org_id" {
+  type        = string
+  description = "Atlas Organization ID"
+}
+-- versions.tf --
+terraform {
+  required_version = ">= 1.9"
+  required_providers {
+    mongodbatlas = {
+      source  = "mongodb/mongodbatlas"
+      version = "~> 2.1"
+    }
+  }
+}
+
+provider "mongodbatlas" {
+  client_id     = var.atlas_client_id
+  client_secret = var.atlas_client_secret
+}
