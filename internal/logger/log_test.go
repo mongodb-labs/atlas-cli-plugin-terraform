@@ -156,29 +156,25 @@ func TestPackage(t *testing.T) {
 			buf := new(bytes.Buffer)
 			logger.SetWriter(buf)
 			logger.SetLevel(testCase.level)
-			var err error
 			switch testCase.f {
 			case debugF:
-				_, err = logger.Debug(testCase.input...)
+				logger.Debug(testCase.input...)
 			case debuglnF:
-				_, err = logger.Debugln(testCase.input...)
+				logger.Debugln(testCase.input...)
 			case debugfF:
-				_, err = logger.Debugf(testCase.input[0].(string), testCase.input[1:]...)
+				logger.Debugf(testCase.input[0].(string), testCase.input[1:]...)
 			case warningF:
-				_, err = logger.Warning(testCase.input...)
+				logger.Warning(testCase.input...)
 			case warninglnF:
-				_, err = logger.Warningln(testCase.input...)
+				logger.Warningln(testCase.input...)
 			case warningfF:
-				_, err = logger.Warningf(testCase.input[0].(string), testCase.input[1:]...)
+				logger.Warningf(testCase.input[0].(string), testCase.input[1:]...)
 			case infoF:
-				_, err = logger.Info(testCase.input...)
+				logger.Info(testCase.input...)
 			case infolnF:
-				_, err = logger.Infoln(testCase.input...)
+				logger.Infoln(testCase.input...)
 			case infofF:
-				_, err = logger.Infof(testCase.input[0].(string), testCase.input[1:]...)
-			}
-			if err != nil {
-				t.Fatal(err)
+				logger.Infof(testCase.input[0].(string), testCase.input[1:]...)
 			}
 			got := buf.String()
 			if got != testCase.expected {

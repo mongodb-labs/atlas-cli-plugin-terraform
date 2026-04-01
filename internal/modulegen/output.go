@@ -48,8 +48,10 @@ func RenderModuleBlocks(moduleBlocks []*ModuleBlock) []byte {
 		}
 		blockBody := body.AppendNewBlock("module", []string{moduleBlock.Name}).Body()
 		blockBody.SetAttributeValue("source", cty.StringVal(moduleBlock.Source))
-		blockBody.SetAttributeValue("version", versionValue(moduleBlock.Version))
-		body.AppendNewline()
+		if moduleBlock.Version != nil {
+			blockBody.SetAttributeValue("version", versionValue(*moduleBlock.Version))
+		}
+		blockBody.AppendNewline()
 		for _, attr := range moduleBlock.Attributes {
 			appendAttr(blockBody, &attr)
 		}
@@ -146,22 +148,28 @@ func appendAttr(body *hclwrite.Body, attr *Attribute) {
 	if attr.Comment != nil {
 		body.AppendUnstructuredTokens(hclhelper.TokensComment(*attr.Comment))
 	}
+	val := &attr.Value
 	switch {
-	case attr.Value.Literal != nil:
-		body.SetAttributeValue(attr.Name, *attr.Value.Literal)
-	case attr.Value.Variable != nil:
+	case val.Literal != nil:
+		body.SetAttributeValue(attr.Name, *val.Literal)
+	case val.Variable != nil:
 		body.SetAttributeTraversal(attr.Name, hcl.Traversal{
 			hcl.TraverseRoot{Name: "var"},
-			hcl.TraverseAttr{Name: attr.Value.Variable.Name},
+			hcl.TraverseAttr{Name: val.Variable.Name},
 		})
-	case len(attr.Value.Object) > 0:
-		body.SetAttributeRaw(attr.Name, hclhelper.TokensObject(renderObjectBody(attr.Value.Object)))
-	case len(attr.Value.ObjectList) > 0:
-		bodies := make([]*hclwrite.Body, len(attr.Value.ObjectList))
-		for i, item := range attr.Value.ObjectList {
+	case val.Object != nil:
+		body.SetAttributeRaw(attr.Name, hclhelper.TokensObject(renderObjectBody(val.Object)))
+	case val.ObjectList != nil:
+		bodies := make([]*hclwrite.Body, len(val.ObjectList))
+		for i, item := range val.ObjectList {
 			bodies[i] = renderObjectBody(item)
 		}
 		body.SetAttributeRaw(attr.Name, hclhelper.TokensArray(bodies))
+	case val.Block != nil:
+		blockBody := body.AppendNewBlock(attr.Name, nil).Body()
+		for _, child := range val.Block {
+			appendAttr(blockBody, &child)
+		}
 	}
 }
 

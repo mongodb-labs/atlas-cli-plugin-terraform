@@ -1,0 +1,114 @@
+{
+  "Azure": {},
+  "AWS": {},
+  "GCP": {},
+  "Atlas": {
+    "Project": {
+      "clusterCount": 0,
+      "created": "2025-09-17T12:34:51Z",
+      "id": "a1b2c3d4e5f6a1b2c3d4e5f6",
+      "links": [
+        {
+          "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6",
+          "rel": "self"
+        },
+        {
+          "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/containers",
+          "rel": "https://cloud.mongodb.com/containers"
+        },
+        {
+          "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/clusters",
+          "rel": "https://cloud.mongodb.com/clusters"
+        },
+        {
+          "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/databaseUsers",
+          "rel": "https://cloud.mongodb.com/databaseUsers"
+        },
+        {
+          "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/peers",
+          "rel": "https://cloud.mongodb.com/peers"
+        },
+        {
+          "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/processes",
+          "rel": "https://cloud.mongodb.com/processes"
+        },
+        {
+          "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/whitelist",
+          "rel": "https://cloud.mongodb.com/whitelist"
+        }
+      ],
+      "name": "test-project-0",
+      "orgId": "b2c3d4e5f6a1b2c3d4e5f6a1",
+      "tags": [
+        {
+          "key": "test-tag",
+          "value": "works"
+        }
+      ],
+      "withDefaultAlertsSettings": true
+    },
+    "ProjectSettings": {
+      "isCollectDatabaseSpecificsStatisticsEnabled": false,
+      "isDataExplorerEnabled": false,
+      "isDataExplorerGenAIFeaturesEnabled": false,
+      "isDataExplorerGenAISampleDocumentPassingEnabled": false,
+      "isExtendedStorageSizesEnabled": true,
+      "isPerformanceAdvisorEnabled": true,
+      "isRealtimePerformancePanelEnabled": false,
+      "isSchemaAdvisorEnabled": true
+    },
+    "ProjectIPAccessList": {
+      "links": [
+        {
+          "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/accessList?includeCount=true\u0026pageNum=1\u0026itemsPerPage=100",
+          "rel": "self"
+        }
+      ],
+      "results": [
+        {
+          "cidrBlock": "203.0.113.12/32",
+          "comment": "Created as part of the Auto Setup process",
+          "groupId": "a1b2c3d4e5f6a1b2c3d4e5f6",
+          "ipAddress": "203.0.113.12",
+          "links": [
+            {
+              "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/accessList/203.0.113.12%2F32",
+              "rel": "self"
+            }
+          ]
+        },
+        {
+          "cidrBlock": "2.3.4.1/24",
+          "comment": "",
+          "groupId": "a1b2c3d4e5f6a1b2c3d4e5f6",
+          "links": [
+            {
+              "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/accessList/2.3.4.1%2F24",
+              "rel": "self"
+            }
+          ]
+        },
+        {
+          "cidrBlock": "1.2.3.0/24",
+          "comment": "Test entry",
+          "groupId": "a1b2c3d4e5f6a1b2c3d4e5f6",
+          "links": [
+            {
+              "href": "https://cloud.mongodb.com/api/atlas/v2/groups/a1b2c3d4e5f6a1b2c3d4e5f6/accessList/1.2.3.0%2F24",
+              "rel": "self"
+            }
+          ]
+        }
+      ],
+      "totalCount": 3
+    },
+    "ProjectMaintenanceWindow": {
+      "autoDeferOnceEnabled": false,
+      "dayOfWeek": 4,
+      "hourOfDay": 11,
+      "numberOfDeferrals": 0,
+      "startASAP": false,
+      "timeZoneId": "UTC"
+    }
+  }
+}

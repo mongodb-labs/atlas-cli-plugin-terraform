@@ -11,20 +11,19 @@ func (g ClustersGenerator) ModuleType() ModuleType {
 }
 
 func (g ClustersGenerator) CheckInput(input *Input) []string {
-	var fields []string
-	if input.ProjectID == "" {
-		fields = append(fields, "project_id")
-	}
+	invalidFields := CheckRequiredInputStr([]RequiredStr{
+		{input.ProjectID, "project_id"},
+	})
 	if len(input.ClusterNames) == 0 {
-		fields = append(fields, "cluster_names")
+		invalidFields = append(invalidFields, "cluster_names")
 	}
-	return fields
+	return invalidFields
 }
 
-func (g ClustersGenerator) GetResourcesToFetch(input *Input, resourcesToFetch map[ResourceType]bool) {
+func (g ClustersGenerator) GetResourcesToFetch(_ *Input, resources *ResourcesToFetch) {
 	// TODO@remove: no need to fetch the project for the cluster module. Just testing.
-	resourcesToFetch[ResourceTypeProject] = true
-	resourcesToFetch[ResourceTypeClusters] = true
+	resources.Atlas[AtlasResourceTypeProject] = true
+	resources.Atlas[AtlasResourceTypeClusters] = true
 }
 
 func (g ClustersGenerator) Generate(input *Input, store *ResourceStore) (*GenerateModuleResult, error) {

@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,25 +14,19 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mongodb-labs/atlas-cli-plugin-terraform/internal/logger"
 	"github.com/zclconf/go-cty/cty"
-	"go.mongodb.org/atlas-sdk/v20250312014/admin"
 )
 
-type AtlasClientArgs struct {
-	HTTPClient   *http.Client
-	AtlasBaseURL string
-	UserAgent    string
-}
-
 type GenArgs struct {
-	InputPath  string
-	OutputPath string
+	InputPath    string
+	OutputPath   string
+	AtlasBaseURL string
 }
 
-func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error {
-	_, _ = logger.Debugln("[modulegen] Run")
+func Run(ctx context.Context, args *GenArgs, client Client) error {
+	logger.Debugln("[modulegen] Run")
 
 	// == Parse input ==
-	_, _ = logger.Infof("Reading input from %s...\n", args.InputPath)
+	logger.Infof("Reading input from %s...\n", args.InputPath)
 	var input Input
 	if err := parseInput(args.InputPath, &input); err != nil {
 		return err
@@ -61,9 +54,9 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		}
 	}
 	if len(invalidFieldsPerModule) > 0 {
-		_, _ = logger.Warningln("invalid input:")
+		logger.Warningln("invalid input:")
 		for field, moduleNames := range invalidFieldsPerModule {
-			_, _ = logger.Warningf("\t[%s] `%s` missing or invalid\n", strings.Join(moduleNames, ", "), field)
+			logger.Warningf("\t[%s] `%s` missing or invalid\n", strings.Join(moduleNames, ", "), field)
 		}
 		return errors.New("invalid input")
 	}
@@ -72,7 +65,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 	// It is currently safe to assume that there is only one resource of each type (except clusters), so gathering
 	// the resource type is enough in this step. If this assumption is no longer true, we can collect resource type &
 	// id instead.
-	resourcesToFetch := map[ResourceType]bool{}
+	resourcesToFetch := NewResourcesToFetch()
 	for _, generator := range generators {
 		generator.GetResourcesToFetch(&input, resourcesToFetch)
 	}
@@ -80,7 +73,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 	// == Fetch resources ==
 	// Fetch all resources needed for generating the requested modules.
 	// No network calls are made outside of this step.
-	resourceStore, err := fetchResources(ctx, clientArgs, &input, resourcesToFetch)
+	resourceStore, err := client.FetchResources(ctx, &input, resourcesToFetch)
 	if err != nil {
 		return err
 	}
@@ -93,14 +86,13 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 			return fmt.Errorf("failed to generate module %s: %w", string(generator.ModuleType()), err)
 		}
 	}
-	generatedVersions := generateVersions(generatedModules)
+	generatedVersions := generateVersions(args.AtlasBaseURL, &input, generatedModules)
 
 	// == Render and write output files ==
-	_, _ = logger.Infoln("Generating output...")
+	logger.Infoln("Generating output...")
 
-	// read/write/execute for owner. read/execute for group and others.
-	const fileDirPermissions = 0o755
-	if err = os.MkdirAll(args.OutputPath, fileDirPermissions); err != nil {
+	const dirPermissions, filePermissions = 0o700, 0o600 // owner: read/write/execute for dir, read/write for file.
+	if err = os.MkdirAll(args.OutputPath, dirPermissions); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %w", args.OutputPath, err)
 	}
 
@@ -113,7 +105,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		buffer.Write(RenderModuleBlocks(generatedModule.ModuleBlocks))
 
 		filePath := filepath.Join(args.OutputPath, string(generatedModule.ModuleType)+".tf")
-		if err := os.WriteFile(filePath, buffer.Bytes(), fileDirPermissions); err != nil {
+		if err := os.WriteFile(filePath, buffer.Bytes(), filePermissions); err != nil {
 			return fmt.Errorf("failed to write to file %s: %w", filePath, err)
 		}
 	}
@@ -122,7 +114,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		// Render and write
 		filePath := filepath.Join(args.OutputPath, "versions.tf")
 		rendered := RenderVersionsAndProviders(generatedVersions.TFVersion, generatedVersions.Blocks)
-		if err := os.WriteFile(filePath, rendered, fileDirPermissions); err != nil {
+		if err := os.WriteFile(filePath, rendered, filePermissions); err != nil {
 			return fmt.Errorf("failed to write to file %s: %w", filePath, err)
 		}
 	}
@@ -136,7 +128,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 
 		for _, variable := range generatedVersions.Variables {
 			if _, ok := variableNameSet[variable.Name]; ok {
-				_, _ = logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
+				logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
 				continue
 			}
 			variableNameSet[variable.Name] = true
@@ -146,7 +138,7 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 		for _, generatedModule := range generatedModules {
 			for _, variable := range generatedModule.Variables {
 				if _, ok := variableNameSet[variable.Name]; ok {
-					_, _ = logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
+					logger.Debugf("[modulegen] Deduplicated variable: %s\n", variable.Name)
 					continue
 				}
 				variableNameSet[variable.Name] = true
@@ -159,12 +151,12 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 			rendered := RenderVariables(variables)
 
 			variablesPath := filepath.Join(args.OutputPath, "variables.tf")
-			if err := os.WriteFile(variablesPath, rendered.Blocks, fileDirPermissions); err != nil {
+			if err := os.WriteFile(variablesPath, rendered.Blocks, filePermissions); err != nil {
 				return fmt.Errorf("failed to write to file %s: %w", variablesPath, err)
 			}
 
 			tfvarsPath := filepath.Join(args.OutputPath, "terraform.tfvars")
-			if err := os.WriteFile(tfvarsPath, rendered.Definitions, fileDirPermissions); err != nil {
+			if err := os.WriteFile(tfvarsPath, rendered.Definitions, filePermissions); err != nil {
 				return fmt.Errorf("failed to write to file %s: %w", tfvarsPath, err)
 			}
 		}
@@ -176,13 +168,13 @@ func Run(ctx context.Context, args *GenArgs, clientArgs *AtlasClientArgs) error 
 			guideData.ModuleTypes = append(guideData.ModuleTypes, m.ModuleType)
 		}
 		filePath := filepath.Join(args.OutputPath, "IMPORT_GUIDE.md")
-		if err := os.WriteFile(filePath, RenderImportGuide(guideData), fileDirPermissions); err != nil {
+		if err := os.WriteFile(filePath, RenderImportGuide(guideData), filePermissions); err != nil {
 			return fmt.Errorf("failed to write to file %s: %w", filePath, err)
 		}
 	}
 
-	_, _ = logger.Infof("Done! Output written to: %s\n", args.OutputPath)
-	_, _ = logger.Infoln("See the IMPORT_GUIDE.md for next steps.")
+	logger.Infof("Done! Output written to: %s\n", args.OutputPath)
+	logger.Infoln("See the IMPORT_GUIDE.md for next steps.")
 
 	return nil
 }
@@ -205,114 +197,9 @@ func parseInput(inputPath string, input *Input) error {
 	return nil
 }
 
-type Clients struct {
-	atlasClient *admin.APIClient
-	// awsClient, gcpClient, azureClient
-}
-
-func initClients(clientArgs *AtlasClientArgs, resourcesToFetch map[ResourceType]bool) (Clients, error) {
-	var err error
-	clients := Clients{}
-
-	// Note: Assuming that we always need the Atlas client
-	clients.atlasClient, err = admin.NewClient(
-		// Uncomment to see Atlas SDK debug logs when tool is run in debug mode.
-		// admin.UseDebug(log.IsDebugLevel()) //nolint:gocritic
-		admin.UseBaseURL(clientArgs.AtlasBaseURL),
-		admin.UseHTTPClient(clientArgs.HTTPClient),
-		admin.UseUserAgent(clientArgs.UserAgent),
-	)
-	if err != nil {
-		return clients, fmt.Errorf("failed to create atlas client: %w", err)
-	}
-
-	// TODO: Initialize other clients based on the resources to fetch
-
-	return clients, nil
-}
-
-// fetchResources fetches all resources needed for generating the requested modules and populates them in resourceStore.
-// Note: For testing, mock this whole function. No network calls are made outside of this function.
-func fetchResources(
-	ctx context.Context,
-	clientArgs *AtlasClientArgs,
-	input *Input,
-	resourcesToFetch map[ResourceType]bool,
-) (*ResourceStore, error) {
-	clients, err := initClients(clientArgs, resourcesToFetch)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Parallelize
-	// TODO: Parallelize
-	// TODO: Parallelize
-	resourceStore := ResourceStore{}
-	for resourceType := range resourcesToFetch {
-		switch resourceType {
-		case ResourceTypeOrganization:
-			_, _ = logger.Infof("Reading organization `%s` from MongoDB Atlas...\n", input.OrgID)
-			org, _, err := clients.atlasClient.OrganizationsApi.GetOrg(ctx, input.OrgID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading organization `%s` from MongoDB Atlas: %w", input.OrgID, err)
-			}
-			resourceStore.Organization = org
-		case ResourceTypeProject:
-			_, _ = logger.Infof("Reading project `%s` from MongoDB Atlas...\n", input.ProjectID)
-			project, _, err := clients.atlasClient.ProjectsApi.GetGroup(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading project `%s` from MongoDB Atlas: %w", input.ProjectID, err)
-			}
-			resourceStore.Project = project
-		/* TODO@non-spike: See project_generator.go
-		case ResourceTypeProjectLimits:
-			_, _ = logger.Infof("Reading project limits for `%s` from MongoDB Atlas...\n", input.ProjectID)
-			projectLimits, _, err := clients.atlasClient.ProjectsApi.ListGroupLimits(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading project limits for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
-			}
-			resourceStore.ProjectLimits = projectLimits
-		*/
-		case ResourceTypeProjectSettings:
-			_, _ = logger.Infof("Reading project settings for `%s` from MongoDB Atlas...\n", input.ProjectID)
-			ps, _, err := clients.atlasClient.ProjectsApi.GetGroupSettings(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading project settings for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
-			}
-			resourceStore.ProjectSettings = ps
-		case ResourceTypeProjectIPAccessList:
-			_, _ = logger.Infof("Reading project IP access list for `%s` from MongoDB Atlas...\n", input.ProjectID)
-			list, _, err := clients.atlasClient.ProjectIPAccessListApi.ListAccessListEntries(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("error reading project IP access list for `%s` from MongoDB Atlas: %w", input.ProjectID, err)
-			}
-			resourceStore.ProjectIPAccessList = list
-		case ResourceTypeProjectMaintenanceWindow:
-			_, _ = logger.Infof("Reading project maintenance window for `%s` from MongoDB Atlas...\n", input.ProjectID)
-			mw, _, err := clients.atlasClient.MaintenanceWindowsApi.GetMaintenanceWindow(ctx, input.ProjectID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf(
-					"error reading project maintenance window for `%s` from MongoDB Atlas: %w", input.ProjectID, err,
-				)
-			}
-			resourceStore.ProjectMaintenanceWindow = mw
-		case ResourceTypeClusters:
-			_, _ = logger.Infof("Reading clusters [`%s`] from MongoDB Atlas...\n", strings.Join(input.ClusterNames, "`, `"))
-			clusters := make([]*admin.ClusterDescription20240805, len(input.ClusterNames))
-			for i, clusterName := range input.ClusterNames {
-				cluster, _, err := clients.atlasClient.ClustersApi.GetCluster(ctx, input.ProjectID, clusterName).Execute()
-				if err != nil {
-					return nil, fmt.Errorf("error reading cluster `%s` from MongoDB Atlas: %w", clusterName, err)
-				}
-				clusters[i] = cluster
-			}
-			resourceStore.Clusters = clusters
-		}
-	}
-	return &resourceStore, nil
-}
-
-func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersionsResult {
+func generateVersions(
+	atlasBaseURL string, input *Input, generatedModules []*GenerateModuleResult,
+) GenerateVersionsResult {
 	// Highest required terraform version
 	var tfVersion Version
 	// Collect all provider requirements and deduplicate by type, taking the one with the highest required version.
@@ -323,30 +210,35 @@ func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersions
 	for _, generatedModule := range generatedModules {
 		for _, provider := range generatedModule.Providers {
 			if existing, ok := providerMap[provider.ProviderType]; ok {
-				pMajor, pMinor := provider.Version.Major, provider.Version.Minor
-				eMajor, eMinor := existing.Version.Major, existing.Version.Minor
-				if pMajor > eMajor || (pMajor == eMajor && pMinor > eMinor) {
+				if provider.Version.GreaterThan(existing.Version) {
 					*existing = provider
 				}
-				_, _ = logger.Debugf("[modulegen] Deduplicated provider: %s %s\n", provider.ProviderType, existing.Version)
+				logger.Debugf("[modulegen] Deduplicated provider: %s %s\n", provider.ProviderType, existing.Version)
 			} else {
 				providers = append(providers, provider)
 				providerMap[provider.ProviderType] = &providers[len(providers)-1]
 			}
 		}
 
-		tfMajor, tfMinor := generatedModule.TerraformVersion.Major, generatedModule.TerraformVersion.Minor
-		if tfMajor > tfVersion.Major || (tfMajor == tfVersion.Major && tfMinor > tfVersion.Minor) {
+		if generatedModule.TerraformVersion.GreaterThan(tfVersion) {
 			tfVersion = generatedModule.TerraformVersion
-			_, _ = logger.Debugf("[modulegen] Required Terraform version updated to: %s\n", tfVersion)
+			logger.Debugf("[modulegen] Required Terraform version updated to: %s\n", tfVersion)
 		}
 	}
 
 	var blocks []*ProviderInfo
 	var variables []*Variable
 	for _, p := range providers {
-		switch p.ProviderType { //nolint:gocritic
+		switch p.ProviderType {
 		case ProviderTypeAtlas:
+			var attributes []Attribute
+			if atlasBaseURL != CloudServiceURL {
+				if atlasBaseURL == CloudGovServiceURL {
+					attributes = append(attributes, BoolAttr("is_mongodbgov_cloud", true))
+				} else {
+					attributes = append(attributes, StringAttr("base_url", atlasBaseURL))
+				}
+			}
 			clientID := &Variable{
 				Name:         "atlas_client_id",
 				Description:  "Atlas Service Account Client ID",
@@ -362,13 +254,58 @@ func generateVersions(generatedModules []*GenerateModuleResult) GenerateVersions
 				DefaultValue: new(cty.StringVal("")),
 			}
 			variables = append(variables, clientID, clientSecret)
+			attributes = append(attributes, VarAttr("client_id", clientID), VarAttr("client_secret", clientSecret))
 			blocks = append(blocks, &ProviderInfo{
-				Name:    "mongodbatlas",
-				Source:  "mongodb/mongodbatlas",
+				Name:       "mongodbatlas",
+				Source:     "mongodb/mongodbatlas",
+				Version:    p.Version,
+				Attributes: attributes,
+			})
+		case ProviderTypeAWS:
+			blocks = append(blocks, &ProviderInfo{
+				Name:       "aws",
+				Source:     "hashicorp/aws",
+				Version:    p.Version,
+				Attributes: []Attribute{StringAttr("region", input.MultiSDK.AWSRegion)},
+			})
+		case ProviderTypeAzureRM:
+			subscriptionID := &Variable{
+				Name:        "azure_subscription_id",
+				Description: "Azure subscription ID",
+				Type:        cty.String,
+				Value:       cty.StringVal(input.MultiSDK.AzureSubscriptionID),
+			}
+			variables = append(variables, subscriptionID)
+			blocks = append(blocks, &ProviderInfo{
+				Name:    "azurerm",
+				Source:  "hashicorp/azurerm",
 				Version: p.Version,
 				Attributes: []Attribute{
-					{Name: "client_id", Value: AttributeValue{Variable: clientID}},
-					{Name: "client_secret", Value: AttributeValue{Variable: clientSecret}},
+					VarAttr("subscription_id", subscriptionID),
+					BlockAttr("features", nil),
+				},
+			})
+		case ProviderTypeAzureAD:
+			blocks = append(blocks, &ProviderInfo{
+				Name:    "azuread",
+				Source:  "hashicorp/azuread",
+				Version: p.Version,
+			})
+		case ProviderTypeGoogle:
+			projectID := &Variable{
+				Name:        "gcp_project_id",
+				Description: "GCP project ID",
+				Type:        cty.String,
+				Value:       cty.StringVal(input.MultiSDK.GCPProjectID),
+			}
+			variables = append(variables, projectID)
+			blocks = append(blocks, &ProviderInfo{
+				Name:    "google",
+				Source:  "hashicorp/google",
+				Version: p.Version,
+				Attributes: []Attribute{
+					VarAttr("project", projectID),
+					StringAttr("region", input.MultiSDK.GCPRegion),
 				},
 			})
 		}
