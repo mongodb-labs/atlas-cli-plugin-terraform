@@ -52,7 +52,7 @@ jobs:
           VERSION: ${{ inputs.version_number }}
         run: make generate-all-manifests
       - name: Log in to MongoDB Docker registry
-        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ${{ secrets.ARTIFACTORY_REGISTRY }}
           username: ${{ secrets.ARTIFACTORY_USER }}
